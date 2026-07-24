@@ -3,7 +3,7 @@ services:
     name: sisgersa
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn main:app --workers 4
+    startCommand: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker
     envVars:
       - key: DB_ENGINE
         value: postgresql
