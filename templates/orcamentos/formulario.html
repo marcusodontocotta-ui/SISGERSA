@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block titulo %}Novo Orcamento{% endblock %}
+{% block conteudo %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-file-earmark-text"></i> Novo Orcamento</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/orcamentos/criar">
+                    {% if estabelecimento_id %}
+                    <input type="hidden" name="estabelecimento_id" value="{{ estabelecimento_id }}">
+                    {% endif %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Paciente *</label>
+                            <select class="form-select" name="paciente_id" id="selectPaciente" required>
+                                <option value="">Selecione...</option>
+                                {% for p in pacientes %}
+                                <option value="{{ p.id }}">{{ p.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Profissional *</label>
+                            <select class="form-select" name="profissional_id" required>
+                                <option value="">Selecione...</option>
+                                {% for p in profissionais %}
+                                <option value="{{ p.id }}">{{ p.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Convenio</label>
+                            <select class="form-select" name="convenio_id" id="selectConvenio">
+                                <option value="">Particular</option>
+                                {% for c in convenios %}
+                                <option value="{{ c.id }}">{{ c.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Validade</label>
+                            <input type="date" class="form-control" name="data_validade">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observacoes</label>
+                        <textarea class="form-control" name="observacoes" rows="2"></textarea>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="/orcamentos" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Voltar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Criar e Adicionar Itens
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

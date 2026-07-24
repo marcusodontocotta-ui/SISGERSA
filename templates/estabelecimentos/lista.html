@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block titulo %}Estabelecimentos{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-building"></i> Estabelecimentos</h2>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoEstab">
+        <i class="bi bi-plus-circle"></i> Novo Estabelecimento
+    </button>
+</div>
+
+<div class="row g-4">
+    {% for e in estabelecimentos %}
+    <div class="col-md-4">
+        <div class="card h-100">
+            {% if e.logo_url %}
+            <img src="{{ e.logo_url }}" class="card-img-top" alt="Logo" style="height:160px; object-fit:cover;">
+            {% else %}
+            <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height:160px;">
+                <i class="bi bi-building text-muted" style="font-size:3rem;"></i>
+            </div>
+            {% endif %}
+            <div class="card-body">
+                <h5 class="card-title">
+                    {{ e.nome }}
+                </h5>
+                <p class="badge bg-secondary">{{ e.tipo }}</p>
+                <p class="text-muted small">{{ e.endereco or 'Sem endereco' }}</p>
+                <p class="small"><i class="bi bi-telephone"></i> {{ e.telefone or '-' }}</p>
+                <p class="small"><i class="bi bi-envelope"></i> {{ e.email or '-' }}</p>
+            </div>
+            <div class="card-footer d-flex gap-2">
+                <a href="/estabelecimentos/{{ e.id }}/editar" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-pencil"></i> Editar
+                </a>
+                <form method="POST" action="/estabelecimentos/{{ e.id }}/desativar"
+                      onsubmit="return confirm('Desativar este estabelecimento?')">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-trash"></i> Desativar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="modal fade" id="modalNovoEstab" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Novo Estabelecimento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/estabelecimentos/criar" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" name="logo_url" id="estab-logo-url">
+                    <div class="text-center mb-3">
+                        <div id="estab-logo-preview" class="d-inline-flex align-items-center justify-content-center bg-light rounded" style="width:120px;height:120px;border:2px dashed #ccc;cursor:pointer;" onclick="document.getElementById('estab-logo-input').click()">
+                            <i class="bi bi-image text-muted" style="font-size:2rem;"></i>
+                        </div>
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="document.getElementById('estab-logo-input').click()">
+                                <i class="bi bi-upload"></i> Escolher Logo
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="abrirCamera('estab')">
+                                <i class="bi bi-camera"></i> Tirar Foto
+                            </button>
+                            <input type="file" id="estab-logo-input" accept="image/*" class="d-none" onchange="previewImagem(this, 'estab-logo-preview', 'estab-logo-url')">
+                            <input type="file" id="estab-camera-input" accept="image/*" capture="environment" class="d-none" onchange="previewImagem(this, 'estab-logo-preview', 'estab-logo-url')">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nome</label>
+                        <input type="text" class="form-control" name="nome" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo</label>
+                        <select class="form-select" name="tipo">
+                            <option value="consultorio">Consultorio</option>
+                            <option value="clinica" selected>Clinica</option>
+                            <option value="hospital">Hospital</option>
+                            <option value="laboratorio">Laboratorio</option>
+                            <option value="outro">Outro</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">CNPJ</label>
+                        <input type="text" class="form-control" name="cnpj">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Telefone</label>
+                        <input type="text" class="form-control" name="telefone">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" name="email">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Endereco</label>
+                        <textarea class="form-control" name="endereco" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Criar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

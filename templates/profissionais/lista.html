@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block titulo %}Profissionais - SISGERSA{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-person-badge"></i> Profissionais</h2>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoProf">
+        <i class="bi bi-person-plus"></i> Novo Profissional
+    </button>
+</div>
+
+{% if request.query_params.get('erro') == 'email_existente' %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle"></i> Email ja cadastrado no sistema. Utilize outro email.
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="row g-4">
+    {% for p in profissionais %}
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                {% if p.foto_url %}
+                <img src="{{ p.foto_url }}" class="rounded-circle mb-2" style="width:80px;height:80px;object-fit:cover;border:3px solid #0d6efd;">
+                {% else %}
+                <div class="rounded-circle bg-primary d-inline-flex align-items-center justify-content-center text-white mb-2" style="width:80px;height:80px;">
+                    <i class="bi bi-person" style="font-size:2rem;"></i>
+                </div>
+                {% endif %}
+                <h6 class="card-title mb-1">{{ p.nome }}</h6>
+                <small class="text-muted">{{ p.email }}</small>
+                {% if p.especialidade %}
+                <div><span class="badge bg-info mt-1">{{ p.especialidade }}</span></div>
+                {% endif %}
+                {% if p.estabelecimento_nome %}
+                <div><small class="text-muted"><i class="bi bi-building"></i> {{ p.estabelecimento_nome }}</small></div>
+                {% endif %}
+                {% if p.telefone %}
+                <div><small><i class="bi bi-telephone"></i> {{ p.telefone }}</small></div>
+                {% endif %}
+            </div>
+            <div class="card-footer d-flex justify-content-center gap-2">
+                <a href="/profissionais/{{ p.id }}/editar" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-pencil"></i> Editar
+                </a>
+                <form method="POST" action="/profissionais/{{ p.id }}/desativar"
+                      onsubmit="return confirm('Desativar este profissional?')">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if not profissionais %}
+<div class="text-center py-5 text-muted">
+    <i class="bi bi-person-badge" style="font-size:3rem;"></i>
+    <p class="mt-2">Nenhum profissional cadastrado.</p>
+</div>
+{% endif %}
+
+<div class="modal fade" id="modalNovoProf" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Novo Profissional</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/profissionais/criar" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" name="foto_url" id="prof-novo-foto-url">
+                    <div class="text-center mb-3">
+                        <div id="prof-novo-foto-preview" class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle" style="width:100px;height:100px;border:2px dashed #ccc;cursor:pointer;overflow:hidden;" onclick="document.getElementById('prof-novo-foto-input').click()">
+                            <i class="bi bi-person text-muted" style="font-size:2.5rem;"></i>
+                        </div>
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="document.getElementById('prof-novo-foto-input').click()">
+                                <i class="bi bi-upload"></i> Foto
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="abrirCamera('prof-novo')">
+                                <i class="bi bi-camera"></i> Camera
+                            </button>
+                            <input type="file" id="prof-novo-foto-input" accept="image/*" class="d-none" onchange="previewImagem(this, 'prof-novo-foto-preview', 'prof-novo-foto-url')">
+                            <input type="file" id="prof-novo-camera-input" accept="image/*" capture="user" class="d-none" onchange="previewImagem(this, 'prof-novo-foto-preview', 'prof-novo-foto-url')">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nome Completo *</label>
+                        <input type="text" class="form-control" name="nome" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email *</label>
+                        <input type="email" class="form-control" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Telefone</label>
+                        <input type="text" class="form-control" name="telefone">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Senha Temporaria *</label>
+                        <input type="password" class="form-control" name="senha" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Especialidade</label>
+                        <input type="text" class="form-control" name="especialidade" placeholder="Ex: Odontologia, Clinico Geral">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Cargo</label>
+                        <input type="text" class="form-control" name="cargo" placeholder="Ex: Dentista, Medico">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Registro Profissional</label>
+                        <input type="text" class="form-control" name="registro_profissional" placeholder="Ex: CRO 12345">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Estabelecimento</label>
+                        <select class="form-select" name="estabelecimento_id">
+                            <option value="">Nenhum</option>
+                            {% for e in estabelecimentos %}
+                            <option value="{{ e.id }}">{{ e.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Cadastrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

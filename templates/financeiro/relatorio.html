@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block titulo %}Relatorio Financeiro - SISGERSA{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-graph-up"></i> Relatorio Financeiro</h2>
+    <div class="btn-group">
+        {% set base = '/financeiro' %}
+        <a href="{{ base }}?periodo=hoje{% if paciente_id %}&paciente_id={{ paciente_id }}{% endif %}" class="btn btn-{{ 'primary' if periodo == 'hoje' else 'outline-primary' }}">Hoje</a>
+        <a href="{{ base }}?periodo=semana{% if paciente_id %}&paciente_id={{ paciente_id }}{% endif %}" class="btn btn-{{ 'primary' if periodo == 'semana' else 'outline-primary' }}">Semana</a>
+        <a href="{{ base }}?periodo=mes{% if paciente_id %}&paciente_id={{ paciente_id }}{% endif %}" class="btn btn-{{ 'primary' if periodo == 'mes' else 'outline-primary' }}">Mes</a>
+        <a href="{{ base }}?periodo=ano{% if paciente_id %}&paciente_id={{ paciente_id }}{% endif %}" class="btn btn-{{ 'primary' if periodo == 'ano' else 'outline-primary' }}">Ano</a>
+    </div>
+</div>
+
+{% if pacientes_filtro is defined and pacientes_filtro %}
+<form method="GET" class="mb-3">
+    <div class="row align-items-center g-2">
+        <div class="col-md-4">
+            <select class="form-select form-select-sm" name="paciente_id" onchange="salvarPacienteFiltro(this.value); this.form.submit()">
+                <option value="">Todos os Prontuarios</option>
+                {% for p in pacientes_filtro %}
+                <option value="{{ p.id }}" {{ 'selected' if paciente_id == p.id }}>{{ p.nome }}</option>
+                {% endfor %}
+            </select>
+            <input type="hidden" name="periodo" value="{{ periodo }}">
+        </div>
+        {% if paciente_id %}
+        <div class="col-auto">
+            <a href="/financeiro?periodo={{ periodo }}&pf=1" class="btn btn-sm btn-outline-secondary" onclick="limparPacienteFiltro()"><i class="bi bi-x-circle"></i> Limpar</a>
+        </div>
+        {% endif %}
+    </div>
+</form>
+{% endif %}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-primary">
+            <div class="card-body text-center">
+                <small class="text-muted">Total Recebido</small>
+                <h3 class="text-primary mb-0">R$ {{ "%.2f"|format(resumo.total)|replace('.',',') }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <small class="text-muted">Qtd Pagamentos</small>
+                <h3 class="text-success mb-0">{{ resumo.qtd }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-info">
+            <div class="card-body text-center">
+                <small class="text-muted">Ticket Medio</small>
+                <h3 class="text-info mb-0">
+                    {% if resumo.qtd > 0 %}R$ {{ "%.2f"|format(resumo.total / resumo.qtd)|replace('.',',') }}
+                    {% else %}R$ 0,00{% endif %}
+                </h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-credit-card"></i> Por Metodo de Pagamento</div>
+            <div class="card-body">
+                {% if por_metodo %}
+                {% for m in por_metodo %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>
+                        {% if m.metodo == 'dinheiro' %}<i class="bi bi-cash text-success"></i> Dinheiro
+                        {% elif m.metodo == 'pix' %}<i class="bi bi-qr-code text-info"></i> PIX
+                        {% elif m.metodo == 'cartao_credito' %}<i class="bi bi-credit-card text-primary"></i> Credito
+                        {% elif m.metodo == 'cartao_debito' %}<i class="bi bi-credit-card text-warning"></i> Debito
+                        {% elif m.metodo == 'transferencia' %}<i class="bi bi-bank text-secondary"></i> Transferencia
+                        {% else %}<i class="bi bi-circle"></i> {{ m.metodo|replace('_',' ')|title }}
+                        {% endif %}
+                        <span class="badge bg-secondary">{{ m.qtd }}</span>
+                    </span>
+                    <strong>R$ {{ "%.2f"|format(m.total)|replace('.',',') }}</strong>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-muted text-center">Nenhum pagamento no periodo.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-person-badge"></i> Por Profissional</div>
+            <div class="card-body">
+                {% if por_profissional %}
+                {% for p in por_profissional %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>{{ p.profissional_nome }} <span class="badge bg-secondary">{{ p.qtd }}</span></span>
+                    <strong>R$ {{ "%.2f"|format(p.total)|replace('.',',') }}</strong>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-muted text-center">Nenhum pagamento no periodo.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mb-3">
+    <div class="input-group input-group-sm" style="max-width:400px;">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" id="buscaFinanceiro" placeholder="Buscar por nome, CPF, email, telefone..." oninput="filtrarFinanceiro()">
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><i class="bi bi-list"></i> Detalhamento</div>
+    <div class="card-body p-0">
+        {% if pagamentos %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="tabelaFinanceiro">
+                <thead class="table-light">
+                    <tr>
+                        <th>Data</th>
+                        <th>Paciente</th>
+                        <th>Profissional</th>
+                        <th>Metodo</th>
+                        <th>Parcelas</th>
+                        <th class="text-end">Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in pagamentos %}
+                    <tr data-paciente="{{ p.paciente_nome|lower }}" data-cpf="{{ (p.paciente_cpf or '')|lower }}" data-email="{{ (p.paciente_email or '')|lower }}" data-telefone="{{ (p.paciente_telefone or '')|lower }}">
+                        <td>{{ p.data_pagamento.strftime('%d/%m/%Y') if p.data_pagamento else '-' }}</td>
+                        <td>{{ p.paciente_nome }}</td>
+                        <td>{{ p.profissional_nome }}</td>
+                        <td>{{ p.metodo|replace('_', ' ')|title }}</td>
+                        <td>{{ p.parcelas }}x</td>
+                        <td class="text-end fw-bold">R$ {{ "%.2f"|format(p.valor)|replace('.',',') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-dark text-white">
+                    <tr>
+                        <td colspan="5"><strong>TOTAL</strong></td>
+                        <td class="text-end"><strong>R$ {{ "%.2f"|format(resumo.total)|replace('.',',') }}</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <div id="nenhumResultadoFinanceiro" class="text-center py-4 text-muted" style="display:none;">
+            <i class="bi bi-search fs-1"></i>
+            <p class="mt-2">Nenhum pagamento encontrado para esta busca.</p>
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+            <i class="bi bi-inbox" style="font-size:2rem;"></i>
+            <p class="mt-2">Nenhum pagamento encontrado no periodo.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function filtrarFinanceiro() {
+    var termo = document.getElementById('buscaFinanceiro').value.toLowerCase();
+    var linhas = document.querySelectorAll('#tabelaFinanceiro tbody tr');
+    var visiveis = 0;
+    linhas.forEach(function(linha) {
+        var paciente = linha.getAttribute('data-paciente') || '';
+        var cpf = linha.getAttribute('data-cpf') || '';
+        var email = linha.getAttribute('data-email') || '';
+        var telefone = linha.getAttribute('data-telefone') || '';
+        if (paciente.indexOf(termo) !== -1 || cpf.indexOf(termo) !== -1 || email.indexOf(termo) !== -1 || telefone.indexOf(termo) !== -1) {
+            linha.style.display = '';
+            visiveis++;
+        } else {
+            linha.style.display = 'none';
+        }
+    });
+    document.getElementById('nenhumResultadoFinanceiro').style.display = visiveis === 0 ? '' : 'none';
+}
+</script>
+{% endblock %}

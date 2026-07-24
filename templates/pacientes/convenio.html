@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block titulo %}Convenio - {{ pac.nome }}{% endblock %}
+{% block conteudo %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4><i class="bi bi-shield-check"></i> Convenios de {{ pac.nome }}</h4>
+            <a href="/pacientes" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </a>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6>Adicionar Convenio</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/pacientes/{{ pac.id }}/convenio/salvar">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Convenio *</label>
+                            <select class="form-select" name="convenio_id" required>
+                                <option value="">Selecione...</option>
+                                {% for c in convenios %}
+                                <option value="{{ c.id }}">{{ c.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Numero da Carteirinha</label>
+                            <input type="text" class="form-control" name="numero_carteirinha">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Validade</label>
+                            <input type="date" class="form-control" name="validade">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-circle"></i> Adicionar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h6>Convinculos Ativos</h6>
+            </div>
+            <div class="card-body">
+                {% if vinculos %}
+                <table class="table table-sm table-striped">
+                    <thead>
+                        <tr>
+                            <th>Convenio</th>
+                            <th>Carteirinha</th>
+                            <th>Validade</th>
+                            <th>Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in vinculos %}
+                        <tr>
+                            <td>{{ v.convenio_nome }}</td>
+                            <td>{{ v.numero_carteirinha or '-' }}</td>
+                            <td>{{ v.validade.strftime('%d/%m/%Y') if v.validade else '-' }}</td>
+                            <td>
+                                <form method="POST" action="/pacientes/{{ pac.id }}/convenio/{{ v.id }}/remover" class="d-inline"
+                                      onsubmit="return confirm('Remover este vinculo?')">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted text-center mb-0">Nenhum convenio vinculado.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

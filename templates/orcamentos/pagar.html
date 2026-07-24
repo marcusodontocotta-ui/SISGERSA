@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block titulo %}Pagamento - Orcamento #{{ orcamento.id }}{% endblock %}
+{% block conteudo %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-credit-card"></i> Pagamento - Orcamento #{{ orcamento.id }}</h2>
+            <div class="d-flex gap-2">
+                <a href="/orcamentos/{{ orcamento.id }}/nota-fiscal" class="btn btn-outline-success" target="_blank">
+                    <i class="bi bi-receipt"></i> Nota Fiscal
+                </a>
+                <a href="/orcamentos" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-md-4">
+                <div class="card border-primary">
+                    <div class="card-body text-center">
+                        <small class="text-muted">Valor Total</small>
+                        <h3 class="text-primary mb-0">R$ {{ "%.2f"|format(orcamento.valor_total)|replace('.',',') }}</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-success">
+                    <div class="card-body text-center">
+                        <small class="text-muted">Total Pago</small>
+                        <h3 class="text-success mb-0">R$ {{ "%.2f"|format(total_pago)|replace('.',',') }}</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-{{ 'danger' if saldo > 0 else 'success' }}">
+                    <div class="card-body text-center">
+                        <small class="text-muted">Saldo</small>
+                        <h3 class="text-{{ 'danger' if saldo > 0 else 'success' }} mb-0">R$ {{ "%.2f"|format(saldo)|replace('.',',') }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-info-circle"></i> Dados do Orcamento
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4"><strong>Paciente:</strong> {{ orcamento.paciente_nome }}</div>
+                    <div class="col-md-4"><strong>Profissional:</strong> {{ orcamento.profissional_nome }}</div>
+                    <div class="col-md-4"><strong>Estabelecimento:</strong> {{ orcamento.estabelecimento_nome }}</div>
+                </div>
+            </div>
+        </div>
+
+        {% if saldo > 0 %}
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <i class="bi bi-plus-circle"></i> Registrar Pagamento
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/orcamentos/{{ orcamento.id }}/pagar" id="formPagamento">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Valor *</label>
+                            <input type="number" class="form-control" name="valor" id="pag-valor"
+                                   min="0.01" step="0.01" max="{{ saldo }}" value="{{ '%.2f'|format(saldo) }}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Metodo *</label>
+                            <select class="form-select" name="metodo" id="pag-metodo" required>
+                                <option value="dinheiro">Dinheiro</option>
+                                <option value="pix">PIX</option>
+                                <option value="cartao_credito">Cartao Credito</option>
+                                <option value="cartao_debito">Cartao Debito</option>
+                                <option value="transferencia">Transferencia</option>
+                                <option value="boleto">Boleto</option>
+                                <option value="cheque">Cheque</option>
+                                <option value="outros">Outros</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Parcelas</label>
+                            <select class="form-select" name="parcelas" id="pag-parcelas">
+                                <option value="1">1x</option>
+                                <option value="2">2x</option>
+                                <option value="3">3x</option>
+                                <option value="6">6x</option>
+                                <option value="10">10x</option>
+                                <option value="12">12x</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Data Pagamento</label>
+                            <input type="date" class="form-control" name="data_pagamento"
+                                   value="" id="pag-data">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Vencimento</label>
+                            <input type="date" class="form-control" name="data_vencimento" id="pag-vencimento">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Observacao</label>
+                            <input type="text" class="form-control" name="observacao" placeholder="Ex: Pagamento entrada">
+                        </div>
+                    </div>
+                    <div id="parcelas-info" class="mt-3 d-none">
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            <span id="parcelas-texto"></span>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-check-circle"></i> Registrar Pagamento
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-success text-center py-4">
+            <i class="bi bi-check-circle" style="font-size:3rem;"></i>
+            <h4 class="mt-2">Pagamento Completo!</h4>
+            <p class="mb-0">Este orcamento foi integralmente pago.</p>
+        </div>
+        {% endif %}
+
+        {% if pagamentos %}
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-clock-history"></i> Historico de Pagamentos
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Data</th>
+                                <th>Valor</th>
+                                <th>Metodo</th>
+                                <th>Parcelas</th>
+                                <th>Vencimento</th>
+                                <th>Status</th>
+                                <th>Obs</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in pagamentos %}
+                            <tr class="{{ 'table-warning' if p.status == 'pendente' else ('table-danger' if p.status == 'cancelado' else '') }}">
+                                <td>{{ p.data_pagamento.strftime('%d/%m/%Y') if p.data_pagamento else '-' }}</td>
+                                <td class="fw-bold">R$ {{ "%.2f"|format(p.valor)|replace('.',',') }}</td>
+                                <td>
+                                    {% if p.metodo == 'dinheiro' %}<i class="bi bi-cash"></i> Dinheiro
+                                    {% elif p.metodo == 'pix' %}<i class="bi bi-qr-code"></i> PIX
+                                    {% elif p.metodo == 'cartao_credito' %}<i class="bi bi-credit-card"></i> Credito
+                                    {% elif p.metodo == 'cartao_debito' %}<i class="bi bi-credit-card"></i> Debito
+                                    {% elif p.metodo == 'transferencia' %}<i class="bi bi-bank"></i> Transferencia
+                                    {% elif p.metodo == 'boleto' %}<i class="bi bi-upc-scan"></i> Boleto
+                                    {% else %}{{ p.metodo }}
+                                    {% endif %}
+                                </td>
+                                <td>{{ p.parcelas }}x de R$ {{ "%.2f"|format(p.valor_parcela)|replace('.',',') }}</td>
+                                <td>{{ p.data_vencimento.strftime('%d/%m/%Y') if p.data_vencimento else '-' }}</td>
+                                <td>
+                                    {% if p.status == 'pago' %}<span class="badge bg-success">Pago</span>
+                                    {% elif p.status == 'pendente' %}<span class="badge bg-warning">Pendente</span>
+                                    {% elif p.status == 'atrasado' %}<span class="badge bg-danger">Atrasado</span>
+                                    {% elif p.status == 'cancelado' %}<span class="badge bg-secondary">Cancelado</span>
+                                    {% endif %}
+                                </td>
+                                <td><small>{{ p.observacao or '-' }}</small></td>
+                                <td>
+                                    {% if p.status == 'pago' %}
+                                    <form method="POST" action="/orcamentos/{{ orcamento.id }}/pagamento/{{ p.id }}/cancelar"
+                                          onsubmit="return confirm('Cancelar este pagamento?')">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.getElementById('pag-parcelas').addEventListener('change', atualizarParcelas);
+document.getElementById('pag-valor').addEventListener('input', atualizarParcelas);
+
+function atualizarParcelas() {
+    const valor = parseFloat(document.getElementById('pag-valor').value) || 0;
+    const parcelas = parseInt(document.getElementById('pag-parcelas').value) || 1;
+    const info = document.getElementById('parcelas-info');
+    const texto = document.getElementById('parcelas-texto');
+
+    if (parcelas > 1) {
+        const valorParcela = (valor / parcelas).toFixed(2).replace('.', ',');
+        texto.textContent = parcelas + 'x de R$ ' + valorParcela;
+        info.classList.remove('d-none');
+    } else {
+        info.classList.add('d-none');
+    }
+}
+
+document.getElementById('pag-data').value = new Date().toISOString().split('T')[0];
+</script>
+{% endblock %}

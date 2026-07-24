@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block titulo %}Valores - {{ procedimento.nome }}{% endblock %}
+{% block conteudo %}
+{% set ns = namespace(val_particular='') %}
+{% for v in valores %}
+    {% if v.convenio_id is none %}
+        {% set ns.val_particular = v.valor %}
+    {% endif %}
+{% endfor %}
+
+{% set ns_conv = {} %}
+{% for v in valores %}
+    {% if v.convenio_id is not none %}
+        {% set _ = ns_conv.update({v.convenio_id|string: v.valor}) %}
+    {% endif %}
+{% endfor %}
+
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4><i class="bi bi-currency-dollar"></i> Valores: {{ procedimento.nome }}</h4>
+            <a href="/procedimentos" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </a>
+        </div>
+
+        <p class="text-muted">
+            Duracao padrao: <strong>{{ procedimento.duracao_minutos }} min</strong> |
+            Defina os valores para cada convenio e/ou particular.
+        </p>
+
+        <form method="POST" action="/procedimentos/{{ procedimento.id }}/valores/salvar">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-person"></i> Particular (sem convenio)
+                </div>
+                <div class="card-body">
+                    <div class="input-group">
+                        <span class="input-group-text">R$</span>
+                        <input type="number" step="0.01" min="0" class="form-control" name="valor_particular"
+                               value="{{ ns.val_particular }}" placeholder="0.00">
+                    </div>
+                </div>
+            </div>
+
+            {% if convenios %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-shield-check"></i> Convenios
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Convenio</th>
+                                    <th style="width:200px">Valor (R$)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for conv in convenios %}
+                                <tr>
+                                    <td>{{ conv.nome }}</td>
+                                    <td>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">R$</span>
+                                            <input type="number" step="0.01" min="0" class="form-control"
+                                                   name="valor_{{ conv.id }}" value="{{ ns_conv.get(conv.id|string, '') }}" placeholder="0.00">
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg"></i> Salvar Valores
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

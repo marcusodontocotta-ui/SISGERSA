@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block titulo %}Consultas{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-calendar-check"></i> Consultas</h2>
+    {% if usuario.tipo in ['admin', 'recepcionista', 'profissional'] %}
+    <a href="/consultas/nova" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Nova Consulta
+    </a>
+    {% endif %}
+</div>
+
+{% if usuario.tipo != 'paciente' and pacientes_filtro is defined and pacientes_filtro %}
+<form method="GET" class="mb-3">
+    <div class="row align-items-center g-2">
+        <div class="col-md-4">
+            <select class="form-select form-select-sm" name="paciente_id" onchange="salvarPacienteFiltro(this.value); this.form.submit()">
+                <option value="">Todos os Prontuarios</option>
+                {% for p in pacientes_filtro %}
+                <option value="{{ p.id }}" {{ 'selected' if paciente_id == p.id }}>{{ p.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% if paciente_id %}
+        <div class="col-auto">
+            <a href="/consultas?pf=1" class="btn btn-sm btn-outline-secondary" onclick="limparPacienteFiltro()"><i class="bi bi-x-circle"></i> Limpar</a>
+        </div>
+        {% endif %}
+    </div>
+</form>
+{% endif %}
+
+<div class="mb-3">
+    <div class="input-group input-group-sm" style="max-width:400px;">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" id="buscaConsulta" placeholder="Buscar por nome, CPF, email, telefone..." oninput="filtrarConsultas()">
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if consultas %}
+        <div class="table-responsive">
+            <table class="table table-hover" id="tabelaConsultas">
+                <thead>
+                    <tr>
+                        <th>Data/Hora</th>
+                        <th>Paciente</th>
+                        <th>Profissional</th>
+                        <th>Duracao</th>
+                        <th>Status</th>
+                        <th>Acoes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in consultas %}
+                    <tr data-paciente="{{ c.paciente_nome|lower }}" data-cpf="{{ (c.paciente_cpf or '')|lower }}" data-email="{{ (c.paciente_email or '')|lower }}" data-telefone="{{ (c.paciente_telefone or '')|lower }}">
+                        <td>{{ c.data_hora.strftime('%d/%m/%Y %H:%M') if c.data_hora else '-' }}</td>
+                        <td>{{ c.paciente_nome }}</td>
+                        <td>{{ c.profissional_nome }}</td>
+                        <td>{{ c.duracao_minutos }} min</td>
+                        <td>
+                            {% if c.status == 'agendada' %}
+                                <span class="badge bg-primary">Agendada</span>
+                            {% elif c.status == 'confirmada' %}
+                                <span class="badge bg-info">Confirmada</span>
+                            {% elif c.status == 'em_andamento' %}
+                                <span class="badge bg-warning text-dark">Em Andamento</span>
+                            {% elif c.status == 'concluida' %}
+                                <span class="badge bg-success">Concluida</span>
+                            {% elif c.status == 'cancelada' %}
+                                <span class="badge bg-danger">Cancelada</span>
+                            {% elif c.status == 'faltou' %}
+                                <span class="badge bg-secondary">Faltou</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                {% if usuario.tipo in ['admin', 'recepcionista', 'profissional'] %}
+                                <form method="POST" action="/consultas/{{ c.id }}/status" class="d-inline">
+                                    {% if c.status == 'agendada' %}
+                                    <input type="hidden" name="status" value="confirmada">
+                                    <button type="submit" class="btn btn-outline-info" title="Confirmar">
+                                        <i class="bi bi-check-circle"></i>
+                                    </button>
+                                    {% elif c.status == 'confirmada' %}
+                                    <input type="hidden" name="status" value="em_andamento">
+                                    <button type="submit" class="btn btn-outline-warning" title="Iniciar">
+                                        <i class="bi bi-play-circle"></i>
+                                    </button>
+                                    {% elif c.status == 'em_andamento' %}
+                                    <input type="hidden" name="status" value="concluida">
+                                    <button type="submit" class="btn btn-outline-success" title="Concluir">
+                                        <i class="bi bi-check2-all"></i>
+                                    </button>
+                                    {% endif %}
+                                </form>
+                                {% if c.status not in ['concluida', 'cancelada'] %}
+                                <form method="POST" action="/consultas/{{ c.id }}/status" class="d-inline">
+                                    <input type="hidden" name="status" value="cancelada">
+                                    <button type="submit" class="btn btn-outline-danger" title="Cancelar"
+                                            onclick="return confirm('Cancelar esta consulta?')">
+                                        <i class="bi bi-x-circle"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                                {% endif %}
+                                {% if c.prontuario_id %}
+                                <a href="/prontuarios/{{ c.prontuario_id }}" class="btn btn-outline-secondary" title="Prontuario">
+                                    <i class="bi bi-folder-medical"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div id="nenhumResultadoConsultas" class="text-center py-4 text-muted" style="display:none;">
+            <i class="bi bi-search fs-1"></i>
+            <p class="mt-2">Nenhuma consulta encontrada para esta busca.</p>
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+            <i class="bi bi-calendar-x fs-1"></i>
+            <p class="mt-2">Nenhuma consulta encontrada.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function filtrarConsultas() {
+    var termo = document.getElementById('buscaConsulta').value.toLowerCase();
+    var linhas = document.querySelectorAll('#tabelaConsultas tbody tr');
+    var visiveis = 0;
+    linhas.forEach(function(linha) {
+        var paciente = linha.getAttribute('data-paciente') || '';
+        var cpf = linha.getAttribute('data-cpf') || '';
+        var email = linha.getAttribute('data-email') || '';
+        var telefone = linha.getAttribute('data-telefone') || '';
+        if (paciente.indexOf(termo) !== -1 || cpf.indexOf(termo) !== -1 || email.indexOf(termo) !== -1 || telefone.indexOf(termo) !== -1) {
+            linha.style.display = '';
+            visiveis++;
+        } else {
+            linha.style.display = 'none';
+        }
+    });
+    document.getElementById('nenhumResultadoConsultas').style.display = visiveis === 0 ? '' : 'none';
+}
+</script>
+{% endblock %}

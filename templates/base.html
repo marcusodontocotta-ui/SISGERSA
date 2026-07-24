@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>{% block titulo %}SISGERSA{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="/static/css/custom.css" rel="stylesheet">
+    <style>
+        .navbar .nav-link {
+            border-radius: 8px;
+            margin: 3px 4px;
+            padding: 8px 16px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.95) !important;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .navbar .nav-link:hover {
+            background: rgba(255,255,255,0.25);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .navbar .nav-link.active {
+            background: rgba(255,255,255,0.3);
+        }
+        #status-sistema {
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            padding: 5px 12px;
+            margin-right: 8px;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        #status-sistema span {
+            font-size: 1.05rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+        }
+        .status-ok { color: #4cff50 !important; text-shadow: 0 0 6px rgba(76,255,80,0.5); }
+        .status-erro { color: #ff6b6b !important; text-shadow: 0 0 6px rgba(255,107,107,0.5); }
+    </style>
+</head>
+<body>
+    {% if usuario %}
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold fs-5" href="/dashboard">
+                SISGERSA
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    {% set estab_cookie = request.cookies.get('estabelecimento_id') %}
+                    {% if pode_acessar(usuario, 'pacientes', 'ver', estab_cookie) %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/pacientes"><i class="bi bi-people"></i> Prontuarios</a>
+                    </li>
+                    {% endif %}
+                    {% if pode_acessar(usuario, 'consultas', 'ver', estab_cookie) %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/consultas"><i class="bi bi-calendar-check"></i> Consultas</a>
+                    </li>
+                    {% endif %}
+                    {% if pode_acessar(usuario, 'agenda', 'ver', estab_cookie) %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/agenda"><i class="bi bi-calendar-week"></i> Agenda</a>
+                    </li>
+                    {% endif %}
+                    {% if pode_acessar(usuario, 'orcamentos', 'ver', estab_cookie) %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/orcamentos"><i class="bi bi-file-earmark-text"></i> Orcamentos</a>
+                    </li>
+                    {% endif %}
+                    {% if pode_acessar(usuario, 'prontuarios', 'ver', estab_cookie) %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/prontuarios"><i class="bi bi-folder-medical"></i> Historico</a>
+                    </li>
+                    {% endif %}
+                    {% if usuario.tipo == 'admin' and usuario.is_super %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/estabelecimentos"><i class="bi bi-building"></i> Estabelecimentos</a>
+                    </li>
+                    {% endif %}
+                    {% if pode_acessar(usuario, 'profissionais', 'ver', estab_cookie) %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/profissionais"><i class="bi bi-person-badge"></i> Profissionais</a>
+                    </li>
+                    {% endif %}
+                    {% if pode_acessar(usuario, 'financeiro', 'ver', estab_cookie) %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/financeiro"><i class="bi bi-graph-up"></i> Financeiro</a>
+                    </li>
+                    {% endif %}
+                    {% if pode_acessar(usuario, 'pagamentos', 'ver', estab_cookie) %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/pagamentos"><i class="bi bi-credit-card"></i> Pagamentos</a>
+                    </li>
+                    {% endif %}
+                    {% if pode_acessar(usuario, 'convenios', 'ver', estab_cookie) or pode_acessar(usuario, 'procedimentos', 'ver', estab_cookie) or (usuario.tipo == 'admin' and usuario.is_super) %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-gear"></i> Configuracoes
+                        </a>
+                        <ul class="dropdown-menu">
+                            {% if pode_acessar(usuario, 'convenios', 'ver', estab_cookie) %}
+                            <li><a class="dropdown-item" href="/convenios"><i class="bi bi-shield-check"></i> Convenios</a></li>
+                            {% endif %}
+                            {% if pode_acessar(usuario, 'procedimentos', 'ver', estab_cookie) %}
+                            <li><a class="dropdown-item" href="/procedimentos"><i class="bi bi-clipboard2-pulse"></i> Procedimentos</a></li>
+                            {% endif %}
+                            {% if usuario.tipo == 'admin' %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/admin/permissoes"><i class="bi bi-shield-lock"></i> Permissoes</a></li>
+                            {% endif %}
+                        </ul>
+                    </li>
+                    {% elif usuario.tipo == 'admin' %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/permissoes"><i class="bi bi-shield-lock"></i> Permissoes</a>
+                    </li>
+                    {% endif %}
+                </ul>
+                <ul class="navbar-nav">
+                    {% if usuario.tipo == 'admin' and usuario.is_super %}
+                    <li class="nav-item d-flex align-items-center">
+                        <form id="form-selecionar-estab" action="/estabelecimento/selecionar" method="POST" class="d-flex align-items-center">
+                            <select id="select-estab-filtro" name="estabelecimento_id" class="form-select form-select-sm bg-transparent text-light border-light" style="max-width:200px; font-size:0.8rem;">
+                                <option value="">Todos os Estabelecimentos</option>
+                            </select>
+                        </form>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item d-flex align-items-center" id="status-sistema">
+                        <span id="status-internet" title="Internet" class="me-3">
+                            <i class="bi bi-wifi"></i> <small class="d-none d-md-inline">Net</small>
+                        </span>
+                        <span id="status-banco" title="Banco de dados">
+                            <i class="bi bi-database"></i> <small class="d-none d-md-inline">DB</small>
+                        </span>
+                    </li>
+                    <li class="nav-item">
+                        <span class="nav-link text-light">
+                            <i class="bi bi-person-circle"></i> {{ usuario.nome }}
+                            <span class="badge bg-{{ 'warning' if usuario.is_super else 'light text-primary' }}">
+                                {{ 'Super Admin' if usuario.is_super else usuario.tipo }}
+                            </span>
+                        </span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/logout"><i class="bi bi-box-arrow-right"></i> Sair</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+
+    <main class="container-fluid py-4">
+        {% block conteudo %}{% endblock %}
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script>
+        var _statusFailCount = 0;
+        var _statusInterval = 30000;
+
+        function fetchRetry(url, opts, retries, delay) {
+            retries = retries || 2;
+            delay = delay || 1500;
+            return fetch(url, opts).catch(function(err) {
+                if (retries <= 0) throw err;
+                return new Promise(function(resolve) {
+                    setTimeout(function() { resolve(fetchRetry(url, opts, retries - 1, delay * 2)); }, delay);
+                });
+            });
+        }
+
+        function verificarStatus() {
+            var elInternet = document.getElementById('status-internet');
+            var elBanco = document.getElementById('status-banco');
+            if (!elInternet || !elBanco) return;
+
+            if (navigator.onLine) {
+                elInternet.innerHTML = '<i class="bi bi-wifi"></i> <small class="d-none d-md-inline">Net</small>';
+                elInternet.title = 'Internet: Online';
+                elInternet.className = 'status-ok';
+            } else {
+                elInternet.innerHTML = '<i class="bi bi-wifi-off"></i> <small class="d-none d-md-inline">Net</small>';
+                elInternet.title = 'Internet: Offline';
+                elInternet.className = 'status-erro';
+            }
+
+            fetchRetry('/api/status', {credentials: 'same-origin', cache: 'no-store'}, 3, 2000)
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    _statusFailCount = 0;
+                    _statusInterval = 30000;
+                    if (d.banco) {
+                        elBanco.innerHTML = '<i class="bi bi-database-check"></i> <small class="d-none d-md-inline">DB</small>';
+                        elBanco.title = 'Banco: Conectado';
+                        elBanco.className = 'status-ok';
+                    } else {
+                        elBanco.innerHTML = '<i class="bi bi-database-x"></i> <small class="d-none d-md-inline">DB</small>';
+                        elBanco.title = 'Banco: Desconectado';
+                        elBanco.className = 'status-erro';
+                    }
+                })
+                .catch(function() {
+                    _statusFailCount++;
+                    if (_statusFailCount > 3) _statusInterval = 60000;
+                    elBanco.innerHTML = '<i class="bi bi-database-x"></i> <small class="d-none d-md-inline">DB</small>';
+                    elBanco.title = 'Banco: Reconectando... (' + _statusFailCount + ')';
+                    elBanco.className = 'status-erro';
+                });
+        }
+
+        function agendarVerificacao() {
+            setTimeout(function() {
+                verificarStatus();
+                agendarVerificacao();
+            }, _statusInterval);
+        }
+
+        window.addEventListener('online', function() {
+            _statusFailCount = 0;
+            _statusInterval = 5000;
+            verificarStatus();
+        });
+        window.addEventListener('offline', verificarStatus);
+        verificarStatus();
+        agendarVerificacao();
+
+        function previewImagem(input, previewId, hiddenUrlId) {
+            if (!input.files || !input.files[0]) return;
+            var file = input.files[0];
+            if (file.size > 5 * 1024 * 1024) { alert('Arquivo muito grande. Maximo 5MB.'); return; }
+
+            var preview = document.getElementById(previewId);
+            var formData = new FormData();
+            formData.append('arquivo', file);
+
+            preview.innerHTML = '<div class="spinner-border spinner-border-sm text-primary"></div>';
+
+            fetchRetry('/api/upload', {method: 'POST', body: formData, credentials: 'same-origin'}, 2, 2000)
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.url) {
+                        document.getElementById(hiddenUrlId).value = d.url;
+                        var isCircle = preview.classList.contains('rounded-circle');
+                        preview.innerHTML = '<img src="' + d.url + '" style="width:100%;height:100%;object-fit:cover;' + (isCircle ? 'border-radius:50%;' : 'border-radius:8px;') + '">';
+                    } else {
+                        preview.innerHTML = '<i class="bi bi-image text-muted" style="font-size:2rem;"></i>';
+                        alert('Erro ao enviar arquivo.');
+                    }
+                })
+                .catch(function() {
+                    preview.innerHTML = '<i class="bi bi-image text-muted" style="font-size:2rem;"></i>';
+                    alert('Falha na conexao. Verifique sua internet e tente novamente.');
+                });
+        }
+
+        function abrirCamera(prefixo) {
+            document.getElementById(prefixo + '-camera-input').click();
+        }
+
+        function salvarPacienteFiltro(id) {
+            if (id) {
+                localStorage.setItem('paciente_filtro_id', id);
+            } else {
+                localStorage.removeItem('paciente_filtro_id');
+            }
+        }
+
+        function limparPacienteFiltro() {
+            localStorage.removeItem('paciente_filtro_id');
+        }
+
+        (function() {
+            var paginasFiltro = ['/consultas', '/orcamentos', '/prontuarios', '/financeiro', '/pagamentos'];
+            var path = window.location.pathname;
+            if (paginasFiltro.indexOf(path) === -1) return;
+            var params = new URLSearchParams(window.location.search);
+            if (params.has('pf')) return;
+            var salvo = localStorage.getItem('paciente_filtro_id');
+            if (salvo) {
+                params.set('paciente_id', salvo);
+                params.set('pf', '1');
+                window.location.search = params.toString();
+            }
+        })();
+    </script>
+        {% block scripts %}{% endblock %}
+
+        {% if usuario and request.query_params.get('welcome') == '1' %}
+        <div class="modal fade" id="modalBoasVindas" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-primary">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="bi bi-person-check"></i> Bem-vindo ao SISGERSA</h5>
+                    </div>
+                    <div class="modal-body text-center py-4">
+                        <div class="mb-3">
+                            <i class="bi bi-person-circle text-primary" style="font-size:3rem;"></i>
+                        </div>
+                        <h4>{{ usuario.nome }}</h4>
+                        <p class="text-muted mb-1">
+                            <span class="badge bg-{{ 'warning' if usuario.is_super else 'primary' }} me-1">
+                                {{ 'Super Administrador' if usuario.is_super else usuario.tipo|title }}
+                            </span>
+                        </p>
+                        <p class="text-muted small">{{ now.strftime('%d/%m/%Y') if now is defined else '' }}</p>
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <button class="btn btn-primary px-4" data-bs-dismiss="modal">Entrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            if (!sessionStorage.getItem('welcome_shown')) {
+                var modal = new bootstrap.Modal(document.getElementById('modalBoasVindas'));
+                modal.show();
+                sessionStorage.setItem('welcome_shown', '1');
+            }
+        </script>
+        {% endif %}
+        {% if usuario.tipo == 'admin' and usuario.is_super %}
+        <script>
+        (function() {
+            var sel = document.getElementById('select-estab-filtro');
+            if (!sel) return;
+            var currentCookie = document.cookie.split(';').map(function(c){ return c.trim(); }).find(function(c){ return c.startsWith('estabelecimento_id='); });
+            var currentId = currentCookie ? currentCookie.split('=')[1] : '';
+            fetch('/api/estabelecimentos').then(function(r){ return r.json(); }).then(function(data){
+                (data.estabelecimentos || []).forEach(function(e){
+                    var opt = document.createElement('option');
+                    opt.value = e.id;
+                    opt.textContent = e.nome;
+                    if (String(e.id) === currentId) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            });
+            sel.addEventListener('change', function(){
+                document.getElementById('form-selecionar-estab').submit();
+            });
+        })();
+        </script>
+        {% endif %}
+    </body>
+</html>

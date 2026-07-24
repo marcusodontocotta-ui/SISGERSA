@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+{% block titulo %}Agenda Semanal{% endblock %}
+{% block conteudo %}
+<style>
+    .agenda-container { display: flex; flex-direction: column; height: calc(100vh - 120px); }
+    .agenda-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .agenda-nav { display: flex; gap: 0.5rem; align-items: center; }
+    .agenda-nav .btn { padding: 0.25rem 0.75rem; }
+    .week-title { font-size: 1.25rem; font-weight: 600; margin: 0; }
+
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: 60px repeat(7, 1fr);
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+        overflow-y: auto;
+        flex: 1;
+    }
+
+    .cal-header {
+        background: #f8f9fa;
+        padding: 0.5rem;
+        text-align: center;
+        font-weight: 600;
+        font-size: 0.85rem;
+        border-bottom: 2px solid #dee2e6;
+        border-right: 1px solid #dee2e6;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    .cal-header.hoje { background: #0d6efd; color: white; }
+    .cal-header .dia-numero { font-size: 1.5rem; display: block; }
+    .cal-header .dia-nome { font-size: 0.7rem; text-transform: uppercase; color: #6c757d; }
+    .cal-header.hoje .dia-nome { color: rgba(255,255,255,0.8); }
+
+    .time-label {
+        background: #f8f9fa;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.7rem;
+        color: #6c757d;
+        text-align: right;
+        border-right: 1px solid #dee2e6;
+        border-bottom: 1px solid #e9ecef;
+        height: 48px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-end;
+    }
+
+    .cal-cell {
+        border-right: 1px solid #e9ecef;
+        border-bottom: 1px solid #e9ecef;
+        height: 48px;
+        position: relative;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .cal-cell:hover { background: #f0f7ff; }
+    .cal-cell.hoje-coluna { background: #f8faff; }
+
+    .evento {
+        position: absolute;
+        left: 2px;
+        right: 2px;
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-size: 0.7rem;
+        line-height: 1.2;
+        cursor: pointer;
+        overflow: hidden;
+        z-index: 5;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .evento:hover { transform: scale(1.02); box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 6; }
+    .evento .evento-horario { font-weight: 600; }
+    .evento .evento-titulo { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .evento-agendada { background: #cfe2ff; border-left: 3px solid #0d6efd; color: #084298; }
+    .evento-confirmada { background: #d1e7dd; border-left: 3px solid #198754; color: #0f5132; }
+    .evento-em_andamento { background: #fff3cd; border-left: 3px solid #ffc107; color: #664d03; }
+    .evento-concluida { background: #d3d3d4; border-left: 3px solid #6c757d; color: #41464b; }
+    .evento-cancelada { background: #f8d7da; border-left: 3px solid #dc3545; color: #842029; text-decoration: line-through; }
+    .evento-faltou { background: #e2d9f3; border-left: 3px solid #6f42c1; color: #432874; }
+
+    .hour-line { border-bottom: 1px solid #e9ecef; }
+    .half-hour-line { border-bottom: 1px dotted #f0f0f0; }
+
+    @media (max-width: 768px) {
+        .calendar-grid { grid-template-columns: 45px repeat(7, 1fr); }
+        .cal-header .dia-numero { font-size: 1rem; }
+        .evento { font-size: 0.6rem; padding: 1px 3px; }
+    }
+</style>
+
+<div class="agenda-container">
+    <div class="agenda-header">
+        <div class="agenda-nav">
+            <a href="#" class="btn btn-outline-primary btn-sm" id="btnPrev">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+            <button class="btn btn-outline-secondary btn-sm" onclick="irParaHoje()">Hoje</button>
+            <a href="#" class="btn btn-outline-primary btn-sm" id="btnNext">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <h5 class="week-title ms-3" id="weekTitle"></h5>
+        </div>
+        <div>
+            {% if usuario.tipo in ['admin', 'recepcionista', 'profissional'] %}
+            <button class="btn btn-primary btn-sm" onclick="abrirModalConsulta()">
+                <i class="bi bi-plus-circle"></i> Nova Consulta
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if usuario.tipo != 'paciente' and profissionais_filtro is defined and profissionais_filtro %}
+    <form method="GET" class="mb-2">
+        <div class="row align-items-center g-2">
+            <div class="col-md-3">
+                <select class="form-select form-select-sm" name="profissional_id" onchange="this.form.submit()">
+                    <option value="">Todos os Profissionais</option>
+                    {% for p in profissionais_filtro %}
+                    <option value="{{ p.id }}" {{ 'selected' if profissional_id == p.id }}>{{ p.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if profissional_id %}
+            <div class="col-auto">
+                <a href="/agenda" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle"></i> Limpar</a>
+            </div>
+            {% endif %}
+        </div>
+    </form>
+    {% endif %}
+
+    <div class="calendar-grid" id="calendarGrid">
+        <div class="cal-header" style="background:#fff;"></div>
+        {% for dia in dias_semana %}
+        <div class="cal-header {% if dia.eh_hoje %}hoje{% endif %}">
+            <span class="dia-nome">{{ dia.dia_semana[:3] }}</span>
+            <span class="dia-numero">{{ dia.dia_numero }}</span>
+        </div>
+        {% endfor %}
+
+        {% for hora in range(7, 21) %}
+        <div class="time-label">{{ "%02d:00"|format(hora) }}</div>
+        {% for dia in dias_semana %}
+        <div class="cal-cell {% if dia.eh_hoje %}hoje-coluna{% endif %}"
+             data-data="{{ dia.data_str }}"
+             data-hora="{{ '%02d:00'|format(hora) }}"
+             onclick="cliqueCelula(this)">
+        </div>
+        {% endfor %}
+        {% endfor %}
+    </div>
+</div>
+
+<div class="modal fade" id="modalConsulta" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">Nova Consulta</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/consultas/criar" id="formConsulta">
+                <div class="modal-body">
+                    {% if estabelecimentos is defined and estabelecimentos %}
+                    <div class="mb-3">
+                        <label class="form-label">Estabelecimento *</label>
+                        <select class="form-select" name="estabelecimento_id" required>
+                            {% for e in estabelecimentos %}
+                            <option value="{{ e.id }}">{{ e.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                    <div class="mb-3">
+                        <label class="form-label">Paciente *</label>
+                        <select class="form-select" name="paciente_id" id="selectPaciente" required>
+                            <option value="">Carregando...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Profissional *</label>
+                        <select class="form-select" name="profissional_id" id="selectProfissional" required>
+                            <option value="">Carregando...</option>
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Data e Hora *</label>
+                            <input type="datetime-local" class="form-control" name="data_hora" id="inputDataHora" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Duracao (min)</label>
+                            <select class="form-select" name="duracao" id="selectDuracao">
+                                <option value="15">15 min</option>
+                                <option value="30" selected>30 min</option>
+                                <option value="45">45 min</option>
+                                <option value="60">60 min</option>
+                                <option value="90">90 min</option>
+                                <option value="120">120 min</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observacoes</label>
+                        <textarea class="form-control" name="observacoes" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Agendar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalDetalhes" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalhes da Consulta</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Paciente:</strong> <span id="detPaciente"></span></p>
+                <p><strong>Profissional:</strong> <span id="detProfissional"></span></p>
+                <p><strong>Data:</strong> <span id="detData"></span></p>
+                <p><strong>Horario:</strong> <span id="detHorario"></span></p>
+                <p><strong>Duracao:</strong> <span id="detDuracao"></span></p>
+                <p><strong>Status:</strong> <span id="detStatus"></span></p>
+                <p><strong>Observacoes:</strong> <span id="detObservacoes"></span></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const DATA_INICIO = "{{ data_inicio.strftime('%Y-%m-%d') }}";
+    const DATA_FIM = "{{ data_fim.strftime('%Y-%m-%d') }}";
+    const PROFISSIONAL_ID = "{{ profissional_id or '' }}";
+
+    const DIAS = [
+        {% for dia in dias_semana %}
+        { str: "{{ dia.data_str }}", nome: "{{ dia.dia_semana }}" },
+        {% endfor %}
+    ];
+
+    function irParaHoje() {
+        const hoje = new Date();
+        const segunda = new Date(hoje);
+        segunda.setDate(hoje.getDate() - hoje.getDay() + 1);
+        const data = segunda.toISOString().split('T')[0];
+        window.location.href = '/agenda?data=' + data + (PROFISSIONAL_ID ? '&profissional_id=' + PROFISSIONAL_ID : '');
+    }
+
+    document.getElementById('btnPrev').href = '/agenda?data=' + getDataAnterior() + (PROFISSIONAL_ID ? '&profissional_id=' + PROFISSIONAL_ID : '');
+    document.getElementById('btnNext').href = '/agenda?data=' + getDataProxima() + (PROFISSIONAL_ID ? '&profissional_id=' + PROFISSIONAL_ID : '');
+
+    function getDataAnterior() {
+        const d = new Date(DATA_INICIO);
+        d.setDate(d.getDate() - 7);
+        return d.toISOString().split('T')[0];
+    }
+
+    function getDataProxima() {
+        const d = new Date(DATA_INICIO);
+        d.setDate(d.getDate() + 7);
+        return d.toISOString().split('T')[0];
+    }
+
+    const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const dInicio = new Date(DATA_INICIO + 'T12:00:00');
+    const dFim = new Date(DATA_FIM + 'T12:00:00');
+    dFim.setDate(dFim.getDate() - 1);
+    document.getElementById('weekTitle').textContent =
+        dInicio.getDate() + ' ' + meses[dInicio.getMonth()] + ' - ' +
+        dFim.getDate() + ' ' + meses[dFim.getMonth()] + ', ' + dFim.getFullYear();
+
+    function carregarConsultas() {
+        fetchRetry('/api/consultas?inicio=' + DATA_INICIO + 'T00:00:00&fim=' + DATA_FIM + 'T23:59:59' + (PROFISSIONAL_ID ? '&profissional_id=' + PROFISSIONAL_ID : ''))
+            .then(function(r) { return r.json(); })
+            .then(function(consultas) {
+                document.querySelectorAll('.evento').forEach(function(e) { e.remove(); });
+
+                consultas.forEach(function(c) {
+                    if (!c.data_hora) return;
+                    var dt = new Date(c.data_hora + ':00');
+                    var diaStr = c.data_hora.split('T')[0];
+                    var hora = dt.getHours();
+                    var minuto = dt.getMinutes();
+
+                    const cell = document.querySelector(
+                        `.cal-cell[data-data="${diaStr}"][data-hora="${String(hora).padStart(2,'0')}:00"]`
+                    );
+                    if (!cell) return;
+
+                    const evento = document.createElement('div');
+                    evento.className = 'evento evento-' + c.status;
+                    const top = (minuto / 60) * 48;
+                    const altura = Math.max((c.duracao / 60) * 48, 24);
+                    evento.style.top = top + 'px';
+                    evento.style.height = altura + 'px';
+                    evento.innerHTML =
+                        '<div class="evento-horario">' + c.horario_inicio + '-' + c.horario_fim + '</div>' +
+                        '<div class="evento-titulo">' + c.paciente + '</div>';
+                    evento.title = c.paciente + ' - ' + c.profissional + '\n' + c.horario_inicio + ' - ' + c.horario_fim;
+                    evento.onclick = function(e) {
+                        e.stopPropagation();
+                        mostrarDetalhes(c);
+                    };
+                    cell.appendChild(evento);
+                });
+            });
+    }
+
+    function mostrarDetalhes(c) {
+        document.getElementById('detPaciente').textContent = c.paciente;
+        document.getElementById('detProfissional').textContent = c.profissional;
+        document.getElementById('detData').textContent = new Date(c.data_hora + 'T12:00:00').toLocaleDateString('pt-BR');
+        document.getElementById('detHorario').textContent = c.horario_inicio + ' - ' + c.horario_fim;
+        document.getElementById('detDuracao').textContent = c.duracao + ' minutos';
+
+        const statusMap = {
+            'agendada': '<span class="badge bg-primary">Agendada</span>',
+            'confirmada': '<span class="badge bg-info">Confirmada</span>',
+            'em_andamento': '<span class="badge bg-warning text-dark">Em Andamento</span>',
+            'concluida': '<span class="badge bg-success">Concluida</span>',
+            'cancelada': '<span class="badge bg-danger">Cancelada</span>',
+            'faltou': '<span class="badge bg-secondary">Faltou</span>'
+        };
+        document.getElementById('detStatus').innerHTML = statusMap[c.status] || c.status;
+        document.getElementById('detObservacoes').textContent = c.observacoes || '-';
+        new bootstrap.Modal(document.getElementById('modalDetalhes')).show();
+    }
+
+    function cliqueCelula(cell) {
+        const data = cell.getAttribute('data-data');
+        const hora = cell.getAttribute('data-hora');
+        document.getElementById('inputDataHora').value = data + 'T' + hora;
+        carregarSelects();
+        new bootstrap.Modal(document.getElementById('modalConsulta')).show();
+    }
+
+    function abrirModalConsulta() {
+        document.getElementById('inputDataHora').value = '';
+        document.getElementById('formConsulta').reset();
+        carregarSelects();
+        new bootstrap.Modal(document.getElementById('modalConsulta')).show();
+    }
+
+    function carregarSelects() {
+        fetchRetry('/api/pacientes')
+            .then(function(r) { return r.json(); })
+            .then(function(pacientes) {
+                var sel = document.getElementById('selectPaciente');
+                sel.innerHTML = '<option value="">Selecione o paciente...</option>';
+                pacientes.forEach(function(p) {
+                    sel.innerHTML += '<option value="' + p.id + '">' + p.nome + '</option>';
+                });
+            });
+
+        fetchRetry('/api/profissionais')
+            .then(function(r) { return r.json(); })
+            .then(function(profs) {
+                var sel = document.getElementById('selectProfissional');
+                sel.innerHTML = '<option value="">Selecione o profissional...</option>';
+                profs.forEach(function(p) {
+                    sel.innerHTML += '<option value="' + p.id + '">' + p.nome + '</option>';
+                });
+            });
+    }
+
+    carregarConsultas();
+</script>
+{% endblock %}

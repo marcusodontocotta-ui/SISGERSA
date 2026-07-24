@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+{% block titulo %}Painel Administrativo - SISGERSA{% endblock %}
+{% block conteudo %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-speedometer2"></i> Painel Administrativo</h2>
+        <p class="text-muted">Visao geral do sistema</p>
+    </div>
+</div>
+
+<div class="row g-2 mb-4">
+    <div class="col-md-2">
+        <a href="/consultas" class="text-decoration-none">
+            <div class="card border-primary text-center h-100 shadow-sm" style="cursor:pointer; transition: transform 0.15s;" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">
+                <div class="card-body py-3">
+                    <i class="bi bi-calendar-check text-primary" style="font-size:1.6rem;"></i>
+                    <h6 class="mt-2 mb-0 text-dark fw-semibold">Consultas</h6>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-2">
+        <a href="/pacientes" class="text-decoration-none">
+            <div class="card border-success text-center h-100 shadow-sm" style="cursor:pointer; transition: transform 0.15s;" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">
+                <div class="card-body py-3">
+                    <i class="bi bi-people text-success" style="font-size:1.6rem;"></i>
+                    <h6 class="mt-2 mb-0 text-dark fw-semibold">Prontuarios</h6>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-2">
+        <a href="/orcamentos" class="text-decoration-none">
+            <div class="card border-warning text-center h-100 shadow-sm" style="cursor:pointer; transition: transform 0.15s;" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">
+                <div class="card-body py-3">
+                    <i class="bi bi-file-earmark-text text-warning" style="font-size:1.6rem;"></i>
+                    <h6 class="mt-2 mb-0 text-dark fw-semibold">Orcamentos</h6>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-2">
+        <a href="/convenios" class="text-decoration-none">
+            <div class="card border-info text-center h-100 shadow-sm" style="cursor:pointer; transition: transform 0.15s;" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">
+                <div class="card-body py-3">
+                    <i class="bi bi-shield-check text-info" style="font-size:1.6rem;"></i>
+                    <h6 class="mt-2 mb-0 text-dark fw-semibold">Convenios</h6>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-2">
+        <a href="/procedimentos" class="text-decoration-none">
+            <div class="card border-secondary text-center h-100 shadow-sm" style="cursor:pointer; transition: transform 0.15s;" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">
+                <div class="card-body py-3">
+                    <i class="bi bi-tools text-secondary" style="font-size:1.6rem;"></i>
+                    <h6 class="mt-2 mb-0 text-dark fw-semibold">Procedimentos</h6>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-2">
+        <a href="/estabelecimentos" class="text-decoration-none">
+            <div class="card border-dark text-center h-100 shadow-sm" style="cursor:pointer; transition: transform 0.15s;" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">
+                <div class="card-body py-3">
+                    <i class="bi bi-building text-dark" style="font-size:1.6rem;"></i>
+                    <h6 class="mt-2 mb-0 text-dark fw-semibold">Estabelecimentos</h6>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col">
+        <div class="card shadow-sm">
+            <div class="card-body py-2">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <strong class="me-1"><i class="bi bi-funnel"></i> Periodo:</strong>
+                        <div class="btn-group btn-group-sm" id="periodoBtns" role="group">
+                            <button type="button" class="btn btn-outline-primary active" data-periodo="hoje">Hoje</button>
+                            <button type="button" class="btn btn-outline-primary" data-periodo="semana">Semana</button>
+                            <button type="button" class="btn btn-outline-primary" data-periodo="mes">Mes</button>
+                            <button type="button" class="btn btn-outline-secondary" data-periodo="personalizado">Personalizado</button>
+                        </div>
+                    </div>
+                    <div id="personalizadoInputs" class="d-none d-flex align-items-center gap-2">
+                        <input type="date" id="data-inicio" class="form-control form-control-sm" style="width:155px;">
+                        <span class="text-muted">ate</span>
+                        <input type="date" id="data-fim" class="form-control form-control-sm" style="width:155px;">
+                        <button class="btn btn-sm btn-primary" onclick="carregarStats()">Aplicar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white fw-semibold">
+                <i class="bi bi-bar-chart-steps"></i> Cadastros
+            </div>
+            <div class="card-body">
+                <div class="row text-center g-3">
+                    <div class="col">
+                        <div class="p-2">
+                            <div class="fs-3 fw-bold text-dark" id="stat-estab">-</div>
+                            <small class="text-muted">Estabelecimentos</small>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="p-2">
+                            <div class="fs-3 fw-bold text-dark" id="stat-prof">-</div>
+                            <small class="text-muted">Profissionais</small>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="p-2">
+                            <div class="fs-3 fw-bold text-dark" id="stat-convenios">-</div>
+                            <small class="text-muted">Convenios</small>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="p-2">
+                            <div class="fs-3 fw-bold text-dark" id="stat-procedimentos">-</div>
+                            <small class="text-muted">Procedimentos</small>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="p-2">
+                            <div class="fs-3 fw-bold text-dark" id="stat-pacientes">-</div>
+                            <small class="text-muted">Prontuarios</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-primary text-white fw-semibold">
+                <i class="bi bi-calendar-check"></i> Consultas
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-3">
+                    <div class="fs-1 fw-bold text-primary" id="stat-consultas-total">-</div>
+                    <small class="text-muted">no periodo</small>
+                </div>
+                <div id="consultas-status" class="d-flex flex-wrap justify-content-center gap-3"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-warning text-dark fw-semibold">
+                <i class="bi bi-file-earmark-text"></i> Orcamentos
+            </div>
+            <div class="card-body">
+                <div class="row text-center mb-3">
+                    <div class="col">
+                        <div class="fs-3 fw-bold text-secondary" id="stat-orc-rascunho">-</div>
+                        <small class="text-muted">Rascunho</small>
+                    </div>
+                    <div class="col">
+                        <div class="fs-3 fw-bold text-success" id="stat-orc-aprovados">-</div>
+                        <small class="text-muted">Aprovados</small>
+                    </div>
+                </div>
+                <div id="orc-status" class="d-flex flex-wrap justify-content-center gap-3"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-success text-white fw-semibold">
+                <i class="bi bi-currency-dollar"></i> Faturamento
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-3">
+                    <div class="fs-1 fw-bold text-success" id="stat-faturamento">-</div>
+                    <small class="text-muted">no periodo</small>
+                </div>
+                <div id="faturamento-por-prof"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let periodoAtual = 'hoje';
+
+    document.querySelectorAll('#periodoBtns button').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('#periodoBtns button').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            periodoAtual = this.dataset.periodo;
+            const personalizado = document.getElementById('personalizadoInputs');
+            if (periodoAtual === 'personalizado') {
+                personalizado.classList.remove('d-none');
+            } else {
+                personalizado.classList.add('d-none');
+                carregarStats();
+            }
+        });
+    });
+
+    function carregarStats() {
+        let url = `/api/dashboard-stats?periodo=${periodoAtual}&_t=${Date.now()}`;
+        if (periodoAtual === 'personalizado') {
+            const ini = document.getElementById('data-inicio').value;
+            const fim = document.getElementById('data-fim').value;
+            if (ini && fim) {
+                url += `&data_inicio=${ini}&data_fim=${fim}`;
+            }
+        }
+        fetchRetry(url, {credentials: 'same-origin', cache: 'no-store'})
+            .then(function(r) {
+                if (r.redirected || r.status === 302 || r.url.includes('/login')) {
+                    window.location.href = '/login';
+                    return;
+                }
+                return r.json();
+            })
+            .then(d => {
+                if (!d) return;
+                document.getElementById('stat-estab').textContent = d.estabelecimentos;
+                document.getElementById('stat-prof').textContent = d.profissionais;
+                document.getElementById('stat-convenios').textContent = d.convenios;
+                document.getElementById('stat-procedimentos').textContent = d.procedimentos;
+                document.getElementById('stat-pacientes').textContent = d.pacientes;
+
+                document.getElementById('stat-consultas-total').textContent = d.consultas_total;
+
+                const statusLabels = {
+                    'agendada': 'Agendada', 'confirmada': 'Confirmada',
+                    'em_andamento': 'Em Andamento', 'concluida': 'Concluida',
+                    'cancelada': 'Cancelada', 'faltou': 'Faltou'
+                };
+                const statusColors = {
+                    'agendada': '#0d6efd', 'confirmada': '#198754',
+                    'em_andamento': '#ffc107', 'concluida': '#6c757d',
+                    'cancelada': '#dc3545', 'faltou': '#6f42c1'
+                };
+                let htmlC = '';
+                for (const [st, tot] of Object.entries(d.consultas_status)) {
+                    htmlC += `<div class="text-center">
+                        <div style="width:42px;height:42px;border-radius:50%;background:${statusColors[st]||'#999'};display:inline-flex;align-items:center;justify-content:center;">
+                            <span class="text-white fw-bold small">${tot}</span>
+                        </div>
+                        <div><small class="text-muted">${statusLabels[st]||st}</small></div>
+                    </div>`;
+                }
+                document.getElementById('consultas-status').innerHTML = htmlC || '<small class="text-muted">Nenhuma consulta</small>';
+
+                document.getElementById('stat-orc-rascunho').textContent = d.orc_rascunho;
+                document.getElementById('stat-orc-aprovados').textContent = d.orc_aprovados;
+
+                const orcLabels = {
+                    'rascunho': 'Rascunho', 'enviado': 'Enviado',
+                    'aprovado': 'Aprovado', 'rejeitado': 'Rejeitado', 'expirado': 'Expirado'
+                };
+                const orcColors = {
+                    'rascunho': '#6c757d', 'enviado': '#0d6efd',
+                    'aprovado': '#198754', 'rejeitado': '#dc3545', 'expirado': '#ffc107'
+                };
+                let htmlO = '';
+                const allOrc = { 'rascunho': d.orc_rascunho, 'enviado': d.orc_enviados, 'aprovado': d.orc_aprovados, 'rejeitado': d.orc_rejeitados };
+                for (const [st, tot] of Object.entries(allOrc)) {
+                    if (tot > 0) {
+                        htmlO += `<div class="text-center">
+                            <div style="width:42px;height:42px;border-radius:50%;background:${orcColors[st]};display:inline-flex;align-items:center;justify-content:center;">
+                                <span class="text-white fw-bold small">${tot}</span>
+                            </div>
+                            <div><small class="text-muted">${orcLabels[st]}</small></div>
+                        </div>`;
+                    }
+                }
+                document.getElementById('orc-status').innerHTML = htmlO || '<small class="text-muted">Nenhum orcamento</small>';
+
+                const f = d.faturamento;
+                document.getElementById('stat-faturamento').textContent = 'R$ ' + f.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+
+                let htmlF = '';
+                if (d.faturamento_por_prof.length > 0) {
+                    d.faturamento_por_prof.forEach(p => {
+                        htmlF += `<div class="d-flex justify-content-between align-items-center mb-1">
+                            <small class="text-truncate" style="max-width:150px;" title="${p.profissional_nome}">${p.profissional_nome}</small>
+                            <small class="fw-bold text-success">R$ ${p.valor.toFixed(2).replace('.',',')}</small>
+                        </div>`;
+                    });
+                } else {
+                    htmlF = '<small class="text-muted d-block text-center">Nenhum faturamento</small>';
+                }
+                document.getElementById('faturamento-por-prof').innerHTML = htmlF;
+            })
+            .catch(() => {
+                ['stat-estab','stat-prof','stat-convenios','stat-procedimentos','stat-pacientes',
+                 'stat-consultas-total','stat-orc-rascunho','stat-orc-aprovados'].forEach(id => {
+                    document.getElementById(id).textContent = '0';
+                });
+                document.getElementById('stat-faturamento').textContent = 'R$ 0,00';
+            });
+    }
+
+    carregarStats();
+</script>
+{% endblock %}

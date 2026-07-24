@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: sisgersa
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn main:app --workers 4
+    envVars:
+      - key: DB_ENGINE
+        value: postgresql
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sisgersa-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: PYTHON_VERSION
+        value: "3.13"
+
+databases:
+  - name: sisgersa-db
+    plan: free
+    databaseName: sisgersa
+    user: sisgersa

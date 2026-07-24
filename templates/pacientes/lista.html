@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block titulo %}Prontuarios{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-people"></i> Prontuarios</h2>
+    {% if usuario.tipo in ['admin', 'recepcionista'] %}
+    <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoPaciente">
+        <i class="bi bi-person-plus"></i> Novo Prontuario
+    </a>
+    {% endif %}
+</div>
+
+{% if pacientes %}
+<div class="mb-3">
+    <div class="input-group input-group-sm" style="max-width:400px;">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" id="buscaProntuario" placeholder="Buscar por nome, CPF, email ou telefone..." oninput="filtrarProntuarios()">
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="tabelaProntuarios">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>CPF</th>
+                        <th>Email</th>
+                        <th>Telefone</th>
+                        <th>Acoes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in pacientes %}
+                    <tr data-nome="{{ p.nome|lower }}" data-cpf="{{ (p.cpf or '')|lower }}" data-email="{{ (p.email or '')|lower }}" data-telefone="{{ (p.telefone or '')|lower }}">
+                        <td class="d-flex align-items-center gap-2">
+                            {% if p.foto_url %}
+                            <img src="{{ p.foto_url }}" class="rounded-circle" style="width:36px;height:36px;object-fit:cover;">
+                            {% else %}
+                            <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white" style="width:36px;height:36px;flex-shrink:0;">
+                                <i class="bi bi-person"></i>
+                            </div>
+                            {% endif %}
+                            {{ p.nome }}
+                        </td>
+                        <td>{{ p.cpf or '-' }}</td>
+                        <td>{{ p.email }}</td>
+                        <td>{{ p.telefone or '-' }}</td>
+                        <td>
+                            <a href="/pacientes/{{ p.id }}/editar" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a href="/pacientes/{{ p.id }}/editar" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            {% if usuario.tipo in ['admin', 'recepcionista'] %}
+                            <a href="/pacientes/{{ p.id }}/convenio" class="btn btn-sm btn-outline-success" title="Convenios">
+                                <i class="bi bi-shield-check"></i>
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div id="nenhumResultado" class="text-center py-4 text-muted" style="display:none;">
+            <i class="bi bi-search fs-1"></i>
+            <p class="mt-2">Nenhum prontuario encontrado para esta busca.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+function filtrarProntuarios() {
+    var termo = document.getElementById('buscaProntuario').value.toLowerCase();
+    var linhas = document.querySelectorAll('#tabelaProntuarios tbody tr');
+    var visiveis = 0;
+    linhas.forEach(function(linha) {
+        var nome = linha.getAttribute('data-nome') || '';
+        var cpf = linha.getAttribute('data-cpf') || '';
+        var email = linha.getAttribute('data-email') || '';
+        var telefone = linha.getAttribute('data-telefone') || '';
+        if (nome.indexOf(termo) !== -1 || cpf.indexOf(termo) !== -1 || email.indexOf(termo) !== -1 || telefone.indexOf(termo) !== -1) {
+            linha.style.display = '';
+            visiveis++;
+        } else {
+            linha.style.display = 'none';
+        }
+    });
+    document.getElementById('nenhumResultado').style.display = visiveis === 0 ? '' : 'none';
+}
+</script>
+{% else %}
+<div class="text-center py-4 text-muted">
+    <i class="bi bi-people fs-1"></i>
+    <p class="mt-2">Nenhum prontuario encontrado.</p>
+</div>
+{% endif %}
+
+<div class="modal fade" id="modalNovoPaciente" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Novo Prontuario</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/pacientes/criar" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" name="foto_url" id="pac-novo-foto-url">
+                    <div class="text-center mb-3">
+                        <div id="pac-novo-foto-preview" class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle" style="width:100px;height:100px;border:2px dashed #ccc;cursor:pointer;overflow:hidden;" onclick="document.getElementById('pac-novo-foto-input').click()">
+                            <i class="bi bi-person text-muted" style="font-size:2.5rem;"></i>
+                        </div>
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="document.getElementById('pac-novo-foto-input').click()">
+                                <i class="bi bi-upload"></i> Foto
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="abrirCamera('pac-novo')">
+                                <i class="bi bi-camera"></i> Camera
+                            </button>
+                            <input type="file" id="pac-novo-foto-input" accept="image/*" class="d-none" onchange="previewImagem(this, 'pac-novo-foto-preview', 'pac-novo-foto-url')">
+                            <input type="file" id="pac-novo-camera-input" accept="image/*" capture="user" class="d-none" onchange="previewImagem(this, 'pac-novo-foto-preview', 'pac-novo-foto-url')">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nome Completo</label>
+                        <input type="text" class="form-control" name="nome" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" name="email" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">CPF</label>
+                            <input type="text" class="form-control" name="cpf" data-mask="cpf" placeholder="000.000.000-00">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Telefone</label>
+                            <input type="text" class="form-control" name="telefone" data-mask="phone">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Data de Nascimento</label>
+                        <input type="date" class="form-control" name="data_nascimento">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Endereco</label>
+                        <input type="text" class="form-control" name="endereco">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Senha Temporaria</label>
+                        <input type="password" class="form-control" name="senha" required>
+                        <small class="text-muted">O prontuario podera alterar no primeiro login.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Cadastrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

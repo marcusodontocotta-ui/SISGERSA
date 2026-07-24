@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block titulo %}Historico{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-folder-medical"></i> Historico</h2>
+    {% if usuario.tipo in ['admin', 'recepcionista', 'profissional'] %}
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoProntuario">
+        <i class="bi bi-plus-circle"></i> Novo Registro
+    </button>
+    {% endif %}
+</div>
+
+{% if usuario.tipo != 'paciente' and pacientes_filtro is defined and pacientes_filtro %}
+<form method="GET" class="mb-3">
+    <div class="row align-items-center g-2">
+        <div class="col-md-4">
+            <select class="form-select form-select-sm" name="paciente_id" onchange="salvarPacienteFiltro(this.value); this.form.submit()">
+                <option value="">Todos os Prontuarios</option>
+                {% for p in pacientes_filtro %}
+                <option value="{{ p.id }}" {{ 'selected' if paciente_id == p.id }}>{{ p.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% if paciente_id %}
+        <div class="col-auto">
+            <a href="/prontuarios?pf=1" class="btn btn-sm btn-outline-secondary" onclick="limparPacienteFiltro()"><i class="bi bi-x-circle"></i> Limpar</a>
+        </div>
+        {% endif %}
+    </div>
+</form>
+{% endif %}
+
+<div class="mb-3">
+    <div class="input-group input-group-sm" style="max-width:400px;">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" id="buscaHistorico" placeholder="Buscar por nome, CPF, email, telefone..." oninput="filtrarHistorico()">
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if prontuarios %}
+        <div class="table-responsive">
+            <table class="table table-hover" id="tabelaHistorico">
+                <thead>
+                    <tr>
+                        <th>Numero</th>
+                        <th>Paciente</th>
+                        <th>Data de Criacao</th>
+                        <th>Acoes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in prontuarios %}
+                    <tr data-paciente="{{ p.paciente_nome|lower }}" data-cpf="{{ (p.paciente_cpf or '')|lower }}" data-email="{{ (p.paciente_email or '')|lower }}" data-telefone="{{ (p.paciente_telefone or '')|lower }}">
+                        <td><code>{{ p.numero_prontuario or 'S/N' }}</code></td>
+                        <td>{{ p.paciente_nome }}</td>
+                        <td>{{ p.criado_em.strftime('%d/%m/%Y') if p.criado_em else '-' }}</td>
+                        <td>
+                            <a href="/prontuarios/{{ p.id }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i> Ver
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div id="nenhumResultadoHistorico" class="text-center py-4 text-muted" style="display:none;">
+            <i class="bi bi-search fs-1"></i>
+            <p class="mt-2">Nenhum registro encontrado para esta busca.</p>
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+            <i class="bi bi-folder fs-1"></i>
+            <p class="mt-2">Nenhum registro encontrado.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal fade" id="modalNovoProntuario" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Novo Registro</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/prontuarios/criar">
+                <div class="modal-body">
+                    {% if estabelecimentos is defined and estabelecimentos %}
+                    <div class="mb-3">
+                        <label class="form-label">Estabelecimento *</label>
+                        <select class="form-select" name="estabelecimento_id" required>
+                            <option value="">Selecione...</option>
+                            {% for e in estabelecimentos %}
+                            <option value="{{ e.id }}">{{ e.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                    <div class="mb-3">
+                        <label class="form-label">Paciente *</label>
+                        <select class="form-select" name="paciente_id" required>
+                            <option value="">Selecione...</option>
+                            {% for p in pacientes %}
+                            <option value="{{ p.id }}">{{ p.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Numero do Registro</label>
+                        <input type="text" class="form-control" name="numero"
+                               placeholder="Deixe vazio para gerar automatico">
+                        <small class="text-muted">Se vazio, sera gerado automaticamente.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Criar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function filtrarHistorico() {
+    var termo = document.getElementById('buscaHistorico').value.toLowerCase();
+    var linhas = document.querySelectorAll('#tabelaHistorico tbody tr');
+    var visiveis = 0;
+    linhas.forEach(function(linha) {
+        var paciente = linha.getAttribute('data-paciente') || '';
+        var cpf = linha.getAttribute('data-cpf') || '';
+        var email = linha.getAttribute('data-email') || '';
+        var telefone = linha.getAttribute('data-telefone') || '';
+        if (paciente.indexOf(termo) !== -1 || cpf.indexOf(termo) !== -1 || email.indexOf(termo) !== -1 || telefone.indexOf(termo) !== -1) {
+            linha.style.display = '';
+            visiveis++;
+        } else {
+            linha.style.display = 'none';
+        }
+    });
+    document.getElementById('nenhumResultadoHistorico').style.display = visiveis === 0 ? '' : 'none';
+}
+</script>
+{% endblock %}

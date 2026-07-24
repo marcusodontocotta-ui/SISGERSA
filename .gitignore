@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+ngrok_bin/
+ngrok_log.txt
+ngrok_log_new.txt
+tunnel_error.txt
+tunnel_error_new.txt
+tunnel_output.txt
+server.log
+*.sqlite3
+uploads/
+static/uploads/

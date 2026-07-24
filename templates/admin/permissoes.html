@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block titulo %}Gerenciar Permissoes - SISGERSA{% endblock %}
+{% block conteudo %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3><i class="bi bi-shield-lock"></i> Gerenciar Permissoes</h3>
+        <a href="/dashboard" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Voltar</a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="/admin/permissoes" class="row g-3 align-items-end">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Estabelecimento</label>
+                    <select name="estabelecimento_id" class="form-select" id="select-estab" required>
+                        <option value="">Selecione...</option>
+                        {% for e in estabelecimentos %}
+                        <option value="{{ e.id }}" {{ 'selected' if e.id|string == estabSelecionado|string }}>{{ e.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label fw-bold">Funcionario / Paciente</label>
+                    <select name="usuario_id" class="form-select" id="select-usuario" required>
+                        <option value="">Selecione o estabelecimento primeiro</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if usuarioSelecionado %}
+    <div class="card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <span>
+                <i class="bi bi-person-gear"></i>
+                Permissoes de <strong>{{ usuarioSelecionado.nome }}</strong>
+                <span class="badge bg-light text-dark">{{ usuarioSelecionado.tipo }}</span>
+            </span>
+            <div>
+                <button type="button" class="btn btn-sm btn-outline-light" onclick="marcarTodas(true)"><i class="bi bi-check-all"></i> Tudo</button>
+                <button type="button" class="btn btn-sm btn-outline-light" onclick="marcarTodas(false)"><i class="bi bi-x-lg"></i> Nenhum</button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <form method="POST" action="/admin/permissoes/salvar" id="form-permissoes">
+                <input type="hidden" name="usuario_id" value="{{ usuarioSelecionado.id }}">
+                <input type="hidden" name="estabelecimento_id" value="{{ estabSelecionado }}">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:30%">Modulo</th>
+                                <th class="text-center" style="width:17.5%">Ver</th>
+                                <th class="text-center" style="width:17.5%">Criar</th>
+                                <th class="text-center" style="width:17.5%">Editar</th>
+                                <th class="text-center" style="width:17.5%">Excluir</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for mod_key, mod_info in modulos.items() %}
+                            {% set override = overrides.get(mod_key, {}) %}
+                            {% set default = defaults.get(mod_key, {}) %}
+                            <tr>
+                                <td>
+                                    <i class="bi {{ mod_info.icon }}"></i>
+                                    <strong>{{ mod_info.label }}</strong>
+                                    {% if override %}
+                                    <span class="badge bg-info ms-1" title="Personalizado">P</span>
+                                    {% else %}
+                                    <small class="text-muted ms-1">(padrao)</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% set val = override.ver if override.ver is not none else default.ver %}
+                                    <input type="checkbox" name="{{ mod_key }}_ver" class="form-check-input perm-check"
+                                           {{ 'checked' if val }} data-mod="{{ mod_key }}" data-acao="ver">
+                                </td>
+                                <td class="text-center">
+                                    {% set val = override.criar if override.criar is not none else default.criar %}
+                                    <input type="checkbox" name="{{ mod_key }}_criar" class="form-check-input perm-check"
+                                           {{ 'checked' if val }} data-mod="{{ mod_key }}" data-acao="criar">
+                                </td>
+                                <td class="text-center">
+                                    {% set val = override.editar if override.editar is not none else default.editar %}
+                                    <input type="checkbox" name="{{ mod_key }}_editar" class="form-check-input perm-check"
+                                           {{ 'checked' if val }} data-mod="{{ mod_key }}" data-acao="editar">
+                                </td>
+                                <td class="text-center">
+                                    {% set val = override.excluir if override.excluir is not none else default.excluir %}
+                                    <input type="checkbox" name="{{ mod_key }}_excluir" class="form-check-input perm-check"
+                                           {{ 'checked' if val }} data-mod="{{ mod_key }}" data-acao="excluir">
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer d-flex justify-content-between">
+                    <small class="text-muted">
+                        <span class="badge bg-info">P</span> = Permissao personalizada (diferente do padrao do role)
+                    </small>
+                    <div>
+                        <button type="button" class="btn btn-outline-warning btn-sm" onclick="resetarPermissoes()">
+                            <i class="bi bi-arrow-counterclockwise"></i> Restaurar Padrao
+                        </button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-lg"></i> Salvar Permissoes
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+const selectEstab = document.getElementById('select-estab');
+const selectUsuario = document.getElementById('select-usuario');
+
+if (selectEstab) {
+    selectEstab.addEventListener('change', function() {
+        const estabId = this.value;
+        if (!estabId) {
+            selectUsuario.innerHTML = '<option value="">Selecione o estabelecimento primeiro</option>';
+            return;
+        }
+        fetchRetry('/api/usuarios-por-estab?estabelecimento_id=' + estabId)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                selectUsuario.innerHTML = '<option value="">Selecione...</option>';
+                (data.usuarios || []).forEach(u => {
+                    const opt = document.createElement('option');
+                    opt.value = u.id;
+                    opt.textContent = u.nome + ' (' + u.tipo + ')';
+                    {% if usuarioSelecionado %}
+                    if (u.id == {{ usuarioSelecionado.id }}) opt.selected = true;
+                    {% endif %}
+                    selectUsuario.appendChild(opt);
+                });
+            });
+    });
+    if (selectEstab.value) selectEstab.dispatchEvent(new Event('change'));
+}
+
+function marcarTodas(valor) {
+    document.querySelectorAll('.perm-check').forEach(cb => cb.checked = valor);
+}
+
+function resetarPermissoes() {
+    document.querySelectorAll('.perm-check').forEach(cb => {
+        cb.checked = cb.dataset.default === 'true';
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orcamento #{{ orcamento.id }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; font-size: 12px; color: #333; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 2px solid #0d6efd; padding-bottom: 15px; }
+        .header-left h1 { font-size: 18px; color: #0d6efd; margin-bottom: 5px; }
+        .header-left p { font-size: 11px; color: #666; }
+        .header-right { text-align: right; }
+        .header-right .orc-num { font-size: 24px; font-weight: bold; color: #0d6efd; }
+        .header-right .orc-status { font-size: 12px; padding: 3px 10px; border-radius: 3px; color: white; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .info-box { border: 1px solid #ddd; padding: 10px; border-radius: 4px; }
+        .info-box h3 { font-size: 11px; color: #666; text-transform: uppercase; margin-bottom: 5px; }
+        .info-box p { font-size: 12px; margin: 0; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px; }
+        th { background: #f0f0f0; font-weight: bold; }
+        td.text-right, th.text-right { text-align: right; }
+        td.text-center, th.text-center { text-align: center; }
+        tfoot td { font-weight: bold; background: #f8f9fa; }
+        .total-row td { font-size: 14px; background: #0d6efd; color: white; }
+        .footer { margin-top: 30px; border-top: 1px solid #ddd; padding-top: 10px; font-size: 10px; color: #999; text-align: center; }
+        .btn-print { position: fixed; top: 10px; right: 10px; padding: 8px 16px; background: #0d6efd; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; z-index: 100; }
+        @media print { .btn-print { display: none; } body { padding: 0; } }
+    </style>
+</head>
+<body>
+    <button class="btn-print" onclick="window.print()">Imprimir</button>
+
+    <div class="header">
+        <div class="header-left">
+            <h1>{{ orcamento.estabelecimento_nome }}</h1>
+            <p>{{ orcamento.estab_endereco or '' }}</p>
+            <p>{{ orcamento.estab_telefone or '' }} | {{ orcamento.estab_email or '' }}</p>
+            {% if orcamento.estab_cnpj %}
+            <p>CNPJ: {{ orcamento.estab_cnpj }}</p>
+            {% endif %}
+        </div>
+        <div class="header-right">
+            <div class="orc-num">ORC #{{ '%05d'|format(orcamento.id) }}</div>
+            {% set status_colors = {'rascunho':'#6c757d', 'enviado':'#0d6efd', 'aprovado':'#198754', 'rejeitado':'#dc3545', 'expirado':'#ffc107'} %}
+            <span class="orc-status" style="background:{{ status_colors.get(orcamento.status, '#6c757d') }}">{{ orcamento.status|upper }}</span>
+        </div>
+    </div>
+
+    <div class="info-grid">
+        <div class="info-box">
+            <h3>Paciente</h3>
+            <p><strong>{{ orcamento.paciente_nome }}</strong></p>
+            {% if orcamento.paciente_email %}<p>{{ orcamento.paciente_email }}</p>{% endif %}
+            {% if orcamento.paciente_telefone %}<p>{{ orcamento.paciente_telefone }}</p>{% endif %}
+        </div>
+        <div class="info-box">
+            <h3>Profissional</h3>
+            <p><strong>{{ orcamento.profissional_nome }}</strong></p>
+        </div>
+        <div class="info-box">
+            <h3>Detalhes</h3>
+            <p>Convenio: <strong>{{ orcamento.convenio_nome or 'Particular' }}</strong></p>
+            <p>Validade: <strong>{{ orcamento.data_validade.strftime('%d/%m/%Y') if orcamento.data_validade else 'Sem prazo' }}</strong></p>
+            <p>Emitido: <strong>{{ orcamento.criado_em.strftime('%d/%m/%Y') if orcamento.criado_em else '-' }}</strong></p>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th class="text-center" style="width:30px">#</th>
+                <th>Procedimento / Descricao</th>
+                <th class="text-center" style="width:40px">Qtd</th>
+                <th class="text-right" style="width:80px">Valor Unit.</th>
+                <th class="text-right" style="width:70px">Desconto</th>
+                <th class="text-right" style="width:80px">Subtotal</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in itens %}
+            <tr>
+                <td class="text-center">{{ loop.index }}</td>
+                <td>{{ item.descricao or item.procedimento_nome or '-' }}</td>
+                <td class="text-center">{{ item.quantidade }}</td>
+                <td class="text-right">R$ {{ '%.2f'|format(item.valor_unitario|float) }}</td>
+                <td class="text-right">R$ {{ '%.2f'|format(item.desconto|float) }}</td>
+                <td class="text-right">R$ {{ '%.2f'|format(item.subtotal|float) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="5" class="text-right">TOTAL</td>
+                <td class="text-right">R$ {{ '%.2f'|format(orcamento.valor_total|float) }}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    {% if orcamento.observacoes %}
+    <div style="margin-bottom: 20px;">
+        <h3 style="font-size: 12px; margin-bottom: 5px;">Observacoes</h3>
+        <p style="font-size: 11px; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">{{ orcamento.observacoes }}</p>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <p>Este orcamento e valido ate {{ orcamento.data_validade.strftime('%d/%m/%Y') if orcamento.data_validade else 'indefinidamente' }}.</p>
+        <p>{{ orcamento.estabelecimento_nome }} - {{ orcamento.estab_telefone or '' }} - {{ orcamento.estab_email or '' }}</p>
+    </div>
+</body>
+</html>

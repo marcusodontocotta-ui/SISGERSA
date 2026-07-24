@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block titulo %}Nova Consulta{% endblock %}
+{% block conteudo %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="bi bi-calendar-plus"></i> Nova Consulta</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/consultas/criar" id="formConsulta">
+                    {% if estabelecimentos is defined and estabelecimentos %}
+                    <div class="mb-3">
+                        <label class="form-label">Estabelecimento *</label>
+                        <select class="form-select" name="estabelecimento_id" id="selectEstab" required>
+                            <option value="">Selecione o estabelecimento...</option>
+                            {% for e in estabelecimentos %}
+                            <option value="{{ e.id }}" {% if e.id|string == estabelecimento_selecionado|string %}selected{% endif %}>{{ e.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Paciente *</label>
+                            <select class="form-select" name="paciente_id" id="selectPaciente" required>
+                                <option value="">Selecione o paciente...</option>
+                                {% for p in pacientes %}
+                                <option value="{{ p.id }}">{{ p.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Profissional *</label>
+                            <select class="form-select" name="profissional_id" required>
+                                <option value="">Selecione o profissional...</option>
+                                {% for p in profissionais %}
+                                <option value="{{ p.id }}">{{ p.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Procedimento</label>
+                        <select class="form-select" name="procedimento_id" id="selectProcedimento">
+                            <option value="">Selecione o procedimento...</option>
+                            {% for p in procedimentos %}
+                            <option value="{{ p.id }}" data-duracao="{{ p.duracao_minutos }}">{{ p.nome }} ({{ p.duracao_minutos }} min)</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div id="convenioInfo" class="mb-3" style="display:none;">
+                        <div class="alert alert-info py-2 mb-0">
+                            <i class="bi bi-shield-check"></i> Convenio do paciente: <strong id="convenioNome">-</strong>
+                        </div>
+                    </div>
+                    <div id="valorInfo" class="mb-3" style="display:none;">
+                        <div class="alert alert-success py-2 mb-0">
+                            <i class="bi bi-currency-dollar"></i> Valor estimado: <strong id="valorEstimado">R$ 0,00</strong>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Data e Hora *</label>
+                            <input type="datetime-local" class="form-control" name="data_hora" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Duracao (minutos)</label>
+                            <input type="number" class="form-control" name="duracao" id="inputDuracao" value="30" min="10" max="240">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observacoes</label>
+                        <textarea class="form-control" name="observacoes" rows="3"
+                                  placeholder="Motivo da consulta, observacoes..."></textarea>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="/consultas" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Voltar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Agendar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const conveniosData = {{ convenios | tojson }};
+    let pacienteConvenioId = null;
+
+    document.getElementById('selectPaciente').addEventListener('change', function() {
+        const pacienteId = this.value;
+        if (!pacienteId) {
+            document.getElementById('convenioInfo').style.display = 'none';
+            pacienteConvenioId = null;
+            atualizarValor();
+            return;
+        }
+        fetchRetry('/api/convenios-paciente?paciente_id=' + pacienteId)
+            .then(function(r) { return r.json(); })
+            .then(function(convenios) {
+                if (convenios.length > 0) {
+                    document.getElementById('convenioNome').textContent = convenios[0].nome;
+                    document.getElementById('convenioInfo').style.display = 'block';
+                    pacienteConvenioId = convenios[0].id;
+                } else {
+                    document.getElementById('convenioNome').textContent = 'Particular';
+                    document.getElementById('convenioInfo').style.display = 'block';
+                    pacienteConvenioId = null;
+                }
+                atualizarValor();
+            });
+    });
+
+    document.getElementById('selectProcedimento').addEventListener('change', function() {
+        const opt = this.options[this.selectedIndex];
+        if (opt && opt.dataset.duracao) {
+            document.getElementById('inputDuracao').value = opt.dataset.duracao;
+        }
+        atualizarValor();
+    });
+
+    function atualizarValor() {
+        const procId = document.getElementById('selectProcedimento').value;
+        if (!procId) {
+            document.getElementById('valorInfo').style.display = 'none';
+            return;
+        }
+        const convenioParam = pacienteConvenioId || 'null';
+        fetchRetry('/api/procedimento-valor?procedimento_id=' + procId + '&convenio_id=' + convenioParam)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.valor !== null) {
+                    document.getElementById('valorEstimado').textContent = 'R$ ' + data.valor.toFixed(2).replace('.', ',');
+                    document.getElementById('valorInfo').style.display = 'block';
+                } else {
+                    document.getElementById('valorInfo').style.display = 'none';
+                }
+            });
+    }
+</script>
+{% endblock %}
