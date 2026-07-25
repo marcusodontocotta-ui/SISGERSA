@@ -25,6 +25,7 @@ class Settings:
         if database_url:
             if database_url.startswith("postgres"):
                 self.DB_ENGINE = "postgresql"
+                self.DB_PORT = 5432
             elif database_url.startswith("mysql"):
                 self.DB_ENGINE = "mysql"
             self.DATABASE_URL = database_url
