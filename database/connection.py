@@ -31,7 +31,7 @@ class Database:
                 user=settings.DB_USER,
                 password=settings.DB_PASSWORD,
                 dbname=settings.DB_NAME,
-                row_factory=psycopg.rows.RealDictRow,
+                row_factory=psycopg.rows.dict_row,
                 connect_timeout=10,
             )
             self._connection.autocommit = True
@@ -54,11 +54,8 @@ class Database:
         try:
             if self._connection is None:
                 self._connect()
-            else:
-                try:
-                    self._connection.ping(reconnect=False)
-                except Exception:
-                    self._connect()
+            elif not self._is_alive():
+                self._connect()
         except Exception:
             self._connect()
         return self._connection
