@@ -1,4 +1,18 @@
+from config import settings
 from database.connection import db
+
+
+def _mes_atual_filter(alias: str = "") -> str:
+    prefix = f"{alias}." if alias else ""
+    if settings.DB_ENGINE == "postgresql":
+        return (
+            f"EXTRACT(MONTH FROM {prefix}criado_em) = EXTRACT(MONTH FROM CURRENT_DATE) "
+            f"AND EXTRACT(YEAR FROM {prefix}criado_em) = EXTRACT(YEAR FROM CURRENT_DATE)"
+        )
+    return (
+        f"MONTH({prefix}criado_em) = MONTH(CURRENT_DATE()) "
+        f"AND YEAR({prefix}criado_em) = YEAR(CURRENT_DATE())"
+    )
 
 
 def obter_plano_estabelecimento(estabelecimento_id: int) -> dict:
@@ -12,36 +26,27 @@ def obter_plano_estabelecimento(estabelecimento_id: int) -> dict:
 
 def contar_uso(estabelecimento_id: int) -> dict:
     consultas_mes = db.fetch_one(
-        """SELECT COUNT(*) as total FROM consultas
-           WHERE estabelecimento_id = %s
-           AND MONTH(criado_em) = MONTH(CURRENT_DATE())
-           AND YEAR(criado_em) = YEAR(CURRENT_DATE())""",
+        f"SELECT COUNT(*) as total FROM consultas WHERE estabelecimento_id = %s AND {_mes_atual_filter()}",
         (estabelecimento_id,),
     )
     profissionais = db.fetch_one(
-        """SELECT COUNT(*) as total FROM profissional_estabelecimento
-           WHERE estabelecimento_id = %s""",
+        "SELECT COUNT(*) as total FROM profissional_estabelecimento WHERE estabelecimento_id = %s",
         (estabelecimento_id,),
     )
     pacientes = db.fetch_one(
-        """SELECT COUNT(*) as total FROM paciente_estabelecimento
-           WHERE estabelecimento_id = %s""",
+        "SELECT COUNT(*) as total FROM paciente_estabelecimento WHERE estabelecimento_id = %s",
         (estabelecimento_id,),
     )
     prontuarios = db.fetch_one(
-        """SELECT COUNT(*) as total FROM prontuarios
-           WHERE estabelecimento_id = %s""",
+        "SELECT COUNT(*) as total FROM prontuarios WHERE estabelecimento_id = %s",
         (estabelecimento_id,),
     )
     orcamentos_mes = db.fetch_one(
-        """SELECT COUNT(*) as total FROM orcamentos
-           WHERE estabelecimento_id = %s
-           AND MONTH(criado_em) = MONTH(CURRENT_DATE())
-           AND YEAR(criado_em) = YEAR(CURRENT_DATE())""",
+        f"SELECT COUNT(*) as total FROM orcamentos WHERE estabelecimento_id = %s AND {_mes_atual_filter()}",
         (estabelecimento_id,),
     )
     procedimentos = db.fetch_one(
-        """SELECT COUNT(*) as total FROM procedimentos""",
+        "SELECT COUNT(*) as total FROM procedimentos",
         (),
     )
     return {
