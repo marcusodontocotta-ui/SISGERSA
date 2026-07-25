@@ -33,6 +33,7 @@ class Database:
                 dbname=settings.DB_NAME,
                 row_factory=psycopg.rows.dict_row,
                 connect_timeout=10,
+                sslmode="prefer",
             )
             self._connection.autocommit = True
         else:

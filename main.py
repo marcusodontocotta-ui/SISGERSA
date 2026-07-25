@@ -172,14 +172,21 @@ def obter_pacientes_para_filtro(usuario, estab_id=None):
 
 @app.on_event("startup")
 def startup():
-    db.get_connection()
+    import logging
+    _log = logging.getLogger("startup")
+    try:
+        db.get_connection()
+        _log.info("Conexao DB OK")
+    except Exception as e:
+        _log.error(f"Falha na conexao DB: {e}")
     if settings.ENVIRONMENT == "production":
         try:
-            from init_db import criar_banco
+            from init_db import criar_banco, criar_admin_padrao
             criar_banco()
-            print("Banco de dados inicializado (producao)")
+            criar_admin_padrao()
+            _log.info("Banco de dados inicializado (producao)")
         except Exception as e:
-            print(f"Aviso init_db: {e}")
+            _log.error(f"Erro init_db: {e}")
 
 
 @app.on_event("shutdown")
