@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,6 +28,17 @@ class Settings:
             elif database_url.startswith("mysql"):
                 self.DB_ENGINE = "mysql"
             self.DATABASE_URL = database_url
+            parsed = urlparse(database_url)
+            if parsed.hostname:
+                self.DB_HOST = parsed.hostname
+            if parsed.port:
+                self.DB_PORT = parsed.port
+            if parsed.username:
+                self.DB_USER = parsed.username
+            if parsed.password:
+                self.DB_PASSWORD = parsed.password
+            if parsed.path and len(parsed.path) > 1:
+                self.DB_NAME = parsed.path.lstrip("/")
         else:
             self.DATABASE_URL = None
 
