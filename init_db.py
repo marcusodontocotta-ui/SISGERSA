@@ -12,49 +12,11 @@ from config import settings
 
 def criar_banco():
     engine = settings.DB_ENGINE
-    logger.info(f"Iniciando criacao de banco (engine={engine})")
-
-    if engine == "postgresql":
-        import psycopg
-        try:
-            conn = psycopg.connect(
-                host=settings.DB_HOST,
-                port=settings.DB_PORT,
-                user=settings.DB_USER,
-                password=settings.DB_PASSWORD,
-                dbname="postgres",
-                sslmode="prefer",
-            )
-            conn.autocommit = True
-            cur = conn.cursor()
-            cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (settings.DB_NAME,))
-            exists = cur.fetchone()
-            if not exists:
-                cur.execute(f'CREATE DATABASE "{settings.DB_NAME}"')
-                logger.info(f"Banco '{settings.DB_NAME}' criado.")
-            else:
-                logger.info(f"Banco '{settings.DB_NAME}' ja existe.")
-            cur.close()
-            conn.close()
-        except Exception as e:
-            logger.warning(f"Aviso ao criar banco PostgreSQL: {e}")
-    else:
-        import pymysql
-        conn = pymysql.connect(
-            host=settings.DB_HOST,
-            port=settings.DB_PORT,
-            user=settings.DB_USER,
-            password=settings.DB_PASSWORD,
-            charset="utf8mb4",
-        )
-        with conn.cursor() as cursor:
-            cursor.execute(
-                f"CREATE DATABASE IF NOT EXISTS {settings.DB_NAME} "
-                "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-            )
-        conn.close()
+    logger.info(f"criar_banco: engine={engine}, host={settings.DB_HOST}, port={settings.DB_PORT}, db={settings.DB_NAME}")
 
     schema = get_schema()
+    statements = [s.strip() for s in schema.strip().split(";") if s.strip()]
+    logger.info(f"criar_banco: {len(statements)} statements para executar")
 
     if engine == "postgresql":
         import psycopg
@@ -69,9 +31,10 @@ def criar_banco():
             )
             conn.autocommit = True
         except Exception as e:
-            logger.error(f"Falha ao conectar no banco {settings.DB_NAME}: {e}")
+            logger.error(f"criar_banco: falha ao conectar: {e}")
             return
     else:
+        import pymysql
         conn = pymysql.connect(
             host=settings.DB_HOST,
             port=settings.DB_PORT,
@@ -79,25 +42,25 @@ def criar_banco():
             password=settings.DB_PASSWORD,
             database=settings.DB_NAME,
             charset="utf8mb4",
+            autocommit=True,
         )
 
     erros = 0
     criadas = 0
     cursor = conn.cursor()
-    for statement in schema.strip().split(";"):
-        statement = statement.strip()
-        if statement:
-            try:
-                cursor.execute(statement)
-                criadas += 1
-            except Exception as e:
-                erros += 1
-                logger.warning(f"Erro ao executar SQL: {e}")
-                logger.warning(f"SQL: {statement[:120]}...")
+    for i, statement in enumerate(statements):
+        try:
+            cursor.execute(statement)
+            criadas += 1
+        except Exception as e:
+            erros += 1
+            if erros <= 5:
+                logger.warning(f"criar_banco: erro stmt {i}: {e}")
+                logger.warning(f"criar_banco: sql: {statement[:150]}")
     cursor.close()
     conn.close()
 
-    logger.info(f"Tabelas: {criadas} criadas, {erros} erros")
+    logger.info(f"criar_banco: {criadas} OK, {erros} erros")
 
 
 def criar_admin_padrao():
@@ -110,9 +73,9 @@ def criar_admin_padrao():
             tipo="admin",
             is_super=True,
         )
-        logger.info(f"Admin criado: marcusodontocotta@gmail.com / admin123 (ID: {admin_id})")
+        logger.info(f"criar_admin: criado ID={admin_id}")
     except Exception as e:
-        logger.info(f"Admin ja existe ou erro: {e}")
+        logger.info(f"criar_admin: {e}")
 
 
 if __name__ == "__main__":

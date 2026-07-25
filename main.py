@@ -4,6 +4,11 @@ import uuid
 import secrets
 from collections import defaultdict
 import time
+import logging
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logger = logging.getLogger("sisgersa")
+
 from fastapi import FastAPI, Request, Form, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -172,21 +177,21 @@ def obter_pacientes_para_filtro(usuario, estab_id=None):
 
 @app.on_event("startup")
 def startup():
-    import logging
-    _log = logging.getLogger("startup")
+    logger.info(f"Startup: ENVIRONMENT={settings.ENVIRONMENT}, DB_ENGINE={settings.DB_ENGINE}")
     try:
         db.get_connection()
-        _log.info("Conexao DB OK")
+        logger.info("Startup: conexao DB OK")
     except Exception as e:
-        _log.error(f"Falha na conexao DB: {e}")
+        logger.error(f"Startup: falha na conexao DB: {e}")
+
     if settings.ENVIRONMENT == "production":
         try:
             from init_db import criar_banco, criar_admin_padrao
             criar_banco()
             criar_admin_padrao()
-            _log.info("Banco de dados inicializado (producao)")
+            logger.info("Startup: banco inicializado com sucesso")
         except Exception as e:
-            _log.error(f"Erro init_db: {e}")
+            logger.error(f"Startup: erro ao inicializar banco: {e}", exc_info=True)
 
 
 @app.on_event("shutdown")
