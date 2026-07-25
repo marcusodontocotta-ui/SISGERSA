@@ -59,12 +59,17 @@ def contar_uso(estabelecimento_id: int) -> dict:
     }
 
 
-def verificar_limite(estabelecimento_id: int, tipo_recurso: str) -> dict:
-    plano = obter_plano_estabelecimento(estabelecimento_id)
+def verificar_limite(estabelecimento_id, tipo_recurso: str) -> dict:
+    try:
+        eid = int(estabelecimento_id)
+    except (TypeError, ValueError):
+        return {"permitido": True, "uso": 0, "limite": -1, "plano": "Nenhum"}
+
+    plano = obter_plano_estabelecimento(eid)
     if not plano:
         return {"permitido": True, "uso": 0, "limite": -1, "plano": "Nenhum"}
 
-    uso = contar_uso(estabelecimento_id)
+    uso = contar_uso(eid)
     valor_uso = uso.get(tipo_recurso, 0)
     limite = plano.get(f"limite_{tipo_recurso}", -1)
 
@@ -79,8 +84,12 @@ def verificar_limite(estabelecimento_id: int, tipo_recurso: str) -> dict:
     }
 
 
-def bloquear_se_limite(estabelecimento_id: int, tipo_recurso: str):
-    resultado = verificar_limite(estabelecimento_id, tipo_recurso)
+def bloquear_se_limite(estabelecimento_id, tipo_recurso: str):
+    try:
+        eid = int(estabelecimento_id)
+    except (TypeError, ValueError):
+        return
+    resultado = verificar_limite(eid, tipo_recurso)
     if not resultado["permitido"]:
         plano = resultado["plano"]
         limite = resultado["limite"]

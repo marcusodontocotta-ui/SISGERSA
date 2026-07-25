@@ -40,6 +40,13 @@ templates.env.globals["MODULOS_INFO"] = MODULOS
 templates.env.globals["pode_acessar"] = pode_acessar
 
 
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    if exc.status_code == 302 and exc.headers and "Location" in exc.headers:
+        return RedirectResponse(url=exc.headers["Location"], status_code=302)
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
@@ -1535,6 +1542,8 @@ def criar_prontuario(
         bloquear_se_limite(estab_id, "prontuarios")
     except LimiteAtingidoError as e:
         return RedirectResponse(f"/prontuarios?erro_quota={e}", status_code=302)
+    except Exception as e:
+        logger.warning(f"criar_prontuario: erro ao verificar quota: {e}")
 
     if not numero:
         count = db.fetch_one(
