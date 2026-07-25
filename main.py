@@ -184,7 +184,7 @@ def startup():
     except Exception as e:
         logger.error(f"Startup: falha na conexao DB: {e}")
 
-    if settings.ENVIRONMENT == "production":
+    if settings.DB_ENGINE == "postgresql":
         try:
             from init_db import criar_banco, criar_admin_padrao
             criar_banco()
