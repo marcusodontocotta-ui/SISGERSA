@@ -1048,6 +1048,17 @@ def restore_db():
 
     db.execute("""INSERT INTO estabelecimentos (id, nome, tipo, ativo) VALUES
         (1, 'Clinica IDOR', 'clinica', TRUE)""")
+
+    from utils.auth import hash_senha
+    pwd_hash = hash_senha("pac123")
+    db.execute("""INSERT INTO usuarios (id, nome, email, senha_hash, tipo, ativo)
+        VALUES (2, 'PacienteIDOR', 'paciente@test.com', %s, 'paciente', TRUE)
+        ON DUPLICATE KEY UPDATE ativo=TRUE""", (pwd_hash,))
+    db.execute("""INSERT INTO usuarios (id, nome, email, senha_hash, tipo, ativo)
+        VALUES (3, 'PacienteIDOR2', 'paciente2@test.com', %s, 'paciente', TRUE)
+        ON DUPLICATE KEY UPDATE ativo=TRUE""", (pwd_hash,))
+    db.execute("ALTER TABLE usuarios AUTO_INCREMENT = 4")
+
     db.execute("""INSERT IGNORE INTO profissional_estabelecimento (usuario_id, estabelecimento_id)
         VALUES (1, 1)""")
     db.execute("""INSERT IGNORE INTO paciente_estabelecimento (usuario_id, estabelecimento_id)
