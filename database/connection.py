@@ -24,17 +24,15 @@ class Database:
             pass
 
         if _DB_ENGINE == "postgresql":
-            import psycopg2
-            import psycopg2.extras
-            self._connection = psycopg2.connect(
+            import psycopg
+            self._connection = psycopg.connect(
                 host=settings.DB_HOST,
                 port=settings.DB_PORT,
                 user=settings.DB_USER,
                 password=settings.DB_PASSWORD,
                 dbname=settings.DB_NAME,
-                cursor_factory=psycopg2.extras.RealDictCursor,
+                row_factory=psycopg.rows.RealDictRow,
                 connect_timeout=10,
-                options="-c statement_timeout=30000",
             )
             self._connection.autocommit = True
         else:

@@ -11,9 +11,9 @@ def criar_banco():
     engine = settings.DB_ENGINE
 
     if engine == "postgresql":
-        import psycopg2
+        import psycopg
         try:
-            conn = psycopg2.connect(
+            conn = psycopg.connect(
                 host=settings.DB_HOST,
                 port=settings.DB_PORT,
                 user=settings.DB_USER,
@@ -47,8 +47,8 @@ def criar_banco():
     schema = get_schema()
 
     if engine == "postgresql":
-        import psycopg2
-        conn = psycopg2.connect(
+        import psycopg
+        conn = psycopg.connect(
             host=settings.DB_HOST,
             port=settings.DB_PORT,
             user=settings.DB_USER,
