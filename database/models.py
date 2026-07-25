@@ -309,6 +309,39 @@ CREATE TABLE IF NOT EXISTS pagamentos (
     FOREIGN KEY (orcamento_id) REFERENCES orcamentos(id) ON DELETE CASCADE
 );
 
+-- ============================================
+-- PLANOS E ASSINATURAS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS planos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    slug VARCHAR(50) NOT NULL UNIQUE,
+    descricao TEXT,
+    valor_mensal DECIMAL(10,2) NOT NULL DEFAULT 0,
+    limite_estabelecimentos INT DEFAULT 1,
+    limite_consultas_mes INT DEFAULT 100,
+    limite_profissionais INT DEFAULT 3,
+    limite_pacientes INT DEFAULT 50,
+    recursos TEXT,
+    ativo BOOLEAN DEFAULT TRUE,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS cupons (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    codigo VARCHAR(50) NOT NULL UNIQUE,
+    descricao TEXT,
+    desconto_percentual INT DEFAULT 0,
+    desconto_valor DECIMAL(10,2) DEFAULT 0,
+    plano_destino VARCHAR(50) DEFAULT 'basico',
+    validade_dias INT DEFAULT 30,
+    max_usos INT DEFAULT 0,
+    usos_atual INT DEFAULT 0,
+    ativo BOOLEAN DEFAULT TRUE,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 """
 
 
@@ -621,13 +654,67 @@ CREATE TABLE IF NOT EXISTS pagamentos (
     FOREIGN KEY (orcamento_id) REFERENCES orcamentos(id) ON DELETE CASCADE
 );
 
+-- ============================================
+-- PLANOS E ASSINATURAS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS planos (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    slug VARCHAR(50) NOT NULL UNIQUE,
+    descricao TEXT,
+    valor_mensal DECIMAL(10,2) NOT NULL DEFAULT 0,
+    limite_estabelecimentos INT DEFAULT 1,
+    limite_consultas_mes INT DEFAULT 100,
+    limite_profissionais INT DEFAULT 3,
+    limite_pacientes INT DEFAULT 50,
+    recursos TEXT,
+    ativo BOOLEAN DEFAULT TRUE,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- CUPONS DE DESCONTO
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS cupons (
+    id SERIAL PRIMARY KEY,
+    codigo VARCHAR(50) NOT NULL UNIQUE,
+    descricao TEXT,
+    desconto_percentual INT DEFAULT 0 CHECK (desconto_percentual >= 0 AND desconto_percentual <= 100),
+    desconto_valor DECIMAL(10,2) DEFAULT 0,
+    plano_destino VARCHAR(50) DEFAULT 'basico',
+    validade_dias INT DEFAULT 30,
+    max_usos INT DEFAULT 0,
+    usos_atual INT DEFAULT 0,
+    ativo BOOLEAN DEFAULT TRUE,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE estabelecimentos ADD COLUMN IF NOT EXISTS cupom_id INT REFERENCES cupons(id);
+ALTER TABLE estabelecimentos ADD COLUMN IF NOT EXISTS plano_id INT REFERENCES planos(id);
+ALTER TABLE estabelecimentos ADD COLUMN IF NOT EXISTS plano_expira_em DATE;
+
 """
+
+
+SCHEMA_ALTER_MYSQL = [
+    "ALTER TABLE estabelecimentos ADD COLUMN plano_id INT NULL",
+    "ALTER TABLE estabelecimentos ADD COLUMN plano_expira_em DATE NULL",
+    "ALTER TABLE estabelecimentos ADD COLUMN cupom_id INT NULL",
+]
 
 
 def get_schema():
     if settings.DB_ENGINE == "postgresql":
         return SCHEMA_POSTGRESQL
     return SCHEMA_MYSQL
+
+
+def get_alter_tables():
+    if settings.DB_ENGINE == "postgresql":
+        return []
+    return SCHEMA_ALTER_MYSQL
 
 
 SCHEMA_SQL = SCHEMA_MYSQL

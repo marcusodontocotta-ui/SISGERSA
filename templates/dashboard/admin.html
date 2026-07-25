@@ -8,6 +8,28 @@
     </div>
 </div>
 
+{% if plano_info and plano_info.slug != 'enterprise' %}
+<div class="card mb-4 border-info">
+    <div class="card-body py-2">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+                <span class="badge bg-info me-2"><i class="bi bi-gem"></i> Plano {{ plano_info.nome }}</span>
+                {% if uso_info %}
+                <small class="text-muted">
+                    Consultas: {{ uso_info.consultas_mes }}{% if plano_info.limite_consultas_mes > 0 %}/{{ plano_info.limite_consultas_mes }}{% endif %} |
+                    Profissionais: {{ uso_info.profissionais }}{% if plano_info.limite_profissionais > 0 %}/{{ plano_info.limite_profissionais }}{% endif %} |
+                    Pacientes: {{ uso_info.pacientes }}{% if plano_info.limite_pacientes > 0 %}/{{ plano_info.limite_pacientes }}{% endif %}
+                </small>
+                {% endif %}
+            </div>
+            <a href="#" class="btn btn-sm btn-outline-primary" onclick="alert('Em breve! Planos de assinatura em construção.')">
+                <i class="bi bi-arrow-up-circle"></i> Upgrade
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="row g-2 mb-4">
     <div class="col-md-2">
         <a href="/consultas" class="text-decoration-none">

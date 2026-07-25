@@ -30,6 +30,7 @@ from utils.permissoes import (
     pode_acessar, obter_permissoes_usuario, obter_permissoes_para_nav,
     salvar_permissoes, limpar_permissoes, exigir_permissao,
 )
+from utils.planos import verificar_limite, LimiteAtingidoError, obter_plano_estabelecimento, contar_uso, bloquear_se_limite
 
 app = FastAPI(title="SISGERSA", docs_url=None, redoc_url=None)
 
@@ -186,12 +187,21 @@ def startup():
 
     if settings.DB_ENGINE == "postgresql":
         try:
-            from init_db import criar_banco, criar_admin_padrao
+            from init_db import criar_banco, criar_admin_padrao, seed_planos, seed_cupons
             criar_banco()
             criar_admin_padrao()
+            seed_planos()
+            seed_cupons()
             logger.info("Startup: banco inicializado com sucesso")
         except Exception as e:
             logger.error(f"Startup: erro ao inicializar banco: {e}", exc_info=True)
+    else:
+        try:
+            from init_db import seed_planos, seed_cupons
+            seed_planos()
+            seed_cupons()
+        except Exception as e:
+            logger.error(f"Startup: erro ao semear dados: {e}")
 
 
 @app.on_event("shutdown")
@@ -202,9 +212,13 @@ def shutdown():
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     usuario = obter_usuario_atual(request)
-    if not usuario:
-        return RedirectResponse("/login", status_code=302)
-    return RedirectResponse("/dashboard", status_code=302)
+    if usuario:
+        return RedirectResponse("/dashboard", status_code=302)
+    planos = db.fetch_all("SELECT * FROM planos WHERE ativo = TRUE ORDER BY valor_mensal ASC")
+    return templates.TemplateResponse(
+        "landing.html",
+        {"request": request, "planos": planos},
+    )
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -250,6 +264,142 @@ def login_submit(request: Request, email: str = Form(...), senha: str = Form(...
     return response
 
 
+@app.get("/registrar", response_class=HTMLResponse)
+def registrar_page(request: Request):
+    usuario = obter_usuario_atual(request)
+    if usuario:
+        return RedirectResponse("/dashboard", status_code=302)
+    return templates.TemplateResponse("auth/registrar.html", {"request": request})
+
+
+@app.get("/api/cupom/validar")
+def api_validar_cupom(codigo: str):
+    cupom = db.fetch_one(
+        "SELECT * FROM cupons WHERE codigo = %s AND ativo = TRUE",
+        (codigo.upper(),),
+    )
+    if not cupom:
+        return {"valido": False, "mensagem": "Cupom não encontrado ou inativo"}
+
+    if cupom["max_usos"] > 0 and cupom["usos_atual"] >= cupom["max_usos"]:
+        return {"valido": False, "mensagem": "Cupom atingiu o limite de uso"}
+
+    desconto = cupom["desconto_percentual"]
+    plano = cupom["plano_destino"]
+    if desconto == 100:
+        msg = f"Cupom válido! Acesso gratuito ao plano {plano} por {cupom['validade_dias']} dias"
+    else:
+        msg = f"Cupom válido! {desconto}% de desconto no plano {plano}"
+    return {"valido": True, "mensagem": msg, "desconto": desconto, "plano": plano}
+
+
+@app.post("/registrar")
+def registrar_submit(
+    request: Request,
+    nome_estabelecimento: str = Form(...),
+    tipo: str = Form("clinica"),
+    cnpj: str = Form(None),
+    telefone: str = Form(None),
+    email_estab: str = Form(None),
+    endereco: str = Form(None),
+    nome_admin: str = Form(...),
+    email: str = Form(...),
+    senha: str = Form(...),
+    senha2: str = Form(...),
+    cupom: str = Form(None),
+):
+    if senha != senha2:
+        return templates.TemplateResponse("auth/registrar.html", {
+            "request": request, "erro": "As senhas não coincidem"
+        })
+
+    if len(senha) < 6:
+        return templates.TemplateResponse("auth/registrar.html", {
+            "request": request, "erro": "A senha deve ter no mínimo 6 caracteres"
+        })
+
+    from database.connection import db
+    existente = db.fetch_one("SELECT id FROM usuarios WHERE email = %s", (email,))
+    if existente:
+        return templates.TemplateResponse("auth/registrar.html", {
+            "request": request, "erro": "Já existe uma conta com este email"
+        })
+
+    cupom_id = None
+    plano_slug = "gratis"
+    if cupom and cupom.strip():
+        cupom_row = db.fetch_one(
+            "SELECT * FROM cupons WHERE codigo = %s AND ativo = TRUE",
+            (cupom.strip().upper(),),
+        )
+        if cupom_row:
+            if cupom_row["max_usos"] > 0 and cupom_row["usos_atual"] >= cupom_row["max_usos"]:
+                return templates.TemplateResponse("auth/registrar.html", {
+                    "request": request, "erro": "Cupom atingiu o limite de uso"
+                })
+            cupom_id = cupom_row["id"]
+            plano_slug = cupom_row["plano_destino"]
+
+    plano_row = db.fetch_one("SELECT id FROM planos WHERE slug = %s", (plano_slug,))
+    plano_id = plano_row["id"] if plano_row else None
+
+    try:
+        if settings.DB_ENGINE == "postgresql":
+            db.execute(
+                """INSERT INTO estabelecimentos (nome, tipo, cnpj, telefone, email, endereco, plano_id, cupom_id)
+                   VALUES (%s, %s, NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), %s, %s)""",
+                (nome_estabelecimento, tipo, cnpj or "", telefone or "", email_estab or "", endereco or "", plano_id, cupom_id),
+            )
+        else:
+            db.execute(
+                """INSERT INTO estabelecimentos (nome, tipo, cnpj, telefone, email, endereco, plano_id, cupom_id)
+                   VALUES (%s, %s, NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), %s, %s)""",
+                (nome_estabelecimento, tipo, cnpj or "", telefone or "", email_estab or "", endereco or "", plano_id, cupom_id),
+            )
+
+        estab = db.fetch_one("SELECT id FROM estabelecimentos ORDER BY id DESC LIMIT 1")
+        estab_id = estab["id"]
+
+        if cupom_id:
+            db.execute("UPDATE cupons SET usos_atual = usos_atual + 1 WHERE id = %s", (cupom_id,))
+    except Exception as e:
+        logger.error(f"registrar: erro ao criar estabelecimento: {e}")
+        return templates.TemplateResponse("auth/registrar.html", {
+            "request": request, "erro": f"Erro ao criar estabelecimento: {e}"
+        })
+
+    try:
+        from utils.auth import criar_usuario, vincular_profissional
+        admin_id = criar_usuario(
+            nome=nome_admin,
+            email=email,
+            senha=senha,
+            tipo="admin",
+            telefone=telefone or None,
+            is_super=False,
+        )
+        vincular_profissional(admin_id, estab_id, cargo="Administrador")
+    except Exception as e:
+        logger.error(f"registrar: erro ao criar admin: {e}")
+        return templates.TemplateResponse("auth/registrar.html", {
+            "request": request, "erro": f"Erro ao criar usuário: {e}"
+        })
+
+    token = criar_token(admin_id, "admin", False)
+
+    cookie_kwargs = dict(httponly=True, max_age=172800, samesite="lax")
+    is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    if is_https:
+        cookie_kwargs["secure"] = True
+
+    response = RedirectResponse("/dashboard?welcome=1", status_code=302)
+    response.set_cookie("token", token, **cookie_kwargs)
+    response.set_cookie("estabelecimento_id", str(estab_id), **cookie_kwargs)
+
+    logger.info(f"registrar: nova clínica '{nome_estabelecimento}' (ID={estab_id}), admin={email}")
+    return response
+
+
 @app.get("/logout")
 def logout():
     response = RedirectResponse("/login", status_code=302)
@@ -279,6 +429,55 @@ def selecionar_estabelecimento(
     else:
         response.delete_cookie("estabelecimento_id")
     return response
+
+
+@app.get("/admin/cupons", response_class=HTMLResponse)
+def listar_cupons(request: Request, usuario=Depends(exigir_login)):
+    if not usuario.get("is_super"):
+        raise HTTPException(status_code=403)
+    cupons = db.fetch_all("SELECT * FROM cupons ORDER BY criado_em DESC")
+    return templates.TemplateResponse(
+        "admin/cupons.html",
+        {"request": request, "usuario": usuario, "cupons": cupons},
+    )
+
+
+@app.post("/admin/cupons/criar")
+def criar_cupom(
+    request: Request,
+    codigo: str = Form(...),
+    descricao: str = Form(None),
+    desconto_percentual: int = Form(0),
+    plano_destino: str = Form("basico"),
+    validade_dias: int = Form(30),
+    max_usos: int = Form(0),
+    usuario=Depends(exigir_login),
+):
+    if not usuario.get("is_super"):
+        raise HTTPException(status_code=403)
+
+    try:
+        db.execute(
+            """INSERT INTO cupons (codigo, descricao, desconto_percentual, plano_destino, validade_dias, max_usos)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (codigo.upper().strip(), descricao, desconto_percentual, plano_destino, validade_dias, max_usos),
+        )
+    except Exception:
+        return RedirectResponse("/admin/cupons?erro=codigo_duplicado", status_code=302)
+
+    return RedirectResponse("/admin/cupons", status_code=302)
+
+
+@app.post("/admin/cupons/{cupom_id}/toggle")
+def toggle_cupom(cupom_id: int, usuario=Depends(exigir_login)):
+    if not usuario.get("is_super"):
+        raise HTTPException(status_code=403)
+    cupom = db.fetch_one("SELECT id, ativo FROM cupons WHERE id = %s", (cupom_id,))
+    if not cupom:
+        raise HTTPException(status_code=404)
+    novo = not cupom["ativo"]
+    db.execute("UPDATE cupons SET ativo = %s WHERE id = %s", (novo, cupom_id))
+    return RedirectResponse("/admin/cupons", status_code=302)
 
 
 @app.get("/admin/permissoes", response_class=HTMLResponse)
@@ -383,9 +582,19 @@ def api_usuarios_por_estab(
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request, usuario=Depends(exigir_login)):
+    plano_info = None
+    uso_info = None
+    estab_id = resolver_estabelecimento(request, usuario)
+    if estab_id:
+        plano_info = obter_plano_estabelecimento(estab_id)
+        uso_info = contar_uso(estab_id)
+
     return templates.TemplateResponse(
         f"dashboard/{usuario['tipo']}.html",
-        {"request": request, "usuario": usuario, "now": datetime.now()},
+        {
+            "request": request, "usuario": usuario, "now": datetime.now(),
+            "plano_info": plano_info, "uso_info": uso_info,
+        },
     )
 
 
@@ -725,6 +934,13 @@ def criar_profissional(
     if usuario["tipo"] != "admin":
         raise HTTPException(status_code=403)
 
+    estab_id = resolver_estabelecimento(request, usuario, estabelecimento_id)
+    if estab_id:
+        try:
+            bloquear_se_limite(estab_id, "profissionais")
+        except LimiteAtingidoError as e:
+            return RedirectResponse(f"/profissionais?erro_quota={e}", status_code=302)
+
     try:
         user_id = criar_usuario(nome, email, senha, "profissional", telefone)
     except Exception:
@@ -838,6 +1054,12 @@ def criar_paciente(
         raise HTTPException(status_code=403)
 
     estab_id = resolver_estabelecimento(request, usuario, estabelecimento_id)
+    if estab_id:
+        try:
+            bloquear_se_limite(estab_id, "pacientes")
+        except LimiteAtingidoError as e:
+            return RedirectResponse(f"/pacientes?erro_quota={e}", status_code=302)
+
     user_id = criar_usuario(nome, email, senha, "paciente", telefone)
     db.execute(
         "UPDATE usuarios SET cpf = %s, data_nascimento = %s, endereco = %s WHERE id = %s",
@@ -1028,6 +1250,11 @@ def criar_consulta(
     estab_id = resolver_estabelecimento(request, usuario, estabelecimento_id)
     if not estab_id or usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
         raise HTTPException(status_code=403)
+
+    try:
+        bloquear_se_limite(estab_id, "consultas_mes")
+    except LimiteAtingidoError as e:
+        return RedirectResponse(f"/consultas?erro_quota={e}", status_code=302)
 
     prontuario = db.fetch_one(
         "SELECT id FROM prontuarios WHERE paciente_usuario_id = %s AND estabelecimento_id = %s",
@@ -2214,6 +2441,11 @@ def converter_orcamento_em_consulta(
 
     if usuario["tipo"] == "profissional" and orcamento["profissional_usuario_id"] != usuario["id"]:
         raise HTTPException(status_code=403)
+
+    try:
+        bloquear_se_limite(orcamento["estabelecimento_id"], "consultas_mes")
+    except LimiteAtingidoError as e:
+        return RedirectResponse(f"/orcamentos/{orc_id}?erro_quota={e}", status_code=302)
 
     prontuario = db.fetch_one(
         "SELECT id FROM prontuarios WHERE paciente_usuario_id = %s AND estabelecimento_id = %s",

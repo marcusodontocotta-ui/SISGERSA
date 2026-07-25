@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block titulo %}Cupons de Desconto - SISGERSA{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-tag"></i> Cupons de Desconto</h2>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoCupom">
+        <i class="bi bi-plus-circle"></i> Novo Cupom
+    </button>
+</div>
+
+{% if request.query_params.get('erro') == 'codigo_duplicado' %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle"></i> Já existe um cupom com este código.
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Código</th>
+                    <th>Descrição</th>
+                    <th>Desconto</th>
+                    <th>Plano</th>
+                    <th>Validade</th>
+                    <th>Usos</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in cupons %}
+                <tr>
+                    <td><code class="fs-6">{{ c.codigo }}</code></td>
+                    <td>{{ c.descricao or '-' }}</td>
+                    <td>
+                        {% if c.desconto_percentual == 100 %}
+                            <span class="badge bg-success">100% (Grátis)</span>
+                        {% else %}
+                            <span class="badge bg-primary">{{ c.desconto_percentual }}% OFF</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge bg-secondary">{{ c.plano_destino }}</span></td>
+                    <td>{{ c.validade_dias }} dias</td>
+                    <td>
+                        {{ c.usos_atual }}
+                        {% if c.max_usos > 0 %}/ {{ c.max_usos }}{% else %}/ ∞{% endif %}
+                    </td>
+                    <td>
+                        {% if c.ativo %}
+                            <span class="badge bg-success">Ativo</span>
+                        {% else %}
+                            <span class="badge bg-danger">Inativo</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <form method="POST" action="/admin/cupons/{{ c.id }}/toggle" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-outline-{{ 'danger' if c.ativo else 'success' }}">
+                                {{ 'Desativar' if c.ativo else 'Ativar' }}
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not cupons %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">
+                        <i class="bi bi-tag" style="font-size:2rem;"></i><br>
+                        Nenhum cupom criado ainda.
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="modalNovoCupom" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/admin/cupons/criar">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-tag"></i> Novo Cupom</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Código do cupom *</label>
+                        <input type="text" class="form-control text-uppercase" name="codigo" required
+                               placeholder="Ex: PRIMEIRO50" maxlength="50" style="text-transform:uppercase;">
+                        <div class="form-text">Será convertido para maiúsculas automaticamente</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descrição</label>
+                        <input type="text" class="form-control" name="descricao"
+                               placeholder="Ex: 50% off para novos clientes">
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Desconto (%)</label>
+                            <input type="number" class="form-control" name="desconto_percentual"
+                                   value="50" min="0" max="100">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Plano destino</label>
+                            <select class="form-select" name="plano_destino">
+                                <option value="gratis">Grátis</option>
+                                <option value="basico" selected>Básico</option>
+                                <option value="profissional">Profissional</option>
+                                <option value="enterprise">Enterprise</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Validade (dias)</label>
+                            <input type="number" class="form-control" name="validade_dias"
+                                   value="90" min="1">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Limite de usos</label>
+                            <input type="number" class="form-control" name="max_usos"
+                                   value="0" min="0">
+                            <div class="form-text">0 = ilimitado</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Criar Cupom
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

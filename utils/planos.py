@@ -1,0 +1,70 @@
+from database.connection import db
+
+
+def obter_plano_estabelecimento(estabelecimento_id: int) -> dict:
+    return db.fetch_one(
+        """SELECT p.* FROM planos p
+           JOIN estabelecimentos e ON e.plano_id = p.id
+           WHERE e.id = %s""",
+        (estabelecimento_id,),
+    )
+
+
+def contar_uso(estabelecimento_id: int) -> dict:
+    consultas_mes = db.fetch_one(
+        """SELECT COUNT(*) as total FROM consultas
+           WHERE estabelecimento_id = %s
+           AND MONTH(criado_em) = MONTH(CURRENT_DATE())
+           AND YEAR(criado_em) = YEAR(CURRENT_DATE())""",
+        (estabelecimento_id,),
+    )
+    profissionais = db.fetch_one(
+        """SELECT COUNT(*) as total FROM profissional_estabelecimento
+           WHERE estabelecimento_id = %s""",
+        (estabelecimento_id,),
+    )
+    pacientes = db.fetch_one(
+        """SELECT COUNT(*) as total FROM paciente_estabelecimento
+           WHERE estabelecimento_id = %s""",
+        (estabelecimento_id,),
+    )
+    return {
+        "consultas_mes": consultas_mes["total"] if consultas_mes else 0,
+        "profissionais": profissionais["total"] if profissionais else 0,
+        "pacientes": pacientes["total"] if pacientes else 0,
+    }
+
+
+def verificar_limite(estabelecimento_id: int, tipo_recurso: str) -> dict:
+    plano = obter_plano_estabelecimento(estabelecimento_id)
+    if not plano:
+        return {"permitido": True, "uso": 0, "limite": -1, "plano": "Nenhum"}
+
+    uso = contar_uso(estabelecimento_id)
+    valor_uso = uso.get(tipo_recurso, 0)
+    limite = plano.get(f"limite_{tipo_recurso}", -1)
+
+    if limite == -1:
+        return {"permitido": True, "uso": valor_uso, "limite": -1, "plano": plano["nome"]}
+
+    return {
+        "permitido": valor_uso < limite,
+        "uso": valor_uso,
+        "limite": limite,
+        "plano": plano["nome"],
+    }
+
+
+def bloquear_se_limite(estabelecimento_id: int, tipo_recurso: str):
+    resultado = verificar_limite(estabelecimento_id, tipo_recurso)
+    if not resultado["permitido"]:
+        plano = resultado["plano"]
+        limite = resultado["limite"]
+        raise LimiteAtingidoError(
+            f"Limite do plano {plano} atingido: {resultado['uso']}/{limite} {tipo_recurso}. "
+            f"Faça upgrade do seu plano para continuar."
+        )
+
+
+class LimiteAtingidoError(Exception):
+    pass

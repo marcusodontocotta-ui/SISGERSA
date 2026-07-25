@@ -121,6 +121,9 @@
                             {% if usuario.tipo == 'admin' %}
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="/admin/permissoes"><i class="bi bi-shield-lock"></i> Permissoes</a></li>
+                            {% if usuario.is_super %}
+                            <li><a class="dropdown-item" href="/admin/cupons"><i class="bi bi-tag"></i> Cupons</a></li>
+                            {% endif %}
                             {% endif %}
                         </ul>
                     </li>
@@ -128,6 +131,11 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/admin/permissoes"><i class="bi bi-shield-lock"></i> Permissoes</a>
                     </li>
+                    {% if usuario.is_super %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/cupons"><i class="bi bi-tag"></i> Cupons</a>
+                    </li>
+                    {% endif %}
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav">
@@ -357,5 +365,24 @@
         })();
         </script>
         {% endif %}
+        <script>
+        (function() {
+            var params = new URLSearchParams(window.location.search);
+            var erro = params.get('erro_quota');
+            if (erro) {
+                var toast = document.createElement('div');
+                toast.className = 'position-fixed top-0 end-0 p-3';
+                toast.style.zIndex = '9999';
+                toast.innerHTML = '<div class="alert alert-danger alert-dismissible fade show shadow" role="alert">' +
+                    '<i class="bi bi-exclamation-triangle-fill"></i> <strong>Limite do plano!</strong> ' + erro +
+                    '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
+                document.body.appendChild(toast);
+                var bsAlert = new bootstrap.Alert(toast.querySelector('.alert'));
+                setTimeout(function() { bsAlert.close(); }, 8000);
+                params.delete('erro_quota');
+                window.history.replaceState({}, '', window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
+            }
+        })();
+        </script>
     </body>
 </html>
