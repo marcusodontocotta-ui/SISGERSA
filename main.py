@@ -651,14 +651,22 @@ def dashboard_stats(
         estab_params = [estab_id]
 
     estabelecimentos = db.fetch_one("SELECT COUNT(*) AS total FROM estabelecimentos WHERE ativo = TRUE")
-    pacientes = db.fetch_one(
-        f"SELECT COUNT(*) AS total FROM usuarios WHERE tipo = 'paciente' AND ativo = TRUE{estab_filter}",
-        tuple(estab_params),
-    )
-    profissionais = db.fetch_one(
-        f"SELECT COUNT(*) AS total FROM usuarios WHERE tipo = 'profissional' AND ativo = TRUE{estab_filter}",
-        tuple(estab_params),
-    )
+    if estab_id:
+        pacientes = db.fetch_one(
+            "SELECT COUNT(*) AS total FROM usuarios u JOIN paciente_estabelecimento pe ON pe.usuario_id = u.id WHERE u.tipo = 'paciente' AND u.ativo = TRUE AND pe.estabelecimento_id = %s",
+            (estab_id,),
+        )
+        profissionais = db.fetch_one(
+            "SELECT COUNT(*) AS total FROM usuarios u JOIN profissional_estabelecimento pe ON pe.usuario_id = u.id WHERE u.tipo = 'profissional' AND u.ativo = TRUE AND pe.estabelecimento_id = %s",
+            (estab_id,),
+        )
+    else:
+        pacientes = db.fetch_one(
+            "SELECT COUNT(*) AS total FROM usuarios WHERE tipo = 'paciente' AND ativo = TRUE"
+        )
+        profissionais = db.fetch_one(
+            "SELECT COUNT(*) AS total FROM usuarios WHERE tipo = 'profissional' AND ativo = TRUE"
+        )
     convenios = db.fetch_one("SELECT COUNT(*) AS total FROM convenios WHERE ativo = TRUE")
     procedimentos = db.fetch_one("SELECT COUNT(*) AS total FROM procedimentos WHERE ativo = TRUE")
 
