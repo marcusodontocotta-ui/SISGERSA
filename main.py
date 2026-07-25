@@ -274,10 +274,14 @@ def registrar_page(request: Request):
 
 @app.get("/api/cupom/validar")
 def api_validar_cupom(codigo: str):
-    cupom = db.fetch_one(
-        "SELECT * FROM cupons WHERE codigo = %s AND ativo = TRUE",
-        (codigo.upper(),),
-    )
+    try:
+        cupom = db.fetch_one(
+            "SELECT * FROM cupons WHERE codigo = %s AND ativo = TRUE",
+            (codigo.upper(),),
+        )
+    except Exception:
+        return {"valido": False, "mensagem": "Sistema de cupons indisponível"}
+
     if not cupom:
         return {"valido": False, "mensagem": "Cupom não encontrado ou inativo"}
 
@@ -435,7 +439,10 @@ def selecionar_estabelecimento(
 def listar_cupons(request: Request, usuario=Depends(exigir_login)):
     if not usuario.get("is_super"):
         raise HTTPException(status_code=403)
-    cupons = db.fetch_all("SELECT * FROM cupons ORDER BY criado_em DESC")
+    try:
+        cupons = db.fetch_all("SELECT * FROM cupons ORDER BY criado_em DESC")
+    except Exception:
+        cupons = []
     return templates.TemplateResponse(
         "admin/cupons.html",
         {"request": request, "usuario": usuario, "cupons": cupons},
