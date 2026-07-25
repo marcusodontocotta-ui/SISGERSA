@@ -66,14 +66,15 @@ def criar_banco():
             charset="utf8mb4",
         )
 
-    with conn.cursor() as cursor:
-        for statement in schema.strip().split(";"):
-            statement = statement.strip()
-            if statement:
-                try:
-                    cursor.execute(statement)
-                except Exception as e:
-                    print(f"Aviso: {e}")
+    cursor = conn.cursor()
+    for statement in schema.strip().split(";"):
+        statement = statement.strip()
+        if statement:
+            try:
+                cursor.execute(statement)
+            except Exception as e:
+                print(f"Aviso: {e}")
+    cursor.close()
 
     conn.commit()
     conn.close()

@@ -75,15 +75,15 @@ class Database:
             if not self._is_alive():
                 self._connection = None
             conn = self.get_connection()
-            with conn.cursor() as cursor:
-                cursor.execute(query, params)
-                return cursor
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            return cursor
         except Exception:
             self._connection = None
             conn = self.get_connection()
-            with conn.cursor() as cursor:
-                cursor.execute(query, params)
-                return cursor
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            return cursor
 
     def fetch_one(self, query: str, params=None):
         cursor = self.execute(query, params)
