@@ -87,11 +87,17 @@ class Database:
 
     def fetch_one(self, query: str, params=None):
         cursor = self.execute(query, params)
-        return cursor.fetchone()
+        row = cursor.fetchone()
+        if row is not None and _DB_ENGINE == "postgresql":
+            return dict(row)
+        return row
 
     def fetch_all(self, query: str, params=None):
         cursor = self.execute(query, params)
-        return cursor.fetchall()
+        rows = cursor.fetchall()
+        if _DB_ENGINE == "postgresql":
+            return [dict(r) for r in rows]
+        return rows
 
     def close(self):
         if self._connection is not None:
