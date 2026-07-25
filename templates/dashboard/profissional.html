@@ -1,65 +1,160 @@
 {% extends "base.html" %}
-{% block titulo %}Painel do Profissional{% endblock %}
+{% block titulo %}Painel Profissional{% endblock %}
 {% block conteudo %}
-<div class="row mb-4">
-    <div class="col">
-        <h2><i class="bi bi-person-badge"></i> Painel do Profissional</h2>
-        <p class="text-muted">Bem-vindo, {{ usuario.nome }}</p>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-person-badge"></i> Olá, {{ usuario.nome }}</h2>
+        <small class="text-muted">Painel do Profissional | {{ estab_info.nome if estab_info else '' }}</small>
     </div>
+    <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Online</span>
 </div>
 
-<div class="row g-4">
-    <div class="col-md-4">
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
         <div class="card text-bg-primary">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Meus Prontuarios</h6>
-                        <h2>-</h2>
-                    </div>
-                    <i class="bi bi-people fs-1 opacity-50"></i>
-                </div>
+            <div class="card-body text-center">
+                <h3>{{ consultas_hoje|length if consultas_hoje else 0 }}</h3>
+                <small>Consultas Hoje</small>
             </div>
+            <a href="/agenda" class="card-footer text-center text-white text-decoration-none">
+                <i class="bi bi-calendar-week"></i> Ver Agenda
+            </a>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
+        <div class="card text-bg-info">
+            <div class="card-body text-center">
+                <h3>{{ meus_pacientes|length if meus_pacientes else 0 }}</h3>
+                <small>Meus Pacientes</small>
+            </div>
+            <a href="/pacientes" class="card-footer text-center text-white text-decoration-none">
+                <i class="bi bi-people"></i> Ver Todos
+            </a>
+        </div>
+    </div>
+    <div class="col-md-3">
         <div class="card text-bg-success">
+            <div class="card-body text-center">
+                <h3>{{ consultas_proximas|length if consultas_proximas else 0 }}</h3>
+                <small>Próximas Consultas</small>
+            </div>
+            <a href="/agenda" class="card-footer text-center text-white text-decoration-none">
+                <i class="bi bi-calendar-event"></i> Agenda
+            </a>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-warning">
+            <div class="card-body text-center">
+                <h3>{{ total_prontuarios.total if total_prontuarios else 0 }}</h3>
+                <small>Prontuários</small>
+            </div>
+            <a href="/prontuarios" class="card-footer text-center text-dark text-decoration-none">
+                <i class="bi bi-folder-medical"></i> Ver Todos
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-calendar-check"></i> Consultas Hoje</div>
             <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Consultas Hoje</h6>
-                        <h2>-</h2>
+                {% if consultas_hoje %}
+                <div class="list-group list-group-flush">
+                    {% for c in consultas_hoje %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ c.paciente_nome }}</strong><br>
+                            <small class="text-muted">{{ c.data_hora.strftime('%H:%M') if c.data_hora else '-' }}</small>
+                        </div>
+                        <div>
+                            {% set cores = {'agendada':'primary','confirmada':'info','em_andamento':'warning','concluida':'success','cancelada':'danger','faltou':'secondary'} %}
+                            <span class="badge bg-{{ cores.get(c.status, 'secondary') }}">{{ c.status|replace('_', ' ') }}</span>
+                        </div>
                     </div>
-                    <i class="bi bi-calendar-check fs-1 opacity-50"></i>
+                    {% endfor %}
                 </div>
+                {% else %}
+                <div class="text-center py-3 text-muted">
+                    <i class="bi bi-calendar-x fs-1"></i>
+                    <p class="mt-2">Nenhuma consulta agendada para hoje.</p>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card text-bg-warning">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-clock-history"></i> Próximas Consultas</div>
             <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Pendentes</h6>
-                        <h2>-</h2>
+                {% if consultas_proximas %}
+                <div class="list-group list-group-flush">
+                    {% for c in consultas_proximas %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ c.paciente_nome }}</strong><br>
+                            <small class="text-muted">{{ c.data_hora.strftime('%d/%m %H:%M') if c.data_hora else '-' }}</small>
+                        </div>
+                        {% set cores = {'agendada':'primary','confirmada':'info'} %}
+                        <span class="badge bg-{{ cores.get(c.status, 'secondary') }}">{{ c.status|replace('_', ' ') }}</span>
                     </div>
-                    <i class="bi bi-clock-history fs-1 opacity-50"></i>
+                    {% endfor %}
                 </div>
+                {% else %}
+                <div class="text-center py-3 text-muted">
+                    <i class="bi bi-calendar-check fs-1"></i>
+                    <p class="mt-2">Nenhuma consulta futura agendada.</p>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="bi bi-calendar3"></i> Proximas Consultas</h5>
-            </div>
-            <div class="card-body">
-                <p class="text-muted">Nenhuma consulta agendada.</p>
-            </div>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5><i class="bi bi-lightning-charge"></i> Acesso Rápido</h5>
+</div>
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <a href="/prontuarios" class="btn btn-outline-primary w-100 py-3">
+            <i class="bi bi-folder-medical fs-4 d-block mb-1"></i> Prontuários
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="/agenda" class="btn btn-outline-success w-100 py-3">
+            <i class="bi bi-calendar-week fs-4 d-block mb-1"></i> Agenda
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="/consultas/nova" class="btn btn-outline-info w-100 py-3">
+            <i class="bi bi-plus-circle fs-4 d-block mb-1"></i> Nova Consulta
+        </a>
+    </div>
+</div>
+
+{% if meus_pacientes %}
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-people"></i> Meus Pacientes</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead><tr><th>Nome</th><th>Email</th><th>Telefone</th></tr></thead>
+                <tbody>
+                    {% for p in meus_pacientes %}
+                    <tr>
+                        <td>{{ p.nome }}</td>
+                        <td>{{ p.email or '-' }}</td>
+                        <td>{{ p.telefone or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
+{% endif %}
+
 {% endblock %}

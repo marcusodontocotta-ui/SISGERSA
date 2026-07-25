@@ -30,7 +30,7 @@ from utils.permissoes import (
     pode_acessar, obter_permissoes_usuario, obter_permissoes_para_nav,
     salvar_permissoes, limpar_permissoes, exigir_permissao,
 )
-from utils.planos import verificar_limite, LimiteAtingidoError, obter_plano_estabelecimento, contar_uso, bloquear_se_limite
+from utils.planos import verificar_limite, LimiteAtingidoError, obter_plano_estabelecimento, contar_uso, bloquear_se_limite, _mes_atual_filter
 
 app = FastAPI(title="SISGERSA", docs_url=None, redoc_url=None)
 
@@ -221,7 +221,7 @@ def index(request: Request):
     usuario = obter_usuario_atual(request)
     if usuario:
         return RedirectResponse("/dashboard", status_code=302)
-    planos = db.fetch_all("SELECT * FROM planos WHERE ativo = TRUE ORDER BY valor_mensal ASC")
+    planos = db.fetch_all("SELECT * FROM planos WHERE ativo = TRUE AND slug != 'cortesia' ORDER BY valor_mensal ASC")
     return templates.TemplateResponse(
         "landing.html",
         {"request": request, "planos": planos},
@@ -565,6 +565,61 @@ def salvar_permissoes_rota(
     return RedirectResponse(f"/admin/permissoes?estabelecimento_id={estabelecimento_id}&usuario_id={usuario_id}", status_code=302)
 
 
+@app.get("/admin/configuracoes-recepcionista", response_class=HTMLResponse)
+def configuracoes_recepcionista_page(request: Request, usuario=Depends(exigir_login), usuario_id: str = ""):
+    estab_id = resolver_estabelecimento(request, usuario)
+    if not estab_id or usuario["tipo"] != "admin":
+        raise HTTPException(status_code=403)
+
+    recepcionistas = db.fetch_all(
+        """SELECT u.id, u.nome, u.email FROM usuarios u
+           JOIN profissional_estabelecimento pe ON pe.usuario_id = u.id
+           WHERE u.tipo = 'recepcionista' AND u.ativo = TRUE AND pe.estabelecimento_id = %s""",
+        (estab_id,),
+    )
+
+    permissoes_atuais = []
+    if usuario_id:
+        rows = db.fetch_all(
+            "SELECT modulo FROM permissoes_usuario WHERE usuario_id = %s AND estabelecimento_id = %s AND pode_ver = TRUE",
+            (int(usuario_id), estab_id),
+        )
+        permissoes_atuais = [r["modulo"] for r in rows]
+
+    return templates.TemplateResponse(
+        "admin/config_recepcionista.html",
+        {
+            "request": request, "usuario": usuario,
+            "recepcionistas": recepcionistas,
+            "usuario_id_sel": usuario_id,
+            "modulos": MODULOS,
+            "permissoes_atuais": permissoes_atuais,
+            "mensagem": None, "tipo_mensagem": "success",
+        },
+    )
+
+
+@app.post("/admin/configuracoes-recepcionista/salvar")
+def salvar_config_recepcionista(
+    request: Request,
+    usuario_id: int = Form(...),
+    usuario=Depends(exigir_login),
+):
+    estab_id = resolver_estabelecimento(request, usuario)
+    if not estab_id or usuario["tipo"] != "admin":
+        raise HTTPException(status_code=403)
+
+    permissoes = {}
+    for chave, info in MODULOS.items():
+        if chave in ("estabelecimentos", "configuracoes"):
+            continue
+        ativo = f"modulo_{chave}" in request._form
+        permissoes[chave] = {"ver": ativo, "criar": ativo, "editar": ativo, "excluir": False}
+
+    salvar_permissoes(usuario_id, estab_id, permissoes)
+    return RedirectResponse(f"/admin/configuracoes-recepcionista?usuario_id={usuario_id}&salvo=1", status_code=302)
+
+
 @app.get("/api/usuarios-por-estab")
 def api_usuarios_por_estab(
     request: Request,
@@ -599,17 +654,113 @@ def dashboard(request: Request, usuario=Depends(exigir_login)):
     plano_info = None
     uso_info = None
     estab_id = resolver_estabelecimento(request, usuario)
+    estab_info = None
     if estab_id:
         plano_info = obter_plano_estabelecimento(estab_id)
         uso_info = contar_uso(estab_id)
+        estab_info = db.fetch_one("SELECT * FROM estabelecimentos WHERE id = %s", (estab_id,))
 
-    return templates.TemplateResponse(
-        f"dashboard/{usuario['tipo']}.html",
-        {
-            "request": request, "usuario": usuario, "now": datetime.now(),
-            "plano_info": plano_info, "uso_info": uso_info,
-        },
-    )
+    template_name = f"dashboard/{usuario['tipo']}.html"
+    if usuario["tipo"] == "admin" and not usuario.get("is_super"):
+        template_name = "dashboard/admin_estab.html"
+
+    ctx = {
+        "request": request, "usuario": usuario, "now": datetime.now(),
+        "plano_info": plano_info, "uso_info": uso_info,
+        "estab_id": estab_id, "estab_info": estab_info,
+    }
+
+    if usuario["tipo"] == "profissional" and estab_id:
+        ctx["consultas_hoje"] = db.fetch_all(
+            """SELECT c.*, u.nome AS paciente_nome FROM consultas c
+               JOIN usuarios u ON u.id = c.paciente_usuario_id
+               WHERE c.profissional_usuario_id = %s AND c.estabelecimento_id = %s
+               AND DATE(c.data_hora) = CURRENT_DATE ORDER BY c.data_hora""",
+            (usuario["id"], estab_id),
+        )
+        ctx["consultas_proximas"] = db.fetch_all(
+            """SELECT c.*, u.nome AS paciente_nome FROM consultas c
+               JOIN usuarios u ON u.id = c.paciente_usuario_id
+               WHERE c.profissional_usuario_id = %s AND c.estabelecimento_id = %s
+               AND c.data_hora > NOW() AND c.status IN ('agendada','confirmada')
+               ORDER BY c.data_hora LIMIT 10""",
+            (usuario["id"], estab_id),
+        )
+        ctx["meus_pacientes"] = db.fetch_all(
+            """SELECT DISTINCT u.id, u.nome, u.email, u.telefone FROM usuarios u
+               JOIN consultas c ON c.paciente_usuario_id = u.id
+               WHERE c.profissional_usuario_id = %s AND c.estabelecimento_id = %s AND u.ativo = TRUE
+               ORDER BY u.nome""",
+            (usuario["id"], estab_id),
+        )
+        ctx["total_prontuarios"] = db.fetch_one(
+            "SELECT COUNT(*) AS total FROM prontuarios WHERE estabelecimento_id = %s",
+            (estab_id,),
+        )
+
+    if usuario["tipo"] == "recepcionista" and estab_id:
+        ctx["consultas_hoje"] = db.fetch_all(
+            """SELECT c.*, u.nome AS paciente_nome, up.nome AS profissional_nome FROM consultas c
+               JOIN usuarios u ON u.id = c.paciente_usuario_id
+               JOIN usuarios up ON up.id = c.profissional_usuario_id
+               WHERE c.estabelecimento_id = %s AND DATE(c.data_hora) = CURRENT_DATE
+               ORDER BY c.data_hora""",
+            (estab_id,),
+        )
+        ctx["pacientes_cadastrados"] = db.fetch_one(
+            "SELECT COUNT(*) AS total FROM paciente_estabelecimento WHERE estabelecimento_id = %s",
+            (estab_id,),
+        )
+        ctx["consultas_pendentes"] = db.fetch_one(
+            "SELECT COUNT(*) AS total FROM consultas WHERE estabelecimento_id = %s AND status IN ('agendada','confirmada') AND DATE(data_hora) >= CURRENT_DATE",
+            (estab_id,),
+        )
+        perm_modulos = db.fetch_all(
+            "SELECT modulo, pode_ver FROM permissoes_usuario WHERE usuario_id = %s AND estabelecimento_id = %s AND pode_ver = TRUE",
+            (usuario["id"], estab_id),
+        )
+        ctx["modulos_liberados"] = [m["modulo"] for m in perm_modulos]
+
+    if usuario["tipo"] == "paciente":
+        ctx["minhas_consultas"] = db.fetch_all(
+            """SELECT c.*, up.nome AS profissional_nome, e.nome AS estab_nome FROM consultas c
+               JOIN usuarios up ON up.id = c.profissional_usuario_id
+               JOIN estabelecimentos e ON e.id = c.estabelecimento_id
+               WHERE c.paciente_usuario_id = %s ORDER BY c.data_hora DESC LIMIT 10""",
+            (usuario["id"],),
+        )
+        ctx["meus_prontuarios"] = db.fetch_all(
+            """SELECT p.*, e.nome AS estab_nome FROM prontuarios p
+               JOIN estabelecimentos e ON e.id = p.estabelecimento_id
+               WHERE p.paciente_usuario_id = %s ORDER BY p.criado_em DESC""",
+            (usuario["id"],),
+        )
+        ctx["meus_orcamentos"] = db.fetch_all(
+            """SELECT o.*, up.nome AS profissional_nome, e.nome AS estab_nome FROM orcamentos o
+               JOIN usuarios up ON up.id = o.profissional_usuario_id
+               JOIN estabelecimentos e ON e.id = o.estabelecimento_id
+               WHERE o.paciente_usuario_id = %s ORDER BY o.criado_em DESC LIMIT 5""",
+            (usuario["id"],),
+        )
+
+    if usuario["tipo"] == "admin" and usuario.get("is_super"):
+        ctx["total_estabelecimentos"] = db.fetch_one("SELECT COUNT(*) AS total FROM estabelecimentos WHERE ativo = TRUE")
+        ctx["total_usuarios"] = db.fetch_one("SELECT COUNT(*) AS total FROM usuarios WHERE ativo = TRUE")
+        ctx["total_pacientes"] = db.fetch_one("SELECT COUNT(*) AS total FROM usuarios WHERE tipo = 'paciente' AND ativo = TRUE")
+        ctx["total_profissionais"] = db.fetch_one("SELECT COUNT(*) AS total FROM usuarios WHERE tipo = 'profissional' AND ativo = TRUE")
+        ctx["total_consultas_mes"] = db.fetch_one(
+            f"SELECT COUNT(*) AS total FROM consultas WHERE {_mes_atual_filter()}"
+        )
+        ctx["receita_mes"] = db.fetch_one(
+            f"SELECT COALESCE(SUM(valor), 0) AS total FROM pagamentos WHERE status = 'pago' AND {_mes_atual_filter('')}"
+        )
+        ctx["planos_distribuicao"] = db.fetch_all(
+            """SELECT p.nome, COUNT(e.id) AS total FROM planos p
+               LEFT JOIN estabelecimentos e ON e.plano_id = p.id AND e.ativo = TRUE
+               WHERE p.ativo = TRUE GROUP BY p.id, p.nome ORDER BY p.valor_mensal"""
+        )
+
+    return templates.TemplateResponse(template_name, ctx)
 
 
 @app.get("/api/dashboard-stats")

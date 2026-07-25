@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block titulo %}Painel - {{ estab_info.nome if estab_info else 'Estabelecimento' }}{% endblock %}
+{% block conteudo %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-building"></i> {{ estab_info.nome if estab_info else 'Meu Estabelecimento' }}</h2>
+        <small class="text-muted">{{ estab_info.tipo|capitalize if estab_info else '' }} | {{ estab_info.email if estab_info else '' }}</small>
+    </div>
+    {% if estab_id %}
+    <span class="badge bg-primary fs-6"><i class="bi bi-building"></i> Estab. #{{ estab_id }}</span>
+    {% endif %}
+</div>
+
+{% if plano_info and plano_info.get('limite_consultas_mes') != -1 %}
+<div class="alert alert-info d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <strong>Plano: {{ plano_info.nome }}</strong>
+        {% if uso_info %}
+        <span class="ms-3">Consultas: {{ uso_info.consultas_mes }}/{{ plano_info.limite_consultas_mes }}</span>
+        <span class="ms-3">Pacientes: {{ uso_info.pacientes }}/{{ plano_info.limite_pacientes }}</span>
+        <span class="ms-3">Profissionais: {{ uso_info.profissionais }}/{{ plano_info.limite_profissionais }}</span>
+        {% endif %}
+    </div>
+    <a href="#" class="btn btn-sm btn-warning" onclick="alert('Em breve: upgrade de plano')"><i class="bi bi-arrow-up-circle"></i> Upgrade</a>
+</div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card text-bg-primary">
+            <div class="card-body text-center">
+                <h3 id="stat-pacientes">-</h3>
+                <small>Pacientes</small>
+            </div>
+            <a href="/pacientes" class="card-footer text-center text-white text-decoration-none">
+                <i class="bi bi-people"></i> Gerenciar
+            </a>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-success">
+            <div class="card-body text-center">
+                <h3 id="stat-consultas">-</h3>
+                <small>Consultas (mês)</small>
+            </div>
+            <a href="/consultas" class="card-footer text-center text-white text-decoration-none">
+                <i class="bi bi-calendar-check"></i> Ver Todas
+            </a>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-info">
+            <div class="card-body text-center">
+                <h3 id="stat-profissionais">-</h3>
+                <small>Profissionais</small>
+            </div>
+            <a href="/profissionais" class="card-footer text-center text-white text-decoration-none">
+                <i class="bi bi-person-badge"></i> Gerenciar
+            </a>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-warning">
+            <div class="card-body text-center">
+                <h3 id="stat-faturamento">-</h3>
+                <small>Faturamento (mês)</small>
+            </div>
+            <a href="/financeiro" class="card-footer text-center text-dark text-decoration-none">
+                <i class="bi bi-graph-up"></i> Relatório
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-calendar-week"></i> Consultas Hoje</div>
+            <div class="card-body">
+                <h4 class="text-center" id="stat-consultas-hoje">-</h4>
+                <div id="status-consultas" class="d-flex flex-wrap gap-2 justify-content-center mt-2"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-file-earmark-text"></i> Orçamentos</div>
+            <div class="card-body">
+                <div id="orc-status"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-folder-medical"></i> Prontuários</div>
+            <div class="card-body text-center">
+                <h4 id="stat-prontuarios">-</h4>
+                <small class="text-muted">Registros totais</small>
+            </div>
+            <a href="/prontuarios" class="card-footer text-center text-decoration-none">
+                <i class="bi bi-eye"></i> Ver Todos
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5><i class="bi bi-lightning-charge"></i> Acesso Rápido</h5>
+</div>
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <a href="/consultas/nova" class="btn btn-outline-primary w-100 py-3">
+            <i class="bi bi-plus-circle fs-4 d-block mb-1"></i> Nova Consulta
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="/pacientes" class="btn btn-outline-success w-100 py-3">
+            <i class="bi bi-person-plus fs-4 d-block mb-1"></i> Cadastrar Paciente
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="/orcamentos/novo" class="btn btn-outline-warning w-100 py-3">
+            <i class="bi bi-file-earmark-plus fs-4 d-block mb-1"></i> Novo Orçamento
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="/admin/configuracoes-recepcionista" class="btn btn-outline-secondary w-100 py-3">
+            <i class="bi bi-gear fs-4 d-block mb-1"></i> Config. Secretária
+        </a>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5><i class="bi bi-person-badge"></i> Profissionais</h5>
+    <a href="/profissionais" class="btn btn-sm btn-outline-primary">Ver Todos</a>
+</div>
+<div class="card mb-4">
+    <div class="card-body">
+        <div id="lista-profissionais" class="text-muted">Carregando...</div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-graph-up"></i> Faturamento por Profissional (mês)</div>
+    <div class="card-body">
+        <div id="faturamento-prof"></div>
+    </div>
+</div>
+
+<script>
+function formatarMoeda(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', {minimumFractionDigits:2}); }
+
+function carregarStats() {
+    fetch('/api/dashboard-stats?periodo=mes')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        document.getElementById('stat-pacientes').textContent = d.pacientes || 0;
+        document.getElementById('stat-consultas').textContent = d.consultas_total || 0;
+        document.getElementById('stat-profissionais').textContent = d.profissionais || 0;
+        document.getElementById('stat-faturamento').textContent = formatarMoeda(d.faturamento);
+        document.getElementById('stat-prontuarios').textContent = '-';
+        document.getElementById('stat-consultas-hoje').textContent = '-';
+
+        var cs = d.consultas_status || [];
+        var html = '';
+        var colors = {agendada:'primary', confirmada:'info', em_andamento:'warning', concluida:'success', cancelada:'danger', faltou:'secondary'};
+        cs.forEach(function(s) {
+            html += '<span class="badge bg-' + (colors[s.status]||'secondary') + '">' + s.status.replace(/_/g,' ') + ': ' + s.total + '</span>';
+        });
+        document.getElementById('status-consultas').innerHTML = html || '<span class="text-muted">Nenhuma</span>';
+
+        var os = document.getElementById('orc-status');
+        os.innerHTML = '<div class="d-flex flex-wrap gap-2">' +
+            '<span class="badge bg-secondary">Rascunho: ' + (d.orc_rascunho||0) + '</span>' +
+            '<span class="badge bg-info">Enviados: ' + (d.orc_enviados||0) + '</span>' +
+            '<span class="badge bg-success">Aprovados: ' + (d.orc_aprovados||0) + '</span>' +
+            '<span class="badge bg-danger">Rejeitados: ' + (d.orc_rejeitados||0) + '</span></div>';
+
+        var fp = d.faturamento_por_prof || [];
+        var fhtml = '';
+        fp.forEach(function(f) { fhtml += '<div class="d-flex justify-content-between border-bottom py-1"><span>' + f.nome + '</span><strong>' + formatarMoeda(f.total) + '</strong></div>'; });
+        document.getElementById('faturamento-prof').innerHTML = fhtml || '<span class="text-muted">Nenhum dado</span>';
+    })
+    .catch(function() {
+        document.getElementById('stat-pacientes').textContent = '0';
+        document.getElementById('stat-consultas').textContent = '0';
+        document.getElementById('stat-profissionais').textContent = '0';
+        document.getElementById('stat-faturamento').textContent = 'R$ 0,00';
+    });
+
+    fetch('/api/profissionais')
+    .then(function(r) { return r.json(); })
+    .then(function(profs) {
+        var el = document.getElementById('lista-profissionais');
+        if (!profs || profs.length === 0) { el.innerHTML = '<em>Nenhum profissional vinculado</em>'; return; }
+        var h = '<div class="list-group">';
+        profs.forEach(function(p) { h += '<div class="list-group-item d-flex justify-content-between"><span><i class="bi bi-person-badge me-2"></i>' + p.nome + '</span><span class="text-muted">' + (p.especialidade||'-') + '</span></div>'; });
+        h += '</div>';
+        el.innerHTML = h;
+    });
+}
+
+carregarStats();
+</script>
+{% endblock %}

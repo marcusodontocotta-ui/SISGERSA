@@ -1,39 +1,117 @@
 {% extends "base.html" %}
 {% block titulo %}Meu Painel{% endblock %}
 {% block conteudo %}
-<div class="row mb-4">
-    <div class="col">
-        <h2><i class="bi bi-person"></i> Meu Painel</h2>
-        <p class="text-muted">Bem-vindo, {{ usuario.nome }}</p>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-person-circle"></i> Olá, {{ usuario.nome }}</h2>
+        <small class="text-muted">Meu Painel</small>
     </div>
+    <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Online</span>
 </div>
 
-<div class="row g-4">
+<div class="row g-3 mb-4">
     <div class="col-md-4">
         <div class="card text-bg-primary">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Minhas Consultas</h6>
-                        <h2>-</h2>
-                    </div>
-                    <i class="bi bi-calendar-check fs-1 opacity-50"></i>
-                </div>
+            <div class="card-body text-center">
+                <h3>{{ minhas_consultas|length if minhas_consultas else 0 }}</h3>
+                <small>Minhas Consultas</small>
             </div>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card text-bg-info">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Meu Historico</h6>
-                        <h2><i class="bi bi-file-medical"></i></h2>
-                    </div>
-                    <i class="bi bi-folder fs-1 opacity-50"></i>
-                </div>
+            <div class="card-body text-center">
+                <h3>{{ meus_prontuarios|length if meus_prontuarios else 0 }}</h3>
+                <small>Meus Prontuários</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-warning">
+            <div class="card-body text-center">
+                <h3>{{ meus_orcamentos|length if meus_orcamentos else 0 }}</h3>
+                <small>Orçamentos</small>
             </div>
         </div>
     </div>
 </div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-calendar-check"></i> Minhas Consultas</div>
+            <div class="card-body">
+                {% if minhas_consultas %}
+                <div class="list-group list-group-flush">
+                    {% for c in minhas_consultas %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ c.profissional_nome or '-' }}</strong><br>
+                            <small class="text-muted">{{ c.estab_nome or '' }} | {{ c.data_hora.strftime('%d/%m/%Y %H:%M') if c.data_hora else '-' }}</small>
+                        </div>
+                        {% set cores = {'agendada':'primary','confirmada':'info','em_andamento':'warning','concluida':'success','cancelada':'danger','faltou':'secondary'} %}
+                        <span class="badge bg-{{ cores.get(c.status, 'secondary') }}">{{ c.status|replace('_', ' ') }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-calendar-x fs-1"></i>
+                    <p class="mt-2">Nenhuma consulta encontrada.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-folder-medical"></i> Meus Prontuários</div>
+            <div class="card-body">
+                {% if meus_prontuarios %}
+                <div class="list-group list-group-flush">
+                    {% for p in meus_prontuarios %}
+                    <a href="/prontuarios/{{ p.id }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ p.numero_prontuario or 'S/N' }}</strong><br>
+                            <small class="text-muted">{{ p.estab_nome or '' }} | {{ p.criado_em.strftime('%d/%m/%Y') if p.criado_em else '-' }}</small>
+                        </div>
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-folder fs-1"></i>
+                    <p class="mt-2">Nenhum prontuário encontrado.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if meus_orcamentos %}
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-file-earmark-text"></i> Meus Orçamentos Recentes</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead><tr><th>Profissional</th><th>Estabelecimento</th><th>Valor</th><th>Status</th></tr></thead>
+                <tbody>
+                    {% for o in meus_orcamentos %}
+                    <tr>
+                        <td>{{ o.profissional_nome or '-' }}</td>
+                        <td>{{ o.estab_nome or '-' }}</td>
+                        <td>R$ {{ '%.2f'|format(o.valor_total|float) }}</td>
+                        <td><span class="badge bg-{% if o.status == 'aprovado' %}success{% elif o.status == 'pago' %}primary{% elif o.status == 'rejeitado' %}danger{% else %}secondary{% endif %}">{{ o.status|replace('_', ' ') }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}

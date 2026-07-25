@@ -1,63 +1,151 @@
 {% extends "base.html" %}
 {% block titulo %}Painel - Recepcionista{% endblock %}
 {% block conteudo %}
-<div class="row mb-4">
-    <div class="col">
-        <h2><i class="bi bi-headset"></i> Painel - Recepcionista</h2>
-        <p class="text-muted">Bem-vindo, {{ usuario.nome }}</p>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-headset"></i> Olá, {{ usuario.nome }}</h2>
+        <small class="text-muted">Painel da Recepcionista | {{ estab_info.nome if estab_info else '' }}</small>
     </div>
+    <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Online</span>
 </div>
 
-<div class="row g-4">
-    <div class="col-md-4">
-        <div class="card text-bg-info">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Prontuarios Cadastrados</h6>
-                        <h2>-</h2>
-                    </div>
-                    <i class="bi bi-people fs-1 opacity-50"></i>
-                </div>
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card text-bg-primary">
+            <div class="card-body text-center">
+                <h3>{{ consultas_hoje|length if consultas_hoje else 0 }}</h3>
+                <small>Consultas Hoje</small>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card text-bg-success">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Consultas Hoje</h6>
-                        <h2>-</h2>
-                    </div>
-                    <i class="bi bi-calendar-check fs-1 opacity-50"></i>
-                </div>
+            <div class="card-body text-center">
+                <h3>{{ consultas_pendentes.total if consultas_pendentes else 0 }}</h3>
+                <small>Próximas Agendadas</small>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
+        <div class="card text-bg-info">
+            <div class="card-body text-center">
+                <h3>{{ pacientes_cadastrados.total if pacientes_cadastrados else 0 }}</h3>
+                <small>Pacientes</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
         <div class="card text-bg-warning">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Aguardando</h6>
-                        <h2>-</h2>
-                    </div>
-                    <i class="bi bi-hourglass-split fs-1 opacity-50"></i>
-                </div>
+            <div class="card-body text-center">
+                <h3 id="stat-faturamento-hoje">-</h3>
+                <small>Recebido Hoje</small>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row mt-4">
-    <div class="col-12">
-        <a href="/pacientes" class="btn btn-primary me-2">
-            <i class="bi bi-person-plus"></i> Cadastrar Paciente
-        </a>
-        <a href="/consultas" class="btn btn-success">
-            <i class="bi bi-calendar-plus"></i> Agendar Consulta
-        </a>
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-calendar-check"></i> Consultas de Hoje</span>
+        <a href="/consultas/nova" class="btn btn-sm btn-primary"><i class="bi bi-plus"></i> Agendar</a>
+    </div>
+    <div class="card-body">
+        {% if consultas_hoje %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr><th>Hora</th><th>Paciente</th><th>Profissional</th><th>Status</th><th>Ações</th></tr>
+                </thead>
+                <tbody>
+                    {% for c in consultas_hoje %}
+                    <tr>
+                        <td><strong>{{ c.data_hora.strftime('%H:%M') if c.data_hora else '-' }}</strong></td>
+                        <td>{{ c.paciente_nome }}</td>
+                        <td>{{ c.profissional_nome }}</td>
+                        <td>
+                            {% set cores = {'agendada':'primary','confirmada':'info','em_andamento':'warning','concluida':'success','cancelada':'danger','faltou':'secondary'} %}
+                            <span class="badge bg-{{ cores.get(c.status, 'secondary') }}">{{ c.status|replace('_', ' ') }}</span>
+                        </td>
+                        <td>
+                            {% if c.status == 'agendada' %}
+                            <form method="POST" action="/consultas/{{ c.id }}/status" style="display:inline">
+                                <input type="hidden" name="status" value="confirmada">
+                                <button class="btn btn-sm btn-outline-success" title="Confirmar"><i class="bi bi-check"></i></button>
+                            </form>
+                            <form method="POST" action="/consultas/{{ c.id }}/status" style="display:inline">
+                                <input type="hidden" name="status" value="cancelada">
+                                <button class="btn btn-sm btn-outline-danger" title="Cancelar" onclick="return confirm('Cancelar esta consulta?')"><i class="bi bi-x"></i></button>
+                            </form>
+                            {% elif c.status == 'confirmada' %}
+                            <form method="POST" action="/consultas/{{ c.id }}/status" style="display:inline">
+                                <input type="hidden" name="status" value="em_andamento">
+                                <button class="btn btn-sm btn-outline-warning" title="Iniciar"><i class="bi bi-play"></i></button>
+                            </form>
+                            {% elif c.status == 'em_andamento' %}
+                            <form method="POST" action="/consultas/{{ c.id }}/status" style="display:inline">
+                                <input type="hidden" name="status" value="concluida">
+                                <button class="btn btn-sm btn-outline-success" title="Concluir"><i class="bi bi-check-circle"></i></button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+            <i class="bi bi-calendar-x fs-1"></i>
+            <p class="mt-2">Nenhuma consulta agendada para hoje.</p>
+            <a href="/consultas/nova" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Agendar Consulta</a>
+        </div>
+        {% endif %}
     </div>
 </div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5><i class="bi bi-lightning-charge"></i> Ações Rápidas</h5>
+</div>
+<div class="row g-3 mb-4">
+    {% if not modulos_liberados or 'pacientes' in modulos_liberados %}
+    <div class="col-md-3">
+        <a href="/pacientes" class="btn btn-outline-success w-100 py-3">
+            <i class="bi bi-person-plus fs-4 d-block mb-1"></i> Cadastrar Paciente
+        </a>
+    </div>
+    {% endif %}
+    {% if not modulos_liberados or 'consultas' in modulos_liberados %}
+    <div class="col-md-3">
+        <a href="/consultas/nova" class="btn btn-outline-primary w-100 py-3">
+            <i class="bi bi-calendar-plus fs-4 d-block mb-1"></i> Agendar Consulta
+        </a>
+    </div>
+    {% endif %}
+    {% if not modulos_liberados or 'orcamentos' in modulos_liberados %}
+    <div class="col-md-3">
+        <a href="/orcamentos/novo" class="btn btn-outline-warning w-100 py-3">
+            <i class="bi bi-file-earmark-plus fs-4 d-block mb-1"></i> Novo Orçamento
+        </a>
+    </div>
+    {% endif %}
+    {% if not modulos_liberados or 'pagamentos' in modulos_liberados %}
+    <div class="col-md-3">
+        <a href="/pagamentos" class="btn btn-outline-info w-100 py-3">
+            <i class="bi bi-credit-card fs-4 d-block mb-1"></i> Pagamentos
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+(function(){
+    fetch('/api/dashboard-stats?periodo=hoje')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        document.getElementById('stat-faturamento-hoje').textContent = 'R$ ' + Number(d.faturamento||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+    })
+    .catch(function(){ document.getElementById('stat-faturamento-hoje').textContent = 'R$ 0,00'; });
+})();
+</script>
 {% endblock %}
