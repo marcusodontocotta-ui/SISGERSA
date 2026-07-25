@@ -1524,6 +1524,11 @@ def criar_prontuario(
     if not estab_id or usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
         raise HTTPException(status_code=403)
 
+    try:
+        bloquear_se_limite(estab_id, "prontuarios")
+    except LimiteAtingidoError as e:
+        return RedirectResponse(f"/prontuarios?erro_quota={e}", status_code=302)
+
     if not numero:
         count = db.fetch_one(
             "SELECT COUNT(*) AS total FROM prontuarios WHERE estabelecimento_id = %s",
@@ -1922,6 +1927,7 @@ def criar_procedimento(
     exigir_permissao(usuario, "procedimentos", "criar")
     if usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
         raise HTTPException(status_code=403)
+
     db.execute(
         "INSERT INTO procedimentos (nome, descricao, duracao_minutos) VALUES (%s, %s, %s)",
         (nome, descricao, duracao_minutos),
@@ -2271,6 +2277,11 @@ def criar_orcamento(
     estab_id = resolver_estabelecimento(request, usuario, estabelecimento_id)
     if not estab_id or usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
         raise HTTPException(status_code=403)
+
+    try:
+        bloquear_se_limite(estab_id, "orcamentos_mes")
+    except LimiteAtingidoError as e:
+        return RedirectResponse(f"/orcamentos?erro_quota={e}", status_code=302)
 
     conv_id = int(convenio_id) if convenio_id and convenio_id.strip() else None
     dv = data_validade if data_validade and data_validade.strip() else None

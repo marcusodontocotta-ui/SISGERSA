@@ -99,6 +99,9 @@ def seed_planos():
             "limite_consultas_mes": 50,
             "limite_profissionais": 2,
             "limite_pacientes": 30,
+            "limite_prontuarios": 30,
+            "limite_orcamentos_mes": 20,
+            "limite_procedimentos": 30,
             "recursos": "Prontuário eletrônico,Agendamento,Relatórios básicos",
         },
         {
@@ -110,6 +113,9 @@ def seed_planos():
             "limite_consultas_mes": -1,
             "limite_profissionais": 20,
             "limite_pacientes": 1000,
+            "limite_prontuarios": -1,
+            "limite_orcamentos_mes": -1,
+            "limite_procedimentos": -1,
             "recursos": "Tudo do Profissional,Suporte prioritário,Multi-estabelecimento",
         },
         {
@@ -121,6 +127,9 @@ def seed_planos():
             "limite_consultas_mes": 500,
             "limite_profissionais": 5,
             "limite_pacientes": 200,
+            "limite_prontuarios": 200,
+            "limite_orcamentos_mes": 200,
+            "limite_procedimentos": 75,
             "recursos": "Tudo do Gratis,Orçamentos,Pagamentos,Relatórios financeiros,Convênios",
         },
         {
@@ -132,6 +141,9 @@ def seed_planos():
             "limite_consultas_mes": -1,
             "limite_profissionais": 20,
             "limite_pacientes": 1000,
+            "limite_prontuarios": -1,
+            "limite_orcamentos_mes": -1,
+            "limite_procedimentos": -1,
             "recursos": "Tudo do Básico,Multi-estabelecimento,Nota fiscal,Agenda semanal,Relatórios avançados",
         },
         {
@@ -143,6 +155,9 @@ def seed_planos():
             "limite_consultas_mes": -1,
             "limite_profissionais": -1,
             "limite_pacientes": -1,
+            "limite_prontuarios": -1,
+            "limite_orcamentos_mes": -1,
+            "limite_procedimentos": -1,
             "recursos": "Tudo do Profissional,Suporte dedicado,API acesso,Backup automático,Customizações",
         },
     ]
@@ -171,16 +186,20 @@ def seed_planos():
                 cursor.execute(
                     """INSERT INTO planos (nome, slug, descricao, valor_mensal,
                        limite_estabelecimentos, limite_consultas_mes,
-                       limite_profissionais, limite_pacientes, recursos)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                       limite_profissionais, limite_pacientes,
+                       limite_prontuarios, limite_orcamentos_mes, limite_procedimentos, recursos)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                        ON CONFLICT (slug) DO NOTHING""" if engine == "postgresql"
                     else """INSERT IGNORE INTO planos (nome, slug, descricao, valor_mensal,
                        limite_estabelecimentos, limite_consultas_mes,
-                       limite_profissionais, limite_pacientes, recursos)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                       limite_profissionais, limite_pacientes,
+                       limite_prontuarios, limite_orcamentos_mes, limite_procedimentos, recursos)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                     (p["nome"], p["slug"], p["descricao"], p["valor_mensal"],
                      p["limite_estabelecimentos"], p["limite_consultas_mes"],
-                     p["limite_profissionais"], p["limite_pacientes"], p["recursos"]),
+                     p["limite_profissionais"], p["limite_pacientes"],
+                     p["limite_prontuarios"], p["limite_orcamentos_mes"],
+                     p["limite_procedimentos"], p["recursos"]),
                 )
             except Exception as e:
                 logger.warning(f"seed_planos: erro ao inserir {p['slug']}: {e}")

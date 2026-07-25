@@ -323,6 +323,9 @@ CREATE TABLE IF NOT EXISTS planos (
     limite_consultas_mes INT DEFAULT 100,
     limite_profissionais INT DEFAULT 3,
     limite_pacientes INT DEFAULT 50,
+    limite_prontuarios INT DEFAULT 50,
+    limite_orcamentos_mes INT DEFAULT 50,
+    limite_procedimentos INT DEFAULT 50,
     recursos TEXT,
     ativo BOOLEAN DEFAULT TRUE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -668,6 +671,9 @@ CREATE TABLE IF NOT EXISTS planos (
     limite_consultas_mes INT DEFAULT 100,
     limite_profissionais INT DEFAULT 3,
     limite_pacientes INT DEFAULT 50,
+    limite_prontuarios INT DEFAULT 50,
+    limite_orcamentos_mes INT DEFAULT 50,
+    limite_procedimentos INT DEFAULT 50,
     recursos TEXT,
     ativo BOOLEAN DEFAULT TRUE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -702,6 +708,9 @@ SCHEMA_ALTER_MYSQL = [
     "ALTER TABLE estabelecimentos ADD COLUMN plano_id INT NULL",
     "ALTER TABLE estabelecimentos ADD COLUMN plano_expira_em DATE NULL",
     "ALTER TABLE estabelecimentos ADD COLUMN cupom_id INT NULL",
+    "ALTER TABLE planos ADD COLUMN limite_prontuarios INT DEFAULT 50",
+    "ALTER TABLE planos ADD COLUMN limite_orcamentos_mes INT DEFAULT 50",
+    "ALTER TABLE planos ADD COLUMN limite_procedimentos INT DEFAULT 50",
 ]
 
 

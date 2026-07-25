@@ -242,6 +242,30 @@
                             <li>Pacientes ilimitados</li>
                             {% endif %}
 
+                            {% if plano.limite_prontuarios is defined %}
+                            {% if plano.limite_prontuarios > 0 %}
+                            <li>{{ plano.limite_prontuarios }} prontuarios</li>
+                            {% else %}
+                            <li>Prontuarios ilimitados</li>
+                            {% endif %}
+                            {% endif %}
+
+                            {% if plano.limite_orcamentos_mes is defined %}
+                            {% if plano.limite_orcamentos_mes > 0 %}
+                            <li>{{ plano.limite_orcamentos_mes }} orcamentos/mes</li>
+                            {% else %}
+                            <li>Orcamentos ilimitados</li>
+                            {% endif %}
+                            {% endif %}
+
+                            {% if plano.limite_procedimentos is defined %}
+                            {% if plano.limite_procedimentos > 0 %}
+                            <li>{{ plano.limite_procedimentos }} procedimentos</li>
+                            {% else %}
+                            <li>Procedimentos ilimitados</li>
+                            {% endif %}
+                            {% endif %}
+
                             {% set recursos = plano.recursos.split(',') if plano.recursos else [] %}
                             {% for r in recursos %}
                             <li>{{ r.strip() }}</li>

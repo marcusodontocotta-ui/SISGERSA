@@ -15,10 +15,13 @@
             <div>
                 <span class="badge bg-info me-2"><i class="bi bi-gem"></i> Plano {{ plano_info.nome }}</span>
                 {% if uso_info %}
-                <small class="text-muted">
-                    Consultas: {{ uso_info.consultas_mes }}{% if plano_info.limite_consultas_mes > 0 %}/{{ plano_info.limite_consultas_mes }}{% endif %} |
-                    Profissionais: {{ uso_info.profissionais }}{% if plano_info.limite_profissionais > 0 %}/{{ plano_info.limite_profissionais }}{% endif %} |
-                    Pacientes: {{ uso_info.pacientes }}{% if plano_info.limite_pacientes > 0 %}/{{ plano_info.limite_pacientes }}{% endif %}
+                <small class="text-muted d-flex flex-wrap gap-3 mt-1">
+                    <span>Consultas: <strong>{{ uso_info.consultas_mes }}</strong>{% if plano_info.limite_consultas_mes > 0 %}/{{ plano_info.limite_consultas_mes }}{% else %}/∞{% endif %}</span>
+                    <span>Pacientes: <strong>{{ uso_info.pacientes }}</strong>{% if plano_info.limite_pacientes > 0 %}/{{ plano_info.limite_pacientes }}{% else %}/∞{% endif %}</span>
+                    <span>Profissionais: <strong>{{ uso_info.profissionais }}</strong>{% if plano_info.limite_profissionais > 0 %}/{{ plano_info.limite_profissionais }}{% else %}/∞{% endif %}</span>
+                    <span>Prontuários: <strong>{{ uso_info.prontuarios }}</strong>{% if plano_info.limite_prontuarios is defined and plano_info.limite_prontuarios > 0 %}/{{ plano_info.limite_prontuarios }}{% else %}/∞{% endif %}</span>
+                    <span>Orçamentos: <strong>{{ uso_info.orcamentos_mes }}</strong>{% if plano_info.limite_orcamentos_mes is defined and plano_info.limite_orcamentos_mes > 0 %}/{{ plano_info.limite_orcamentos_mes }}{% else %}/∞{% endif %}</span>
+                    <span>Procedimentos: <strong>{{ uso_info.procedimentos }}</strong>{% if plano_info.limite_procedimentos is defined and plano_info.limite_procedimentos > 0 %}/{{ plano_info.limite_procedimentos }}{% else %}/∞{% endif %}</span>
                 </small>
                 {% endif %}
             </div>

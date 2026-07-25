@@ -28,10 +28,29 @@ def contar_uso(estabelecimento_id: int) -> dict:
            WHERE estabelecimento_id = %s""",
         (estabelecimento_id,),
     )
+    prontuarios = db.fetch_one(
+        """SELECT COUNT(*) as total FROM prontuarios
+           WHERE estabelecimento_id = %s""",
+        (estabelecimento_id,),
+    )
+    orcamentos_mes = db.fetch_one(
+        """SELECT COUNT(*) as total FROM orcamentos
+           WHERE estabelecimento_id = %s
+           AND MONTH(criado_em) = MONTH(CURRENT_DATE())
+           AND YEAR(criado_em) = YEAR(CURRENT_DATE())""",
+        (estabelecimento_id,),
+    )
+    procedimentos = db.fetch_one(
+        """SELECT COUNT(*) as total FROM procedimentos""",
+        (),
+    )
     return {
         "consultas_mes": consultas_mes["total"] if consultas_mes else 0,
         "profissionais": profissionais["total"] if profissionais else 0,
         "pacientes": pacientes["total"] if pacientes else 0,
+        "prontuarios": prontuarios["total"] if prontuarios else 0,
+        "orcamentos_mes": orcamentos_mes["total"] if orcamentos_mes else 0,
+        "procedimentos": procedimentos["total"] if procedimentos else 0,
     }
 
 
