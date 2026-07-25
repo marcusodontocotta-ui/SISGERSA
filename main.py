@@ -1689,11 +1689,12 @@ def criar_consulta(
     profissional_id: int = Form(...),
     data_hora: str = Form(...),
     duracao: int = Form(30),
-    procedimento_id: int = Form(None),
+    procedimento_id: str = Form(""),
     observacoes: str = Form(None),
     estabelecimento_id: str = Form(None),
     usuario=Depends(exigir_login),
 ):
+    procedimento_id = int(procedimento_id) if procedimento_id and procedimento_id.strip() else None
     exigir_permissao(usuario, "consultas", "criar")
     if is_write_limited(request, usuario, "create"):
         raise HTTPException(status_code=429, detail="Muitas requisicoes. Aguarde 1 minuto.")
@@ -2756,11 +2757,12 @@ def paciente_convenio_page(pac_id: int, request: Request, usuario=Depends(exigir
 def salvar_paciente_convenio(
     pac_id: int,
     request: Request,
-    convenio_id: int = Form(None),
+    convenio_id: str = Form(""),
     numero_carteirinha: str = Form(None),
     validade: str = Form(None),
     usuario=Depends(exigir_login),
 ):
+    convenio_id = int(convenio_id) if convenio_id and convenio_id.strip() else None
     if usuario["tipo"] not in ("admin", "recepcionista"):
         raise HTTPException(status_code=403)
 
