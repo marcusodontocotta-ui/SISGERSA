@@ -15,6 +15,7 @@ def check(name, condition, detail=""):
         errors.append(name)
 
 # Reset DB
+db.execute("SET FOREIGN_KEY_CHECKS = 0")
 for t in ['tratamentos', 'evolucoes', 'imaging', 'consultas', 'prontuarios',
           'paciente_estabelecimento', 'profissional_estabelecimento', 'permissoes_paciente',
           'log_atividades', 'estoque', 'procedimento_valor', 'paciente_convenio',
@@ -24,6 +25,7 @@ db.execute("DELETE FROM usuarios WHERE id > 1")
 db.execute("DELETE FROM estabelecimentos")
 db.execute("DELETE FROM convenios")
 db.execute("DELETE FROM procedimentos")
+db.execute("SET FOREIGN_KEY_CHECKS = 1")
 db.execute("ALTER TABLE usuarios AUTO_INCREMENT = 2")
 db.execute("ALTER TABLE estabelecimentos AUTO_INCREMENT = 1")
 db.execute("ALTER TABLE consultas AUTO_INCREMENT = 1")

@@ -86,7 +86,7 @@
                 <h5 class="modal-title">Novo Registro</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="/prontuarios/criar">
+            <form method="POST" action="/prontuarios/criar" id="formNovoProntuario">
                 <div class="modal-body">
                     {% if estabelecimentos is defined and estabelecimentos %}
                     <div class="mb-3">
@@ -101,10 +101,10 @@
                     {% endif %}
                     <div class="mb-3">
                         <label class="form-label">Paciente *</label>
-                        <select class="form-select" name="paciente_id" required>
+                        <select class="form-select" name="paciente_id" required id="selectPacienteProntuario">
                             <option value="">Selecione...</option>
                             {% for p in pacientes %}
-                            <option value="{{ p.id }}">{{ p.nome }}</option>
+                            <option value="{{ p.id }}" data-email="{{ p.email|default('', true) }}">{{ p.nome }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -120,6 +120,27 @@
                     <button type="submit" class="btn btn-primary">Criar</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEmailDuplicado" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Paciente com mesmo email encontrado</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="msgEmailDuplicado"></p>
+                <div id="listaPacientesDuplicados"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnCadastrarMesmoAssim" onclick="submeterProntuarioForcado()">
+                    <i class="bi bi-plus-circle"></i> Cadastrar mesmo assim
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -142,6 +163,66 @@ function filtrarHistorico() {
         }
     });
     document.getElementById('nenhumResultadoHistorico').style.display = visiveis === 0 ? '' : 'none';
+}
+
+var _skipEmailCheck = false;
+
+document.getElementById('formNovoProntuario').addEventListener('submit', function(e) {
+    if (_skipEmailCheck) { _skipEmailCheck = false; return; }
+    e.preventDefault();
+    var select = document.getElementById('selectPacienteProntuario');
+    var pacienteId = select.value;
+    if (!pacienteId) { this.submit(); return; }
+
+    var opt = select.options[select.selectedIndex];
+    var email = opt.getAttribute('data-email') || '';
+    if (!email) { this.submit(); return; }
+
+    fetch('/api/verificar-email?email=' + encodeURIComponent(email))
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+        if (!data.existe || !data.pacientes || data.pacientes.length === 0) {
+            document.getElementById('formNovoProntuario').submit();
+            return;
+        }
+        var html = '';
+        data.pacientes.forEach(function(p){
+            html += '<div class="card mb-2 ' + (p.pode_acessar ? 'border-primary' : 'border-secondary') + '">';
+            html += '<div class="card-body py-2 px-3">';
+            html += '<div class="d-flex justify-content-between align-items-center">';
+            html += '<div><strong>' + p.nome + '</strong>';
+            if (!p.pode_acessar) {
+                html += ' <span class="badge bg-secondary">Nao e paciente deste profissional</span>';
+            }
+            if (p.prontuarios && p.prontuarios.length > 0) {
+                html += '<br><small class="text-muted">Prontuarios: ';
+                p.prontuarios.forEach(function(pr, i){
+                    if (p.pode_acessar) {
+                        html += '<a href="/prontuarios/' + pr.id + '" class="text-decoration-none">' + (pr.numero || 'S/N') + '</a>';
+                    } else {
+                        html += '<span>' + (pr.numero || 'S/N') + '</span>';
+                    }
+                    if (i < p.prontuarios.length - 1) html += ', ';
+                });
+                html += '</small>';
+            }
+            html += '</div>';
+            if (p.pode_acessar && p.prontuarios && p.prontuarios.length > 0) {
+                html += '<a href="/prontuarios/' + p.prontuarios[0].id + '" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i> Abrir</a>';
+            }
+            html += '</div></div></div>';
+        });
+        document.getElementById('msgEmailDuplicado').textContent = 'Ja existe paciente(s) cadastrado(s) com este email:';
+        document.getElementById('listaPacientesDuplicados').innerHTML = html;
+        new bootstrap.Modal(document.getElementById('modalEmailDuplicado')).show();
+    })
+    .catch(function(){ document.getElementById('formNovoProntuario').submit(); });
+});
+
+function submeterProntuarioForcado() {
+    _skipEmailCheck = true;
+    bootstrap.Modal.getInstance(document.getElementById('modalEmailDuplicado')).hide();
+    document.getElementById('formNovoProntuario').submit();
 }
 </script>
 {% endblock %}

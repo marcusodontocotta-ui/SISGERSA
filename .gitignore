@@ -12,3 +12,6 @@ server.log
 *.sqlite3
 uploads/
 static/uploads/
+
+backups/
+cache/

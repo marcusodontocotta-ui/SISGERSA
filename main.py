@@ -16,8 +16,12 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 from database.connection import db
 from config import settings
+from database.connectivity import init_connectivity_checker, is_online, force_check
+from database.cache import download_to_cache, get_cache_status, start_background_cache, stop_background_cache, cache_query_one, cache_query_all
+from database.backup import dump_database, start_background_backup, stop_background_backup, get_last_backup, get_backup_count, cleanup_old_backups
 from utils.auth import (
     usuario_por_email,
+    usuarios_por_email,
     verificar_senha,
     criar_token,
     verificar_token,
@@ -137,9 +141,22 @@ def verificar_acesso_registro(request: Request, usuario: dict, registro: dict):
     if usuario.get("is_super"):
         return
     estab_id_check = request.cookies.get("estabelecimento_id")
-    if usuario["tipo"] in ("admin", "profissional"):
+    if usuario["tipo"] == "admin":
         if estab_id_check and str(registro.get("estabelecimento_id")) != str(estab_id_check):
             raise HTTPException(status_code=403)
+    elif usuario["tipo"] == "profissional":
+        if estab_id_check and str(registro.get("estabelecimento_id")) != str(estab_id_check):
+            raise HTTPException(status_code=403)
+        paciente_id = registro.get("paciente_usuario_id")
+        if paciente_id:
+            consulta = db.fetch_one(
+                """SELECT 1 FROM consultas
+                   WHERE profissional_usuario_id = %s AND paciente_usuario_id = %s
+                   LIMIT 1""",
+                (usuario["id"], paciente_id),
+            )
+            if not consulta:
+                raise HTTPException(status_code=403)
     elif usuario["tipo"] == "paciente":
         if registro.get("paciente_usuario_id") and registro["paciente_usuario_id"] != usuario["id"]:
             raise HTTPException(status_code=403)
@@ -210,9 +227,48 @@ def startup():
         except Exception as e:
             logger.error(f"Startup: erro ao semear dados: {e}")
 
+    if settings.DB_ENGINE == "postgresql":
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(settings.DATABASE_URL)
+            host = parsed.hostname or settings.DB_HOST
+            port = parsed.port or 5432
+            init_connectivity_checker(host, port)
+            logger.info(f"Startup: Connectivity checker ON, Render={host}:{port}")
+        except Exception as e:
+            logger.error(f"Startup: erro connectivity: {e}")
+
+        try:
+            from database.cache import init_cache, download_to_cache
+            init_cache()
+            initial = force_check()
+            if initial:
+                logger.info("Startup: online, baixando cache...")
+                download_to_cache()
+            else:
+                logger.warning("Startup: offline, usando cache SQLite existente")
+        except Exception as e:
+            logger.error(f"Startup: erro cache inicial: {e}")
+
+        start_background_cache(interval=3600)
+
+    try:
+        dump_file = dump_database()
+        if dump_file:
+            cleanup_old_backups()
+            logger.info(f"Startup: backup local criado")
+        else:
+            logger.warning("Startup: backup nao criado")
+    except Exception as e:
+        logger.error(f"Startup: erro backup: {e}")
+
+    start_background_backup(interval=21600)
+
 
 @app.on_event("shutdown")
 def shutdown():
+    stop_background_cache()
+    stop_background_backup()
     db.close()
 
 
@@ -243,14 +299,59 @@ def login_submit(request: Request, email: str = Form(...), senha: str = Form(...
             {"request": request, "erro": "Muitas tentativas. Aguarde 5 minutos."},
         )
 
-    usuario = usuario_por_email(email)
-    if not usuario or not verificar_senha(senha, usuario["senha_hash"]):
+    todos_usuarios = usuarios_por_email(email)
+    if not todos_usuarios:
         record_login_attempt(client_ip)
         return templates.TemplateResponse(
             "auth/login.html",
             {"request": request, "erro": "Email ou senha invalidos"},
         )
 
+    usuarios_validos = [u for u in todos_usuarios if verificar_senha(senha, u["senha_hash"])]
+
+    if not usuarios_validos:
+        record_login_attempt(client_ip)
+        return templates.TemplateResponse(
+            "auth/login.html",
+            {"request": request, "erro": "Email ou senha invalidos"},
+        )
+
+    if len(usuarios_validos) == 1:
+        return _login_usuario(request, usuarios_validos[0])
+
+    cookie_kwargs = dict(httponly=True, max_age=172800, samesite="lax")
+    is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    if is_https:
+        cookie_kwargs["secure"] = True
+
+    import hashlib, time
+    session_key = hashlib.sha256(f"{email}:{time.time()}:{client_ip}".encode()).hexdigest()[:32]
+
+    _pending_logins[session_key] = [u["id"] for u in usuarios_validos]
+    _pending_logins.pop("__cleanup__", None)
+
+    usuarios_info = []
+    for u in usuarios_validos:
+        estabs = []
+        if u["tipo"] in ("profissional", "recepcionista"):
+            estabs = obter_estabelecimentos_usuario(u["id"])
+        usuarios_info.append({
+            "id": u["id"],
+            "nome": u["nome"],
+            "tipo": u["tipo"],
+            "estabelecimentos": estabs,
+        })
+
+    return templates.TemplateResponse(
+        "auth/selecionar_conta.html",
+        {"request": request, "usuarios": usuarios_info, "session_key": session_key},
+    )
+
+
+_pending_logins = {}
+
+
+def _login_usuario(request: Request, usuario: dict):
     token = criar_token(usuario["id"], usuario["tipo"], bool(usuario.get("is_super", False)))
 
     estabelecimentos = []
@@ -269,6 +370,33 @@ def login_submit(request: Request, email: str = Form(...), senha: str = Form(...
         response.set_cookie("estabelecimento_id", str(estabelecimentos[0]["id"]), **cookie_kwargs)
 
     return response
+
+
+@app.post("/login/selecionar")
+def login_selecionar(request: Request, session_key: str = Form(...), usuario_id: int = Form(...)):
+    client_ip = request.client.host if request.client else "unknown"
+
+    if is_rate_limited(client_ip):
+        return templates.TemplateResponse(
+            "auth/login.html",
+            {"request": request, "erro": "Muitas tentativas. Aguarde 5 minutos."},
+        )
+
+    allowed_ids = _pending_logins.pop(session_key, [])
+    if not allowed_ids or usuario_id not in allowed_ids:
+        return templates.TemplateResponse(
+            "auth/login.html",
+            {"request": request, "erro": "Sessao expirada. Faca login novamente."},
+        )
+
+    usuario = db.fetch_one("SELECT * FROM usuarios WHERE id = %s AND ativo = TRUE", (usuario_id,))
+    if not usuario:
+        return templates.TemplateResponse(
+            "auth/login.html",
+            {"request": request, "erro": "Usuario nao encontrado."},
+        )
+
+    return _login_usuario(request, usuario)
 
 
 @app.get("/registrar", response_class=HTMLResponse)
@@ -416,6 +544,83 @@ def logout():
     response = RedirectResponse("/login", status_code=302)
     response.delete_cookie("token")
     response.delete_cookie("estabelecimento_id")
+    response.delete_cookie("impersonate_token")
+    response.delete_cookie("impersonate_estab")
+    return response
+
+
+@app.get("/admin/impersonate/{user_id}")
+def impersonate_user(
+    request: Request,
+    user_id: int,
+    usuario=Depends(exigir_login),
+):
+    if not usuario.get("is_super"):
+        raise HTTPException(status_code=403)
+
+    target = db.fetch_one("SELECT * FROM usuarios WHERE id = %s AND ativo = TRUE", (user_id,))
+    if not target:
+        raise HTTPException(status_code=404, detail="Usuario nao encontrado")
+
+    estab_id_form = request.query_params.get("estab_id")
+    estab_id_cookie = request.cookies.get("estabelecimento_id")
+    estab_id = estab_id_form or estab_id_cookie
+
+    if not estab_id:
+        if target["tipo"] == "paciente":
+            pe = db.fetch_one(
+                "SELECT estabelecimento_id FROM paciente_estabelecimento WHERE usuario_id = %s LIMIT 1",
+                (user_id,),
+            )
+        else:
+            pe = db.fetch_one(
+                "SELECT estabelecimento_id FROM profissional_estabelecimento WHERE usuario_id = %s LIMIT 1",
+                (user_id,),
+            )
+        if pe:
+            estab_id = str(pe["estabelecimento_id"])
+
+    token = criar_token(target["id"], target["tipo"], target.get("is_super", False))
+
+    cookie_kwargs = dict(httponly=True, max_age=172800, samesite="lax")
+    is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    if is_https:
+        cookie_kwargs["secure"] = True
+
+    response = RedirectResponse("/dashboard?impersonate=1", status_code=302)
+    original_token = request.cookies.get("token")
+    response.set_cookie("impersonate_token", original_token, **cookie_kwargs)
+    if estab_id_cookie:
+        response.set_cookie("impersonate_estab", estab_id_cookie, **cookie_kwargs)
+    response.set_cookie("token", token, **cookie_kwargs)
+    if estab_id:
+        response.set_cookie("estabelecimento_id", estab_id, **cookie_kwargs)
+
+    logger.info(f"impersonate: super admin {usuario['id']} impersonating user {user_id} ({target['tipo']})")
+    return response
+
+
+@app.get("/admin/stop-impersonate")
+def stop_impersonate(request: Request):
+    original_token = request.cookies.get("impersonate_token")
+    original_estab = request.cookies.get("impersonate_estab")
+
+    if not original_token:
+        return RedirectResponse("/login", status_code=302)
+
+    cookie_kwargs = dict(httponly=True, max_age=172800, samesite="lax")
+    is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    if is_https:
+        cookie_kwargs["secure"] = True
+
+    response = RedirectResponse("/dashboard", status_code=302)
+    response.set_cookie("token", original_token, **cookie_kwargs)
+    response.delete_cookie("impersonate_token")
+    response.delete_cookie("impersonate_estab")
+    if original_estab:
+        response.set_cookie("estabelecimento_id", original_estab, **cookie_kwargs)
+    else:
+        response.delete_cookie("estabelecimento_id")
     return response
 
 
@@ -759,6 +964,16 @@ def dashboard(request: Request, usuario=Depends(exigir_login)):
                LEFT JOIN estabelecimentos e ON e.plano_id = p.id AND e.ativo = TRUE
                WHERE p.ativo = TRUE GROUP BY p.id, p.nome ORDER BY p.valor_mensal"""
         )
+        ctx["estabelecimentos"] = db.fetch_all(
+            """SELECT e.id, e.nome, e.tipo, e.email, e.ativo, p.slug AS plano_slug,
+                      (SELECT pe2.usuario_id FROM profissional_estabelecimento pe2
+                       JOIN usuarios u2 ON u2.id = pe2.usuario_id
+                       WHERE pe2.estabelecimento_id = e.id AND u2.tipo = 'admin' AND u2.is_super = FALSE AND u2.ativo = TRUE
+                       LIMIT 1) AS admin_id
+               FROM estabelecimentos e
+               LEFT JOIN planos p ON p.id = e.plano_id
+               WHERE e.ativo = TRUE ORDER BY e.nome"""
+        )
 
     return templates.TemplateResponse(template_name, ctx)
 
@@ -894,6 +1109,23 @@ def api_estabelecimentos(usuario=Depends(exigir_login)):
     return JSONResponse(content={"estabelecimentos": estabs})
 
 
+@app.get("/api/estabelecimento/{estab_id}/usuarios")
+def api_estabelecimento_usuarios(estab_id: int, usuario=Depends(exigir_login)):
+    if usuario["tipo"] != "admin" or not usuario.get("is_super"):
+        raise HTTPException(status_code=403)
+    usuarios = db.fetch_all(
+        """SELECT DISTINCT u.id, u.nome, u.email, u.tipo, u.ativo
+           FROM usuarios u
+           LEFT JOIN profissional_estabelecimento pe ON pe.usuario_id = u.id
+           LEFT JOIN paciente_estabelecimento pae ON pae.usuario_id = u.id
+           WHERE u.ativo = TRUE
+             AND (u.estabelecimento_id = %s OR pe.estabelecimento_id = %s OR pae.estabelecimento_id = %s)
+           ORDER BY u.tipo, u.nome""",
+        (estab_id, estab_id, estab_id),
+    )
+    return JSONResponse(content={"usuarios": usuarios})
+
+
 _server_start_time = time.time()
 
 @app.get("/api/status")
@@ -910,12 +1142,54 @@ def sistema_status():
     except Exception:
         db_ok = False
 
+    online = is_online() if settings.DB_ENGINE == "postgresql" else True
+
     return JSONResponse(content={
         "banco": db_ok,
         "db_latency_ms": db_latency_ms,
         "uptime_seg": round(time.time() - _server_start_time),
         "hora_servidor": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "online": online,
     })
+
+
+@app.get("/api/cache-status")
+def cache_status_endpoint():
+    status = get_cache_status()
+    return JSONResponse(content=status)
+
+
+@app.post("/api/cache-refresh")
+def cache_refresh_endpoint(usuario=Depends(exigir_login)):
+    if not usuario.get("is_super"):
+        raise HTTPException(403, "Apenas super admin pode forcar refresh do cache")
+    try:
+        from database.cache import download_to_cache
+        result = download_to_cache()
+        return JSONResponse(content={"ok": result})
+    except Exception as e:
+        return JSONResponse(content={"ok": False, "error": str(e)})
+
+
+@app.get("/api/backup-status")
+def backup_status_endpoint():
+    last = get_last_backup()
+    count = get_backup_count()
+    return JSONResponse(content={"last_backup": last, "count": count})
+
+
+@app.post("/api/backup-now")
+def backup_now_endpoint(usuario=Depends(exigir_login)):
+    if not usuario.get("is_super"):
+        raise HTTPException(403, "Apenas super admin pode forcar backup")
+    try:
+        dump_file = dump_database()
+        if dump_file:
+            cleanup_old_backups()
+            return JSONResponse(content={"ok": True, "file": os.path.basename(dump_file)})
+        return JSONResponse(content={"ok": False, "error": "Dump falhou"})
+    except Exception as e:
+        return JSONResponse(content={"ok": False, "error": str(e)})
 
 
 UPLOAD_DIR = os.path.join("static", "uploads")
@@ -1233,7 +1507,10 @@ def criar_paciente(
         except LimiteAtingidoError as e:
             return RedirectResponse(f"/pacientes?erro_quota={e}", status_code=302)
 
-    user_id = criar_usuario(nome, email, senha, "paciente", telefone)
+    try:
+        user_id = criar_usuario(nome, email, senha, "paciente", telefone)
+    except Exception:
+        return RedirectResponse("/pacientes?erro=email_duplicado", status_code=302)
     db.execute(
         "UPDATE usuarios SET cpf = %s, data_nascimento = %s, endereco = %s WHERE id = %s",
         (cpf or None, data_nascimento or None, endereco or None, user_id),
@@ -1538,7 +1815,7 @@ def listar_prontuarios(request: Request, usuario=Depends(exigir_login), paciente
     estabelecimentos_list = []
     if estab_id:
         pacientes = db.fetch_all(
-            """SELECT u.id, u.nome FROM usuarios u
+            """SELECT u.id, u.nome, u.email FROM usuarios u
                JOIN paciente_estabelecimento pe ON pe.usuario_id = u.id
                WHERE pe.estabelecimento_id = %s AND u.ativo = TRUE ORDER BY u.nome""",
             (estab_id,),
@@ -1664,6 +1941,15 @@ def ver_prontuario(prontuario_id: int, request: Request, usuario=Depends(exigir_
             orcamento_disponivel_id = orc["id"]
             break
 
+    odontograma = db.fetch_all(
+        """SELECT o.*, u.nome AS profissional_nome
+           FROM odontograma o
+           JOIN usuarios u ON u.id = o.profissional_usuario_id
+           WHERE o.prontuario_id = %s
+           ORDER BY o.data_registro DESC, o.dente, o.face""",
+        (prontuario_id,),
+    )
+
     return templates.TemplateResponse(
         "prontuarios/visualizar.html",
         {
@@ -1678,6 +1964,7 @@ def ver_prontuario(prontuario_id: int, request: Request, usuario=Depends(exigir_
             "tratamentos_realizados": tratamentos_realizados,
             "procedimentos": procedimentos,
             "orcamento_disponivel_id": orcamento_disponivel_id,
+            "odontograma": odontograma,
         },
     )
 
@@ -1774,6 +2061,171 @@ def criar_tratamento(
         (evolucao_id, tipo, descricao, dente, face, material, valor, proc_id),
     )
     return RedirectResponse(f"/prontuarios/{prontuario_id}", status_code=302)
+
+
+# ============================================
+# ODONTOGRAMA - API
+# ============================================
+
+@app.get("/api/odontograma/{prontuario_id}")
+def api_odontograma_listar(prontuario_id: int, request: Request, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "ver")
+    prontuario = db.fetch_one("SELECT * FROM prontuarios WHERE id = %s", (prontuario_id,))
+    if not prontuario:
+        raise HTTPException(status_code=404)
+    verificar_acesso_registro(request, usuario, prontuario)
+    registros = db.fetch_all(
+        """SELECT o.id, o.prontuario_id, o.dente, o.face, o.condicao, o.observacoes,
+                  CAST(o.data_registro AS CHAR) AS data_registro,
+                  o.profissional_usuario_id, CAST(o.criado_em AS CHAR) AS criado_em,
+                  u.nome AS profissional_nome
+           FROM odontograma o
+           JOIN usuarios u ON u.id = o.profissional_usuario_id
+           WHERE o.prontuario_id = %s
+           ORDER BY o.data_registro DESC, o.dente, o.face""",
+        (prontuario_id,),
+    )
+    return JSONResponse([dict(r) for r in registros])
+
+
+@app.get("/api/odontograma/{prontuario_id}/historico")
+def api_odontograma_historico(prontuario_id: int, request: Request, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "ver")
+    prontuario = db.fetch_one("SELECT * FROM prontuarios WHERE id = %s", (prontuario_id,))
+    if not prontuario:
+        raise HTTPException(status_code=404)
+    verificar_acesso_registro(request, usuario, prontuario)
+    datas = db.fetch_all(
+        """SELECT DISTINCT CAST(data_registro AS CHAR) AS data_registro
+           FROM odontograma
+           WHERE prontuario_id = %s
+           ORDER BY data_registro ASC""",
+        (prontuario_id,),
+    )
+    result = []
+    for d in datas:
+        dr = d["data_registro"]
+        result.append({"data": dr if dr else ""})
+    return JSONResponse(result)
+
+
+@app.get("/api/odontograma/{prontuario_id}/estado")
+def api_odontograma_estado(prontuario_id: int, request: Request, usuario=Depends(exigir_login), data: str = None):
+    exigir_permissao(usuario, "prontuarios", "ver")
+    prontuario = db.fetch_one("SELECT * FROM prontuarios WHERE id = %s", (prontuario_id,))
+    if not prontuario:
+        raise HTTPException(status_code=404)
+    verificar_acesso_registro(request, usuario, prontuario)
+    if data:
+        registros = db.fetch_all(
+            """SELECT o.id, o.prontuario_id, o.dente, o.face, o.condicao, o.observacoes,
+                      CAST(o.data_registro AS CHAR) AS data_registro,
+                      o.profissional_usuario_id, u.nome AS profissional_nome
+               FROM odontograma o
+               JOIN usuarios u ON u.id = o.profissional_usuario_id
+               WHERE o.prontuario_id = %s AND o.data_registro <= %s
+               ORDER BY o.data_registro ASC, o.dente, o.face""",
+            (prontuario_id, data),
+        )
+    else:
+        registros = db.fetch_all(
+            """SELECT o.id, o.prontuario_id, o.dente, o.face, o.condicao, o.observacoes,
+                      CAST(o.data_registro AS CHAR) AS data_registro,
+                      o.profissional_usuario_id, u.nome AS profissional_nome
+               FROM odontograma o
+               JOIN usuarios u ON u.id = o.profissional_usuario_id
+               WHERE o.prontuario_id = %s
+               ORDER BY o.data_registro ASC, o.dente, o.face""",
+            (prontuario_id,),
+        )
+    estado = {}
+    for r in registros:
+        dente = int(r["dente"])
+        face = r["face"]
+        key = f"{dente}_{face or 'geral'}"
+        dr = r["data_registro"]
+        estado[key] = {
+            "dente": dente,
+            "face": face,
+            "condicao": r["condicao"],
+            "observacoes": r["observacoes"],
+            "data_registro": dr if dr else "",
+            "profissional_nome": r["profissional_nome"],
+            "id": r["id"],
+        }
+    return JSONResponse(list(estado.values()))
+
+
+@app.post("/api/odontograma/{prontuario_id}")
+def api_odontograma_criar(
+    prontuario_id: int,
+    request: Request,
+    dente: int = Form(...),
+    face: str = Form(None),
+    condicao: str = Form(...),
+    observacoes: str = Form(None),
+    data_registro: str = Form(None),
+    usuario=Depends(exigir_login),
+):
+    exigir_permissao(usuario, "prontuarios", "criar")
+    if usuario["tipo"] not in ("admin", "profissional"):
+        raise HTTPException(status_code=403)
+    prontuario = db.fetch_one("SELECT * FROM prontuarios WHERE id = %s", (prontuario_id,))
+    if not prontuario:
+        raise HTTPException(status_code=404)
+    verificar_acesso_registro(request, usuario, prontuario)
+    valid_faces = ["Mesial", "Distal", "Oclusal", "Incisal", "Vestibular", "Lingual", "Cervical", None, ""]
+    if face and face not in valid_faces:
+        raise HTTPException(status_code=400, detail="Face invalida")
+    valid_condicoes = [
+        "normal", "carie", "restauracao", "extracao", "coroa", "implante", "protese",
+        "ausente", "fratura", "mancha", "desgaste", "mobilidade", "tratar", "observar",
+        "encaminhar", "provisorio",
+    ]
+    if condicao not in valid_condicoes:
+        raise HTTPException(status_code=400, detail="Condicao invalida")
+    if face == "":
+        face = None
+    date_val = data_registro if data_registro else None
+    if date_val:
+        db.execute(
+            """INSERT INTO odontograma
+               (prontuario_id, dente, face, condicao, observacoes, data_registro, profissional_usuario_id)
+               VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+            (prontuario_id, dente, face, condicao, observacoes or None, date_val, usuario["id"]),
+        )
+    else:
+        db.execute(
+            """INSERT INTO odontograma
+               (prontuario_id, dente, face, condicao, observacoes, profissional_usuario_id)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (prontuario_id, dente, face, condicao, observacoes or None, usuario["id"]),
+        )
+    return JSONResponse({"ok": True, "message": "Registro criado"})
+
+
+@app.delete("/api/odontograma/{prontuario_id}/{registro_id}")
+def api_odontograma_remover(
+    prontuario_id: int,
+    registro_id: int,
+    request: Request,
+    usuario=Depends(exigir_login),
+):
+    exigir_permissao(usuario, "prontuarios", "excluir")
+    if usuario["tipo"] not in ("admin", "profissional"):
+        raise HTTPException(status_code=403)
+    prontuario = db.fetch_one("SELECT * FROM prontuarios WHERE id = %s", (prontuario_id,))
+    if not prontuario:
+        raise HTTPException(status_code=404)
+    verificar_acesso_registro(request, usuario, prontuario)
+    existing = db.fetch_one(
+        "SELECT id FROM odontograma WHERE id = %s AND prontuario_id = %s",
+        (registro_id, prontuario_id),
+    )
+    if not existing:
+        raise HTTPException(status_code=404)
+    db.execute("DELETE FROM odontograma WHERE id = %s", (registro_id,))
+    return JSONResponse({"ok": True, "message": "Registro removido"})
 
 
 @app.get("/agenda", response_class=HTMLResponse)
@@ -2974,3 +3426,59 @@ def listar_pagamentos(request: Request, usuario=Depends(exigir_login), paciente_
         {"request": request, "usuario": usuario, "pagamentos": pagamentos,
          "resumo": resumo, "pacientes_filtro": pacientes_filtro, "paciente_id": paciente_id_int},
     )
+
+
+@app.get("/api/verificar-email")
+def api_verificar_email(request: Request, email: str, usuario=Depends(exigir_login)):
+    if not email or "@" not in email:
+        return JSONResponse(content={"existe": False})
+
+    estab_id = resolver_estabelecimento(request, usuario)
+
+    usuarios = db.fetch_all(
+        "SELECT id, nome, tipo, email FROM usuarios WHERE email = %s AND ativo = TRUE",
+        (email,),
+    )
+
+    prontuarios_encontrados = []
+    for u in usuarios:
+        if u["tipo"] != "paciente":
+            continue
+
+        vinculos = db.fetch_all(
+            "SELECT estabelecimento_id FROM paciente_estabelecimento WHERE usuario_id = %s",
+            (u["id"],),
+        )
+        estab_ids = [v["estabelecimento_id"] for v in vinculos]
+
+        if estab_id and int(estab_id) in estab_ids:
+            pronts = db.fetch_all(
+                """SELECT pr.id, pr.numero_prontuario, pr.criado_em
+                   FROM prontuarios pr
+                   WHERE pr.paciente_usuario_id = %s""",
+                (u["id"],),
+            )
+            pode_acessar = True
+        elif usuario["tipo"] == "admin":
+            pronts = db.fetch_all(
+                """SELECT pr.id, pr.numero_prontuario, pr.criado_em
+                   FROM prontuarios pr
+                   WHERE pr.paciente_usuario_id = %s""",
+                (u["id"],),
+            )
+            pode_acessar = True
+        else:
+            pronts = []
+            pode_acessar = False
+
+        prontuarios_encontrados.append({
+            "usuario_id": u["id"],
+            "nome": u["nome"],
+            "pode_acessar": pode_acessar,
+            "prontuarios": [{"id": p["id"], "numero": p["numero_prontuario"]} for p in pronts],
+        })
+
+    return JSONResponse(content={
+        "existe": len(usuarios) > 0,
+        "pacientes": prontuarios_encontrados,
+    })

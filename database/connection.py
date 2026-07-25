@@ -1,7 +1,9 @@
 import pymysql
+import logging
 from config import settings
 
 _DB_ENGINE = settings.DB_ENGINE
+logger = logging.getLogger("database")
 
 
 class Database:

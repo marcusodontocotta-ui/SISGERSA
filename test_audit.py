@@ -27,6 +27,7 @@ def fail(route, msg):
     print(f"  [FALHOU] {route} -> {msg}")
 
 def setup_data():
+    db.execute("SET FOREIGN_KEY_CHECKS = 0")
     db.execute("DELETE FROM tratamentos")
     db.execute("DELETE FROM evolucoes")
     db.execute("DELETE FROM imaging")
@@ -47,6 +48,7 @@ def setup_data():
     db.execute("DELETE FROM procedimentos")
     db.execute("DELETE FROM usuarios WHERE id > 1")
     db.execute("DELETE FROM estabelecimentos")
+    db.execute("SET FOREIGN_KEY_CHECKS = 1")
 
     c = db.execute(
         "INSERT INTO estabelecimentos (nome, tipo) VALUES (%s, %s)",
@@ -906,4 +908,23 @@ def test_rotas():
 
 if __name__ == "__main__":
     success = test_rotas()
+    db.get_connection()
+    db.execute("SET FOREIGN_KEY_CHECKS = 0")
+    for t in ['tratamentos', 'evolucoes', 'imaging', 'consultas', 'prontuarios',
+              'paciente_estabelecimento', 'profissional_estabelecimento', 'permissoes_paciente',
+              'permissoes_usuario', 'log_atividades', 'estoque', 'procedimento_valor', 'paciente_convenio',
+              'orcamento_itens', 'orcamentos', 'pagamentos', 'odontograma', 'sync_meta']:
+        db.execute(f"DELETE FROM {t}")
+    db.execute("DELETE FROM usuarios WHERE id > 1")
+    db.execute("DELETE FROM estabelecimentos")
+    db.execute("DELETE FROM convenios")
+    db.execute("DELETE FROM procedimentos")
+    db.execute("DELETE FROM cupons")
+    db.execute("ALTER TABLE usuarios AUTO_INCREMENT = 2")
+    db.execute("ALTER TABLE estabelecimentos AUTO_INCREMENT = 1")
+    db.execute("INSERT INTO estabelecimentos (id, nome, tipo, ativo) VALUES (1, 'Clinica IDOR', 'clinica', TRUE)")
+    db.execute("INSERT IGNORE INTO profissional_estabelecimento (usuario_id, estabelecimento_id) VALUES (1, 1)")
+    db.execute("INSERT IGNORE INTO paciente_estabelecimento (usuario_id, estabelecimento_id) VALUES (2, 1), (3, 1)")
+    db.execute("SET FOREIGN_KEY_CHECKS = 1")
+    db.close()
     sys.exit(0 if success else 1)

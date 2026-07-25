@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block titulo %}Registro {{ prontuario.numero_prontuario }}{% endblock %}
+{% block styles %}
+<link rel="stylesheet" href="/static/css/odontograma.css">
+{% endblock %}
 {% block conteudo %}
 <div class="row mb-4">
     <div class="col">
@@ -276,6 +279,53 @@
                 {% endif %}
             </div>
         </div>
+
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-emoji-smile"></i> Odontograma</h5>
+                {% if usuario.tipo in ['admin', 'profissional'] %}
+                <button class="btn btn-sm btn-success btn-odontograma" data-bs-toggle="modal" data-bs-target="#modalOdontograma">
+                    <i class="bi bi-plus"></i> Novo Registro
+                </button>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="odontogram-container">
+                    <div id="odontogram-area"></div>
+                    <div id="odontogram-tooltip" class="odontogram-tooltip"></div>
+                </div>
+
+                <div class="row mt-3">
+                    <div class="col-md-8">
+                        <div class="timeline-container mb-3" id="odontogram-timeline"></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="odontogram-legend">
+                            {% for key, cond in [] %}
+                            {% endfor %}
+                        </div>
+                        <div id="odontogram-legend-box" class="odontogram-legend"></div>
+                    </div>
+                </div>
+
+                <div class="table-responsive mt-3">
+                    <table class="table table-sm table-bordered odontogram-records-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Dente</th>
+                                <th>Face</th>
+                                <th>Condicao</th>
+                                <th>Observacoes</th>
+                                <th>Data</th>
+                            </tr>
+                        </thead>
+                        <tbody id="odontogram-records-body">
+                            <tr><td colspan="5" class="text-center text-muted py-3">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -396,4 +446,147 @@
 </div>
 {% endfor %}
 {% endif %}
+
+{% if usuario.tipo in ['admin', 'profissional'] %}
+<div class="modal fade" id="modalOdontograma" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-emoji-smile"></i> Novo Registro - Odontograma</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-odontograma">
+                <div class="modal-body">
+                    <div class="alert alert-info py-2 mb-3" style="font-size:0.8rem;">
+                        <i class="bi bi-info-circle"></i> Clique em um dente no odontograma para selecionar, ou preencha manualmente abaixo.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" id="odonto-tooth-label">Selecionar dente...</label>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Dente (FDI) *</label>
+                            <select class="form-select" name="dente" id="odonto-dente" required>
+                                <option value="">Selecione...</option>
+                                <optgroup label="Quadrante 1 (Sup. Esq.)">
+                                    <option value="11">11 - Incisivo Central</option>
+                                    <option value="12">12 - Incisivo Lateral</option>
+                                    <option value="13">13 - Canino</option>
+                                    <option value="14">14 - 1o Premolar</option>
+                                    <option value="15">15 - 2o Premolar</option>
+                                    <option value="16">16 - 1o Molar</option>
+                                    <option value="17">17 - 2o Molar</option>
+                                    <option value="18">18 - 3o Molar</option>
+                                </optgroup>
+                                <optgroup label="Quadrante 2 (Sup. Dir.)">
+                                    <option value="21">21 - Incisivo Central</option>
+                                    <option value="22">22 - Incisivo Lateral</option>
+                                    <option value="23">23 - Canino</option>
+                                    <option value="24">24 - 1o Premolar</option>
+                                    <option value="25">25 - 2o Premolar</option>
+                                    <option value="26">26 - 1o Molar</option>
+                                    <option value="27">27 - 2o Molar</option>
+                                    <option value="28">28 - 3o Molar</option>
+                                </optgroup>
+                                <optgroup label="Quadrante 3 (Inf. Esq.)">
+                                    <option value="31">31 - Incisivo Central</option>
+                                    <option value="32">32 - Incisivo Lateral</option>
+                                    <option value="33">33 - Canino</option>
+                                    <option value="34">34 - 1o Premolar</option>
+                                    <option value="35">35 - 2o Premolar</option>
+                                    <option value="36">36 - 1o Molar</option>
+                                    <option value="37">37 - 2o Molar</option>
+                                    <option value="38">38 - 3o Molar</option>
+                                </optgroup>
+                                <optgroup label="Quadrante 4 (Inf. Dir.)">
+                                    <option value="41">41 - Incisivo Central</option>
+                                    <option value="42">42 - Incisivo Lateral</option>
+                                    <option value="43">43 - Canino</option>
+                                    <option value="44">44 - 1o Premolar</option>
+                                    <option value="45">45 - 2o Premolar</option>
+                                    <option value="46">46 - 1o Molar</option>
+                                    <option value="47">47 - 2o Molar</option>
+                                    <option value="48">48 - 3o Molar</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Face</label>
+                            <select class="form-select" name="face" id="odonto-face">
+                                <option value="">Dente inteiro</option>
+                                <option value="Vestibular">Vestibular</option>
+                                <option value="Oclusal">Oclusal</option>
+                                <option value="Incisal">Incisal</option>
+                                <option value="Lingual">Lingual</option>
+                                <option value="Mesial">Mesial</option>
+                                <option value="Distal">Distal</option>
+                                <option value="Cervical">Cervical</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Condicao *</label>
+                            <select class="form-select" name="condicao" id="odonto-condicao" required>
+                                <option value="">Selecione...</option>
+                                <option value="normal">Normal</option>
+                                <option value="carie">Cárie</option>
+                                <option value="restauracao">Restauração</option>
+                                <option value="extracao">Extração</option>
+                                <option value="coroa">Coroa</option>
+                                <option value="implante">Implante</option>
+                                <option value="protese">Prótese</option>
+                                <option value="ausente">Ausente</option>
+                                <option value="fratura">Fratura</option>
+                                <option value="mancha">Mancha</option>
+                                <option value="desgaste">Desgaste</option>
+                                <option value="mobilidade">Mobilidade</option>
+                                <option value="tratar">A Tratar (planejamento)</option>
+                                <option value="observar">Em Observação</option>
+                                <option value="encaminhar">Encaminhar</option>
+                                <option value="provisorio">Provisório</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Data</label>
+                            <input type="date" class="form-control" name="data_registro" id="odonto-data">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observacoes</label>
+                        <textarea class="form-control" name="observacoes" rows="2" placeholder="Detalhes do registro..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-check-lg"></i> Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/odontograma.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    Odontograma.init({{ prontuario.id }}, {{ 'true' if usuario.tipo in ['admin', 'profissional'] else 'false' }});
+
+    var legendBox = document.getElementById('odontogram-legend-box');
+    if (legendBox) {
+        var conds = Odontograma.CONDICOES;
+        var html = '';
+        for (var key in conds) {
+            var c = conds[key];
+            var txtColor = (key === 'ausente') ? '#333' : '#fff';
+            html += '<span class="legend-item" data-cond="' + key + '">' +
+                '<span class="legend-dot" style="background:' + c.cor + ';color:' + txtColor + ';"></span>' +
+                '<span>' + c.label + '</span></span>';
+        }
+        legendBox.innerHTML = html;
+    }
+});
+</script>
 {% endblock %}

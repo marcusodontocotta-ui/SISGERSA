@@ -36,6 +36,10 @@ def usuario_por_email(email: str) -> dict | None:
     return db.fetch_one("SELECT * FROM usuarios WHERE email = %s AND ativo = TRUE", (email,))
 
 
+def usuarios_por_email(email: str) -> list:
+    return db.fetch_all("SELECT * FROM usuarios WHERE email = %s AND ativo = TRUE ORDER BY tipo, nome", (email,))
+
+
 def criar_usuario(nome: str, email: str, senha: str, tipo: str, telefone: str = None, is_super: bool = False) -> int:
     hash_pwd = hash_senha(senha)
     cursor = db.execute(

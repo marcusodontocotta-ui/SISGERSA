@@ -67,6 +67,31 @@ def criar_banco():
                 logger.warning(f"criar_banco: erro alter: {e}")
             criadas += 1
 
+    if engine == "mysql":
+        try:
+            cursor.execute("SHOW INDEX FROM usuarios WHERE Column_name = 'email' AND Key_name != 'PRIMARY'")
+            idx = cursor.fetchone()
+            if idx:
+                cursor.execute("ALTER TABLE usuarios DROP INDEX email")
+                logger.info("criar_banco: removido UNIQUE do email (usuarios)")
+                criadas += 1
+        except Exception as e:
+            logger.warning(f"criar_banco: erro ao remover UNIQUE email: {e}")
+    elif engine == "postgresql":
+        try:
+            cursor.execute("""
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'usuarios_email_key') THEN
+                        ALTER TABLE usuarios DROP CONSTRAINT usuarios_email_key;
+                    END IF;
+                END $$;
+            """)
+            logger.info("criar_banco: removido UNIQUE do email (usuarios)")
+            criadas += 1
+        except Exception as e:
+            logger.warning(f"criar_banco: erro ao remover UNIQUE email pg: {e}")
+
     cursor.close()
     conn.close()
 

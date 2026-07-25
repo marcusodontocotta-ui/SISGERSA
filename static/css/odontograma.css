@@ -1,0 +1,258 @@
+.odontogram-container {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #dee2e6;
+}
+
+.odontogram-svg {
+    width: 100%;
+    max-width: 820px;
+    margin: 0 auto;
+    display: block;
+}
+
+.tooth-group {
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.tooth-group:hover {
+    filter: brightness(1.1);
+}
+
+.tooth-group.selected {
+    filter: brightness(1.2) drop-shadow(0 0 4px #0d6efd);
+}
+
+.tooth-outline {
+    fill: #e8e4e0;
+    stroke: #555;
+    stroke-width: 1.2;
+    transition: fill 0.2s ease;
+}
+
+.tooth-shadow {
+    fill: url(#gradShadow);
+    opacity: 0.25;
+}
+
+.tooth-highlight {
+    fill: url(#gradHighlight);
+    opacity: 0.35;
+}
+
+.tooth-label {
+    font-size: 8px;
+    fill: #333;
+    text-anchor: middle;
+    pointer-events: none;
+    font-weight: 600;
+}
+
+.quadrant-label {
+    font-size: 11px;
+    fill: #666;
+    text-anchor: middle;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.face-zone {
+    fill: transparent;
+    stroke: transparent;
+    stroke-width: 0.5;
+    cursor: pointer;
+    transition: fill 0.15s ease;
+}
+
+.face-zone:hover {
+    fill: rgba(13, 110, 253, 0.15);
+    stroke: #0d6efd;
+    stroke-width: 1;
+}
+
+.face-zone.active {
+    fill: rgba(13, 110, 253, 0.25);
+    stroke: #0d6efd;
+    stroke-width: 1.5;
+}
+
+.tooth-extracted {
+    fill: #dee2e6 !important;
+    stroke: #999 !important;
+    stroke-dasharray: 4 2;
+}
+
+.tooth-extracted .tooth-outline {
+    fill: #f0f0f0;
+    stroke: #bbb;
+    stroke-dasharray: 4 2;
+}
+
+.tooth-extracted .tooth-label {
+    fill: #999;
+}
+
+.odontogram-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 12px;
+}
+
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.legend-item:hover {
+    border-color: #0d6efd;
+    background: #e7f1ff;
+}
+
+.legend-item.active {
+    border-color: #0d6efd;
+    background: #0d6efd;
+    color: #fff;
+}
+
+.legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(0,0,0,0.2);
+    flex-shrink: 0;
+}
+
+.timeline-container {
+    padding: 12px 16px;
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.timeline-slider {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: #dee2e6;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+.timeline-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #0d6efd;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.timeline-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #0d6efd;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.timeline-dates {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 0.7rem;
+    color: #666;
+}
+
+.timeline-current {
+    text-align: center;
+    font-weight: 600;
+    color: #0d6efd;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+}
+
+.odontogram-tooltip {
+    position: absolute;
+    background: #333;
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    pointer-events: none;
+    z-index: 1000;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.odontogram-tooltip.show {
+    opacity: 1;
+}
+
+.odontogram-tooltip .tooltip-condicao {
+    font-weight: 700;
+    display: block;
+}
+
+.odontogram-tooltip .tooltip-info {
+    font-size: 0.65rem;
+    opacity: 0.8;
+}
+
+.odontogram-records-table {
+    font-size: 0.8rem;
+}
+
+.odontogram-records-table td,
+.odontogram-records-table th {
+    padding: 4px 8px;
+    vertical-align: middle;
+}
+
+.badge-condicao {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+.btn-odontograma {
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
+}
+
+@media (max-width: 768px) {
+    .odontogram-container {
+        padding: 10px;
+    }
+    .odontogram-legend {
+        gap: 4px;
+    }
+    .legend-item {
+        font-size: 0.65rem;
+        padding: 2px 6px;
+    }
+}

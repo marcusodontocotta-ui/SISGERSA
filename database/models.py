@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS estabelecimentos (
 CREATE TABLE IF NOT EXISTS usuarios (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(200) NOT NULL,
-    email VARCHAR(200) NOT NULL UNIQUE,
+    email VARCHAR(200) NOT NULL,
     senha_hash VARCHAR(255) NOT NULL,
     tipo ENUM('admin', 'profissional', 'recepcionista', 'paciente') NOT NULL,
     is_super BOOLEAN DEFAULT FALSE,
@@ -222,6 +222,20 @@ CREATE TABLE IF NOT EXISTS imaging (
     FOREIGN KEY (consulta_id) REFERENCES consultas(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS odontograma (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    prontuario_id INT NOT NULL,
+    dente INT NOT NULL,
+    face VARCHAR(20) DEFAULT NULL,
+    condicao VARCHAR(30) NOT NULL,
+    observacoes TEXT DEFAULT NULL,
+    data_registro DATE DEFAULT (CURRENT_DATE),
+    profissional_usuario_id INT NOT NULL,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (prontuario_id) REFERENCES prontuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY (profissional_usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS estoque (
     id INT AUTO_INCREMENT PRIMARY KEY,
     estabelecimento_id INT NOT NULL,
@@ -371,7 +385,7 @@ CREATE TABLE IF NOT EXISTS estabelecimentos (
 CREATE TABLE IF NOT EXISTS usuarios (
     id SERIAL PRIMARY KEY,
     nome VARCHAR(200) NOT NULL,
-    email VARCHAR(200) NOT NULL UNIQUE,
+    email VARCHAR(200) NOT NULL,
     senha_hash VARCHAR(255) NOT NULL,
     tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('admin', 'profissional', 'recepcionista', 'paciente')),
     is_super BOOLEAN DEFAULT FALSE,
@@ -568,6 +582,20 @@ CREATE TABLE IF NOT EXISTS imaging (
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (prontuario_id) REFERENCES prontuarios(id) ON DELETE CASCADE,
     FOREIGN KEY (consulta_id) REFERENCES consultas(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS odontograma (
+    id SERIAL PRIMARY KEY,
+    prontuario_id INT NOT NULL,
+    dente INT NOT NULL,
+    face VARCHAR(20) DEFAULT NULL,
+    condicao VARCHAR(30) NOT NULL,
+    observacoes TEXT DEFAULT NULL,
+    data_registro DATE DEFAULT CURRENT_DATE,
+    profissional_usuario_id INT NOT NULL,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (prontuario_id) REFERENCES prontuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY (profissional_usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS estoque (

@@ -8,6 +8,7 @@ from database.connection import db
 db.get_connection()
 
 def clean_db():
+    db.execute("SET FOREIGN_KEY_CHECKS = 0")
     for t in ['tratamentos', 'evolucoes', 'imaging', 'consultas', 'prontuarios',
               'paciente_estabelecimento', 'profissional_estabelecimento', 'permissoes_paciente',
               'permissoes_usuario', 'log_atividades', 'estoque', 'procedimento_valor', 'paciente_convenio',
@@ -28,6 +29,7 @@ def clean_db():
     db.execute("ALTER TABLE orcamentos AUTO_INCREMENT = 1")
     db.execute("ALTER TABLE orcamento_itens AUTO_INCREMENT = 1")
     db.execute("ALTER TABLE pagamentos AUTO_INCREMENT = 1")
+    db.execute("SET FOREIGN_KEY_CHECKS = 1")
 
 clean_db()
 
@@ -1016,3 +1018,44 @@ else:
     print("TODOS OS TESTES PASSARAM!")
 
 db.close()
+
+
+def restore_db():
+    db.get_connection()
+    db.execute("SET FOREIGN_KEY_CHECKS = 0")
+    for t in ['tratamentos', 'evolucoes', 'imaging', 'consultas', 'prontuarios',
+              'paciente_estabelecimento', 'profissional_estabelecimento', 'permissoes_paciente',
+              'permissoes_usuario', 'log_atividades', 'estoque', 'procedimento_valor', 'paciente_convenio',
+              'orcamento_itens', 'orcamentos', 'pagamentos', 'odontograma', 'sync_meta']:
+        db.execute(f"DELETE FROM {t}")
+    db.execute("DELETE FROM usuarios WHERE id > 1")
+    db.execute("DELETE FROM estabelecimentos")
+    db.execute("DELETE FROM convenios")
+    db.execute("DELETE FROM procedimentos")
+    db.execute("DELETE FROM cupons")
+    db.execute("ALTER TABLE usuarios AUTO_INCREMENT = 2")
+    db.execute("ALTER TABLE estabelecimentos AUTO_INCREMENT = 1")
+    db.execute("ALTER TABLE consultas AUTO_INCREMENT = 1")
+    db.execute("ALTER TABLE prontuarios AUTO_INCREMENT = 1")
+    db.execute("ALTER TABLE evolucoes AUTO_INCREMENT = 1")
+    db.execute("ALTER TABLE tratamentos AUTO_INCREMENT = 1")
+    db.execute("ALTER TABLE convenios AUTO_INCREMENT = 1")
+    db.execute("ALTER TABLE procedimentos AUTO_INCREMENT = 1")
+    db.execute("ALTER TABLE orcamentos AUTO_INCREMENT = 1")
+    db.execute("ALTER TABLE orcamento_itens AUTO_INCREMENT = 1")
+    db.execute("ALTER TABLE pagamentos AUTO_INCREMENT = 1")
+    db.execute("ALTER TABLE cupons AUTO_INCREMENT = 1")
+
+    db.execute("""INSERT INTO estabelecimentos (id, nome, tipo, ativo) VALUES
+        (1, 'Clinica IDOR', 'clinica', TRUE)""")
+    db.execute("""INSERT IGNORE INTO profissional_estabelecimento (usuario_id, estabelecimento_id)
+        VALUES (1, 1)""")
+    db.execute("""INSERT IGNORE INTO paciente_estabelecimento (usuario_id, estabelecimento_id)
+        VALUES (2, 1), (3, 1)""")
+
+    db.execute("SET FOREIGN_KEY_CHECKS = 1")
+    db.close()
+    print("restore_db: estado restaurado")
+
+
+restore_db()

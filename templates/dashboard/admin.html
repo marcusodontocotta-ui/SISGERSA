@@ -133,9 +133,53 @@
 </div>
 
 <div class="card mb-4">
-    <div class="card-header"><i class="bi bi-building"></i> Estabelecimentos Ativos</div>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-building"></i> Estabelecimentos Ativos</span>
+        <span class="badge bg-primary">{{ estabelecimentos|length }}</span>
+    </div>
     <div class="card-body">
-        <div id="lista-estabelecimentos" class="text-muted">Carregando...</div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead><tr><th>Nome</th><th>Tipo</th><th>Email</th><th>Plano</th><th>Status</th><th class="text-end">Acoes</th></tr></thead>
+                <tbody>
+                {% for e in estabelecimentos %}
+                <tr>
+                    <td><strong>{{ e.nome }}</strong></td>
+                    <td>{{ e.tipo or '-' }}</td>
+                    <td>{{ e.email or '-' }}</td>
+                    <td><span class="badge bg-info">{{ e.plano_slug or 'gratis' }}</span></td>
+                    <td><span class="badge bg-{{ 'success' if e.ativo else 'danger' }}">{{ 'Ativo' if e.ativo else 'Inativo' }}</span></td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary" onclick="carregarUsuarios({{ e.id }}, '{{ e.nome }}')">
+                            <i class="bi bi-people"></i> Ver Usuarios
+                        </button>
+                        {% if e.admin_id %}
+                        <a href="/admin/impersonate/{{ e.admin_id }}?estab_id={{ e.id }}" class="btn btn-sm btn-outline-success" title="Entrar como admin deste estabelecimento">
+                            <i class="bi bi-box-arrow-in-right"></i> Entrar
+                        </a>
+                        {% else %}
+                        <span class="text-muted small" title="Nenhum admin associado">Sem admin</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalUsuarios" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-people"></i> Usuarios - <span id="modalEstabNome"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="lista-usuarios-modal" class="text-muted">Carregando...</div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -160,18 +204,34 @@ fetch('/api/dashboard-stats?periodo=mes')
 })
 .catch(function(){});
 
-fetch('/api/estabelecimentos')
-.then(function(r){ return r.json(); })
-.then(function(estabs){
-    var el = document.getElementById('lista-estabelecimentos');
-    if (!estabs || estabs.length === 0) { el.innerHTML = '<em>Nenhum estabelecimento</em>'; return; }
-    var h = '<div class="table-responsive"><table class="table table-sm table-hover"><thead><tr><th>Nome</th><th>Tipo</th><th>Email</th><th>Status</th></tr></thead><tbody>';
-    estabs.forEach(function(e){
-        h += '<tr><td><strong>' + e.nome + '</strong></td><td>' + (e.tipo||'-') + '</td><td>' + (e.email||'-') + '</td><td><span class="badge bg-' + (e.ativo ? 'success' : 'danger') + '">' + (e.ativo ? 'Ativo' : 'Inativo') + '</span></td></tr>';
-    });
-    h += '</tbody></table></div>';
-    el.innerHTML = h;
-})
-.catch(function(){ document.getElementById('lista-estabelecimentos').textContent = 'Erro ao carregar'; });
+function carregarUsuarios(estabId, estabNome) {
+    document.getElementById('modalEstabNome').textContent = estabNome;
+    document.getElementById('lista-usuarios-modal').innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm"></div> Carregando...</div>';
+    var modal = new bootstrap.Modal(document.getElementById('modalUsuarios'));
+    modal.show();
+    fetch('/api/estabelecimento/' + estabId + '/usuarios')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+        var usuarios = data.usuarios || [];
+        if (usuarios.length === 0) {
+            document.getElementById('lista-usuarios-modal').innerHTML = '<em>Nenhum usuario encontrado.</em>';
+            return;
+        }
+        var tipoCores = {admin:'danger', profissional:'info', recepcionista:'warning', paciente:'success'};
+        var tipoIcons = {admin:'bi-shield-lock', profissional:'bi-person-badge', recepcionista:'bi-headset', paciente:'bi-person'};
+        var h = '<div class="table-responsive"><table class="table table-sm table-hover align-middle"><thead><tr><th>Nome</th><th>Email</th><th>Tipo</th><th class="text-end">Acao</th></tr></thead><tbody>';
+        usuarios.forEach(function(u){
+            h += '<tr>';
+            h += '<td><strong>' + (u.nome||'-') + '</strong></td>';
+            h += '<td>' + (u.email||'-') + '</td>';
+            h += '<td><span class="badge bg-' + (tipoCores[u.tipo]||'secondary') + '"><i class="bi ' + (tipoIcons[u.tipo]||'bi-person') + '"></i> ' + u.tipo + '</span></td>';
+            h += '<td class="text-end"><a href="/admin/impersonate/' + u.id + '?estab_id=' + estabId + '" class="btn btn-sm btn-outline-success" title="Entrar na conta de ' + (u.nome||'') + '"><i class="bi bi-box-arrow-in-right"></i> Entrar</a></td>';
+            h += '</tr>';
+        });
+        h += '</tbody></table></div>';
+        document.getElementById('lista-usuarios-modal').innerHTML = h;
+    })
+    .catch(function(){ document.getElementById('lista-usuarios-modal').innerHTML = '<span class="text-danger">Erro ao carregar usuarios.</span>'; });
+}
 </script>
 {% endblock %}
