@@ -1520,10 +1520,28 @@ def criar_paciente(
 
     if estab_id:
         vincular_paciente(user_id, int(estab_id))
+        count = db.fetch_one(
+            "SELECT COUNT(*) AS total FROM prontuarios WHERE estabelecimento_id = %s",
+            (estab_id,),
+        )
+        numero = f"PRONT-{int(count['total']) + 1:05d}"
+        db.execute(
+            "INSERT INTO prontuarios (paciente_usuario_id, estabelecimento_id, numero_prontuario) VALUES (%s, %s, %s)",
+            (user_id, int(estab_id), numero),
+        )
     elif usuario.get("is_super"):
         estabs = db.fetch_all("SELECT id FROM estabelecimentos WHERE ativo = TRUE")
         for e in estabs:
             vincular_paciente(user_id, int(e["id"]))
+            count = db.fetch_one(
+                "SELECT COUNT(*) AS total FROM prontuarios WHERE estabelecimento_id = %s",
+                (e["id"],),
+            )
+            numero = f"PRONT-{int(count['total']) + 1:05d}"
+            db.execute(
+                "INSERT INTO prontuarios (paciente_usuario_id, estabelecimento_id, numero_prontuario) VALUES (%s, %s, %s)",
+                (user_id, int(e["id"]), numero),
+            )
 
     return RedirectResponse("/pacientes", status_code=302)
 
