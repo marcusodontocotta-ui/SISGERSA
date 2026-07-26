@@ -1,7 +1,7 @@
 from database.connection import db
 
 MODULOS = {
-    "pacientes": {"label": "Pacientes", "icon": "bi-people", "rota": "/pacientes"},
+    "pacientes": {"label": "Pacientes", "icon": "bi-people", "rota": "/prontuarios"},
     "consultas": {"label": "Consultas", "icon": "bi-calendar-check", "rota": "/consultas"},
     "prontuarios": {"label": "Historico", "icon": "bi-folder-medical", "rota": "/prontuarios"},
     "agenda": {"label": "Agenda", "icon": "bi-calendar-week", "rota": "/agenda"},

@@ -10,6 +10,21 @@
     {% endif %}
 </div>
 
+{% set erro = request.query_params.get('erro') %}
+{% set erro_quota = request.query_params.get('erro_quota') %}
+{% if erro %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle"></i> {{ erro }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if erro_quota %}
+<div class="alert alert-warning alert-dismissible fade show" role="alert">
+    <i class="bi bi-shield-exclamation"></i> {{ erro_quota }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
 {% if usuario.tipo != 'paciente' and pacientes_filtro is defined and pacientes_filtro %}
 <form method="GET" class="mb-3">
     <div class="row align-items-center g-2">
@@ -44,8 +59,11 @@
             <table class="table table-hover" id="tabelaHistorico">
                 <thead>
                     <tr>
-                        <th>Numero</th>
+                        <th>Registro</th>
                         <th>Paciente</th>
+                        <th>CPF</th>
+                        <th>Email</th>
+                        <th>Telefone</th>
                         <th>Data de Criacao</th>
                         <th>Acoes</th>
                     </tr>
@@ -55,6 +73,9 @@
                     <tr data-paciente="{{ p.paciente_nome|lower }}" data-cpf="{{ (p.paciente_cpf or '')|lower }}" data-email="{{ (p.paciente_email or '')|lower }}" data-telefone="{{ (p.paciente_telefone or '')|lower }}">
                         <td><code>{{ p.numero_prontuario or 'S/N' }}</code></td>
                         <td>{{ p.paciente_nome }}</td>
+                        <td>{{ p.paciente_cpf or '-' }}</td>
+                        <td>{{ p.paciente_email or '-' }}</td>
+                        <td>{{ p.paciente_telefone or '-' }}</td>
                         <td>{{ p.criado_em.strftime('%d/%m/%Y') if p.criado_em else '-' }}</td>
                         <td>
                             <a href="/prontuarios/{{ p.id }}" class="btn btn-sm btn-outline-primary">
@@ -100,54 +121,34 @@
                     </div>
                     {% endif %}
 
-                    <div class="mb-2">
-                        <a href="#" class="text-decoration-none" id="toggleNovoPaciente" onclick="alternarNovoPaciente(); return false;">
-                            <i class="bi bi-person-plus"></i> Cadastrar novo paciente
-                        </a>
-                    </div>
+                    <h6 class="text-primary mb-3"><i class="bi bi-person-plus"></i> Dados do Paciente</h6>
 
-                    <div id="secaoPacienteExistente">
-                        <div class="mb-3">
-                            <label class="form-label">Paciente *</label>
-                            <select class="form-select" name="paciente_id" id="selectPacienteProntuario">
-                                <option value="">Selecione...</option>
-                                {% for p in pacientes %}
-                                <option value="{{ p.id }}" data-email="{{ p.email|default('', true) }}">{{ p.nome }}</option>
-                                {% endfor %}
-                            </select>
+                    <div class="mb-3">
+                        <label class="form-label">Nome Completo *</label>
+                        <input type="text" class="form-control" name="novo_paciente_nome" id="novoPacienteNome" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email *</label>
+                        <input type="email" class="form-control" name="novo_paciente_email" id="novoPacienteEmail" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Senha *</label>
+                        <input type="password" class="form-control" name="novo_paciente_senha" id="novoPacienteSenha" required>
+                        <small class="text-muted">O paciente podera alterar no primeiro login.</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">CPF</label>
+                            <input type="text" class="form-control" name="novo_paciente_cpf" data-mask="cpf" placeholder="000.000.000-00">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Telefone</label>
+                            <input type="text" class="form-control" name="novo_paciente_telefone" data-mask="phone">
                         </div>
                     </div>
-
-                    <div id="secaoNovoPaciente" style="display:none;">
-                        <hr class="my-2">
-                        <h6 class="text-primary mb-3"><i class="bi bi-person-plus"></i> Novo Paciente</h6>
-                        <div class="mb-3">
-                            <label class="form-label">Nome Completo *</label>
-                            <input type="text" class="form-control" name="novo_paciente_nome" id="novoPacienteNome">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Email *</label>
-                            <input type="email" class="form-control" name="novo_paciente_email" id="novoPacienteEmail">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Senha *</label>
-                            <input type="password" class="form-control" name="novo_paciente_senha" id="novoPacienteSenha">
-                            <small class="text-muted">O paciente podera alterar no primeiro login.</small>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">CPF</label>
-                                <input type="text" class="form-control" name="novo_paciente_cpf" data-mask="cpf" placeholder="000.000.000-00">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Telefone</label>
-                                <input type="text" class="form-control" name="novo_paciente_telefone" data-mask="phone">
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Data de Nascimento</label>
-                            <input type="date" class="form-control" name="novo_paciente_nascimento">
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label">Data de Nascimento</label>
+                        <input type="date" class="form-control" name="novo_paciente_nascimento">
                     </div>
 
                     <div class="mb-3">
@@ -156,7 +157,7 @@
                                placeholder="Deixe vazio para gerar automatico">
                         <small class="text-muted">Se vazio, sera gerado automaticamente.</small>
                     </div>
-                    <input type="hidden" name="criar_novo_paciente" id="inputCriarNovoPaciente" value="0">
+                    <input type="hidden" name="criar_novo_paciente" value="1">
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -167,21 +168,18 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalEmailDuplicado" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+<div class="modal fade" id="modalAvisoDuplicata" tabindex="-1">
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Paciente com mesmo email encontrado</h5>
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Possivel duplicata detectada</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <p id="msgEmailDuplicado"></p>
-                <div id="listaPacientesDuplicados"></div>
-            </div>
+            <div class="modal-body" id="conteudoAvisoDuplicata"></div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnCadastrarMesmoAssim" onclick="submeterProntuarioForcado()">
-                    <i class="bi bi-plus-circle"></i> Cadastrar mesmo assim
+                <button type="button" class="btn btn-primary" id="btnConfirmarDuplicata" onclick="confirmarDuplicata()">
+                    <i class="bi bi-check-circle"></i> Cadastrar mesmo assim
                 </button>
             </div>
         </div>
@@ -189,27 +187,7 @@
 </div>
 
 <script>
-var _novoPacienteAtivo = false;
-
-function alternarNovoPaciente() {
-    _novoPacienteAtivo = !_novoPacienteAtivo;
-    document.getElementById('secaoPacienteExistente').style.display = _novoPacienteAtivo ? 'none' : '';
-    document.getElementById('secaoNovoPaciente').style.display = _novoPacienteAtivo ? '' : 'none';
-    document.getElementById('inputCriarNovoPaciente').value = _novoPacienteAtivo ? '1' : '0';
-    document.getElementById('selectPacienteProntuario').removeAttribute('required');
-    if (_novoPacienteAtivo) {
-        document.getElementById('novoPacienteNome').setAttribute('required', '');
-        document.getElementById('novoPacienteEmail').setAttribute('required', '');
-        document.getElementById('novoPacienteSenha').setAttribute('required', '');
-        document.getElementById('toggleNovoPaciente').innerHTML = '<i class="bi bi-person-check"></i> Usar paciente existente';
-    } else {
-        document.getElementById('novoPacienteNome').removeAttribute('required');
-        document.getElementById('novoPacienteEmail').removeAttribute('required');
-        document.getElementById('novoPacienteSenha').removeAttribute('required');
-        document.getElementById('selectPacienteProntuario').setAttribute('required', '');
-        document.getElementById('toggleNovoPaciente').innerHTML = '<i class="bi bi-person-plus"></i> Cadastrar novo paciente';
-    }
-}
+var _skipDuplicataCheck = false;
 
 function filtrarHistorico() {
     var termo = document.getElementById('buscaHistorico').value.toLowerCase();
@@ -230,63 +208,70 @@ function filtrarHistorico() {
     document.getElementById('nenhumResultadoHistorico').style.display = visiveis === 0 ? '' : 'none';
 }
 
-var _skipEmailCheck = false;
-
 document.getElementById('formNovoProntuario').addEventListener('submit', function(e) {
-    if (_skipEmailCheck) { _skipEmailCheck = false; return; }
+    if (_skipDuplicataCheck) { _skipDuplicataCheck = false; return; }
     e.preventDefault();
-    var select = document.getElementById('selectPacienteProntuario');
-    var pacienteId = select.value;
-    if (!pacienteId) { this.submit(); return; }
+    var form = this;
 
-    var opt = select.options[select.selectedIndex];
-    var email = opt.getAttribute('data-email') || '';
-    if (!email) { this.submit(); return; }
+    var nome = document.getElementById('novoPacienteNome').value.trim();
+    var cpf = document.querySelector('[name="novo_paciente_cpf"]').value.trim();
+    var email = document.getElementById('novoPacienteEmail').value.trim();
+    var params = [];
+    if (cpf) params.push('cpf=' + encodeURIComponent(cpf));
+    if (nome) params.push('nome=' + encodeURIComponent(nome));
+    if (email) params.push('email=' + encodeURIComponent(email));
 
-    fetch('/api/verificar-email?email=' + encodeURIComponent(email))
+    if (params.length === 0) { form.submit(); return; }
+
+    fetch('/api/verificar-duplicata?' + params.join('&'))
     .then(function(r){ return r.json(); })
     .then(function(data){
-        if (!data.existe || !data.pacientes || data.pacientes.length === 0) {
-            document.getElementById('formNovoProntuario').submit();
-            return;
+        var avisos = [];
+
+        if (data.email_duplicado) {
+            var ed = data.email_duplicado;
+            avisos.push('<div class="alert alert-info mb-2"><strong><i class="bi bi-envelope"></i> Email duplicado:</strong> o email <code>' + email + '</code> ja pertence a <strong>' + ed.nome + '</strong> (CPF: ' + (ed.cpf || 'N/I') + '). O sistema reutilizara este paciente automaticamente.</div>');
         }
-        var html = '';
-        data.pacientes.forEach(function(p){
-            html += '<div class="card mb-2 ' + (p.pode_acessar ? 'border-primary' : 'border-secondary') + '">';
-            html += '<div class="card-body py-2 px-3">';
-            html += '<div class="d-flex justify-content-between align-items-center">';
-            html += '<div><strong>' + p.nome + '</strong>';
-            if (!p.pode_acessar) {
-                html += ' <span class="badge bg-secondary">Nao e paciente deste profissional</span>';
-            }
-            if (p.prontuarios && p.prontuarios.length > 0) {
-                html += '<br><small class="text-muted">Prontuarios: ';
-                p.prontuarios.forEach(function(pr, i){
-                    if (p.pode_acessar) {
-                        html += '<a href="/prontuarios/' + pr.id + '" class="text-decoration-none">' + (pr.numero || 'S/N') + '</a>';
-                    } else {
-                        html += '<span>' + (pr.numero || 'S/N') + '</span>';
-                    }
-                    if (i < p.prontuarios.length - 1) html += ', ';
+
+        if (data.cpf_duplicado) {
+            var cd = data.cpf_duplicado;
+            avisos.push('<div class="alert alert-warning mb-2"><strong><i class="bi bi-person-badge"></i> CPF duplicado:</strong> o CPF <code>' + cpf + '</code> ja pertence a <strong>' + cd.nome + '</strong> (email: ' + cd.email + ').</div>');
+            if (cd.prontuarios && cd.prontuarios.length > 0) {
+                avisos.push('<div class="mb-2 ms-3"><small class="text-muted">Prontuarios existentes: ');
+                cd.prontuarios.forEach(function(p, i) {
+                    avisos.push('<a href="/prontuarios/' + p.id + '">' + (p.numero || 'S/N') + '</a>');
+                    if (i < cd.prontuarios.length - 1) avisos.push(', ');
                 });
-                html += '</small>';
+                avisos.push('</small></div>');
             }
-            html += '</div>';
-            if (p.pode_acessar && p.prontuarios && p.prontuarios.length > 0) {
-                html += '<a href="/prontuarios/' + p.prontuarios[0].id + '" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i> Abrir</a>';
-            }
-            html += '</div></div></div>';
-        });
-        document.getElementById('msgEmailDuplicado').textContent = 'Ja existe paciente(s) cadastrado(s) com este email:';
-        document.getElementById('listaPacientesDuplicados').innerHTML = html;
-        new bootstrap.Modal(document.getElementById('modalEmailDuplicado')).show();
+        }
+
+        if (data.nome_duplicados && data.nome_duplicados.length > 0) {
+            avisos.push('<div class="alert alert-warning mb-2"><strong><i class="bi bi-person"></i> Nome duplicado:</strong> ja existe paciente(s) com o nome <strong>' + nome + '</strong>:</div>');
+            data.nome_duplicados.forEach(function(nd) {
+                avisos.push('<div class="card mb-1 ms-3"><div class="card-body py-2 px-3"><small><strong>' + nd.nome + '</strong> - CPF: ' + (nd.cpf || 'N/I') + ', Email: ' + (nd.email || 'N/I'));
+                if (nd.prontuarios && nd.prontuarios.length > 0) {
+                    avisos.push(' | Prontuarios: ');
+                    nd.prontuarios.forEach(function(p, i) {
+                        avisos.push('<a href="/prontuarios/' + p.id + '">' + (p.numero || 'S/N') + '</a>');
+                        if (i < nd.prontuarios.length - 1) avisos.push(', ');
+                    });
+                }
+                avisos.push('</small></div></div>');
+            });
+        }
+
+        if (avisos.length === 0) { form.submit(); return; }
+
+        document.getElementById('conteudoAvisoDuplicata').innerHTML = avisos.join('');
+        new bootstrap.Modal(document.getElementById('modalAvisoDuplicata')).show();
     })
-    .catch(function(){ document.getElementById('formNovoProntuario').submit(); });
+    .catch(function(){ form.submit(); });
 });
 
-function submeterProntuarioForcado() {
-    _skipEmailCheck = true;
-    bootstrap.Modal.getInstance(document.getElementById('modalEmailDuplicado')).hide();
+function confirmarDuplicata() {
+    _skipDuplicataCheck = true;
+    bootstrap.Modal.getInstance(document.getElementById('modalAvisoDuplicata')).hide();
     document.getElementById('formNovoProntuario').submit();
 }
 </script>

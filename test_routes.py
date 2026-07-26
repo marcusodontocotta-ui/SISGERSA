@@ -58,10 +58,13 @@ check("API status tem hora_servidor", "hora_servidor" in data)
 
 # 2. PAGINAS GET
 print("\n--- Todas as Paginas ---")
-pages = ['dashboard', 'pacientes', 'consultas', 'prontuarios', 'estabelecimentos']
+pages = ['dashboard', 'consultas', 'prontuarios', 'estabelecimentos']
 for page in pages:
     r = client.get(f'/{page}')
     check(f"GET /{page}", r.status_code == 200)
+
+r = client.get('/pacientes')
+check("GET /pacientes (redirect)", r.status_code == 302)
 
 # 3. ESTABELECIMENTOS
 print("\n--- Estabelecimentos CRUD ---")
@@ -109,9 +112,11 @@ r = client.post('/pacientes/criar', data={
 check("Criar paciente Carlos", r.status_code == 302)
 
 r = client.get('/pacientes')
-check("Listar pacientes", 'Ana Silva' in r.text and 'Carlos Souza' in r.text)
-check("Links de edicao presentes", 'bi-pencil' in r.text)
-check("Sem href #", '/editar' in r.text)
+check("GET /pacientes redireciona", r.status_code == 302)
+
+r = client.get('/prontuarios')
+check("Listar pacientes via prontuarios", 'Ana Silva' in r.text and 'Carlos Souza' in r.text)
+check("Links de edicao presentes", 'bi-eye' in r.text)
 
 # Editar paciente
 r = client.get('/pacientes/2/editar')
@@ -123,7 +128,7 @@ r = client.post('/pacientes/2/editar', data={
 })
 check("Salvar edicao paciente", r.status_code == 302)
 
-r = client.get('/pacientes')
+r = client.get('/prontuarios')
 check("Edicao refletida na lista", 'Ana Silva Editada' in r.text)
 
 # 5. PRONTUARIOS

@@ -1219,33 +1219,9 @@ async def upload_arquivo(
     return JSONResponse(content={"url": url})
 
 
-@app.get("/pacientes", response_class=HTMLResponse)
-def listar_pacientes(request: Request, usuario=Depends(exigir_login)):
-    estab_id = resolver_estabelecimento(request, usuario)
-    exigir_permissao(usuario, "pacientes", "ver", estab_id)
-    if estab_id:
-        pacientes = db.fetch_all(
-            """SELECT u.id, u.nome, u.email, u.telefone, u.cpf, pe.data_cadastro
-               FROM usuarios u
-               JOIN paciente_estabelecimento pe ON pe.usuario_id = u.id
-               WHERE pe.estabelecimento_id = %s AND u.ativo = TRUE
-               ORDER BY u.nome""",
-            (estab_id,),
-        )
-    elif usuario.get("is_super"):
-        pacientes = db.fetch_all(
-            """SELECT u.id, u.nome, u.email, u.telefone, u.cpf, NULL as data_cadastro
-               FROM usuarios u WHERE u.tipo = 'paciente' AND u.ativo = TRUE ORDER BY u.nome"""
-        )
-    elif usuario["tipo"] == "paciente":
-        pacientes = [usuario]
-    else:
-        pacientes = []
-
-    return templates.TemplateResponse(
-        "pacientes/lista.html",
-        {"request": request, "usuario": usuario, "pacientes": pacientes},
-    )
+@app.get("/pacientes")
+def listar_pacientes_redirect():
+    return RedirectResponse(url="/prontuarios", status_code=302)
 
 
 @app.get("/estabelecimentos", response_class=HTMLResponse)
@@ -1505,12 +1481,12 @@ def criar_paciente(
         try:
             bloquear_se_limite(estab_id, "pacientes")
         except LimiteAtingidoError as e:
-            return RedirectResponse(f"/pacientes?erro_quota={e}", status_code=302)
+            return RedirectResponse(f"/prontuarios?erro_quota={e}", status_code=302)
 
     try:
         user_id = criar_usuario(nome, email, senha, "paciente", telefone)
     except Exception:
-        return RedirectResponse("/pacientes?erro=email_duplicado", status_code=302)
+        return RedirectResponse("/prontuarios?erro=email_duplicado", status_code=302)
     db.execute(
         "UPDATE usuarios SET cpf = %s, data_nascimento = %s, endereco = %s WHERE id = %s",
         (cpf or None, data_nascimento or None, endereco or None, user_id),
@@ -1543,7 +1519,7 @@ def criar_paciente(
                 (user_id, int(e["id"]), numero),
             )
 
-    return RedirectResponse("/pacientes", status_code=302)
+    return RedirectResponse("/prontuarios", status_code=302)
 
 
 @app.get("/pacientes/{pac_id}/editar", response_class=HTMLResponse)
@@ -1591,7 +1567,7 @@ def salvar_paciente(
             "UPDATE usuarios SET nome = %s, email = %s, telefone = %s, cpf = %s, data_nascimento = %s, endereco = %s, foto_url = %s WHERE id = %s",
             (nome, email, telefone, cpf or None, data_nascimento or None, endereco or None, foto_url, pac_id),
         )
-    return RedirectResponse("/pacientes", status_code=302)
+    return RedirectResponse("/prontuarios", status_code=302)
 
 
 @app.get("/consultas", response_class=HTMLResponse)
@@ -2035,7 +2011,7 @@ def criar_prontuario(
             paciente_id_int = existente["id"]
         else:
             db.execute(
-                "INSERT INTO usuarios (nome, email, telefone, cpf, data_nascimento, senha, tipo, ativo) VALUES (%s, %s, %s, %s, %s, %s, 'paciente', 1)",
+                "INSERT INTO usuarios (nome, email, telefone, cpf, data_nascimento, senha_hash, tipo, ativo) VALUES (%s, %s, %s, %s, %s, %s, 'paciente', 1)",
                 (novo_paciente_nome.strip(), novo_email, novo_paciente_telefone or None, novo_paciente_cpf or None, novo_paciente_nascimento or None, senha_hash),
             )
             paciente_id_int = db.fetch_one("SELECT id FROM usuarios WHERE email = %s AND tipo = 'paciente'", (novo_email,))["id"]
@@ -2050,6 +2026,16 @@ def criar_prontuario(
         return RedirectResponse(f"/prontuarios?erro_quota={e}", status_code=302)
     except Exception as e:
         logger.warning(f"criar_prontuario: erro ao verificar quota: {e}")
+
+    existe_pront = db.fetch_one(
+        "SELECT id, numero_prontuario FROM prontuarios WHERE paciente_usuario_id = %s AND estabelecimento_id = %s",
+        (int(paciente_id_int), int(estab_id)),
+    )
+    if existe_pront:
+        return RedirectResponse(
+            f"/prontuarios?erro=Este paciente ja possui prontuario ({existe_pront['numero_prontuario']}) neste estabelecimento",
+            status_code=302,
+        )
 
     if not numero:
         count = db.fetch_one(
@@ -3549,3 +3535,73 @@ def api_verificar_email(request: Request, email: str, usuario=Depends(exigir_log
         "existe": len(usuarios) > 0,
         "pacientes": prontuarios_encontrados,
     })
+
+
+@app.get("/api/verificar-duplicata")
+def api_verificar_duplicata(
+    request: Request,
+    cpf: str = Query(None),
+    nome: str = Query(None),
+    email: str = Query(None),
+    usuario=Depends(exigir_login),
+):
+    estab_id = resolver_estabelecimento(request, usuario)
+    resultado = {"cpf_duplicado": None, "nome_duplicados": [], "email_duplicado": None}
+
+    if cpf and len(cpf.replace(".", "").replace("-", "").strip()) >= 11:
+        cpf_limpo = cpf.replace(".", "").replace("-", "").strip()
+        existente = db.fetch_one(
+            "SELECT id, nome, email FROM usuarios WHERE cpf = %s AND ativo = TRUE",
+            (cpf_limpo,),
+        )
+        if existente:
+            pronts = db.fetch_all(
+                """SELECT pr.id, pr.numero_prontuario FROM prontuarios pr
+                   WHERE pr.paciente_usuario_id = %s AND pr.estabelecimento_id = %s""",
+                (existente["id"], estab_id),
+            )
+            resultado["cpf_duplicado"] = {
+                "usuario_id": existente["id"],
+                "nome": existente["nome"],
+                "email": existente["email"],
+                "prontuarios": [{"id": p["id"], "numero": p["numero_prontuario"]} for p in pronts],
+            }
+
+    if nome and len(nome.strip()) >= 3:
+        duplicados = db.fetch_all(
+            "SELECT id, nome, email, cpf FROM usuarios WHERE nome = %s AND tipo = 'paciente' AND ativo = TRUE",
+            (nome.strip(),),
+        )
+        for d in duplicados:
+            pronts = db.fetch_all(
+                """SELECT pr.id, pr.numero_prontuario FROM prontuarios pr
+                   WHERE pr.paciente_usuario_id = %s AND pr.estabelecimento_id = %s""",
+                (d["id"], estab_id),
+            )
+            resultado["nome_duplicados"].append({
+                "usuario_id": d["id"],
+                "nome": d["nome"],
+                "email": d["email"],
+                "cpf": d["cpf"],
+                "prontuarios": [{"id": p["id"], "numero": p["numero_prontuario"]} for p in pronts],
+            })
+
+    if email and "@" in email:
+        existente = db.fetch_one(
+            "SELECT id, nome, cpf FROM usuarios WHERE email = %s AND tipo = 'paciente' AND ativo = TRUE",
+            (email.strip().lower(),),
+        )
+        if existente:
+            pronts = db.fetch_all(
+                """SELECT pr.id, pr.numero_prontuario FROM prontuarios pr
+                   WHERE pr.paciente_usuario_id = %s AND pr.estabelecimento_id = %s""",
+                (existente["id"], estab_id),
+            )
+            resultado["email_duplicado"] = {
+                "usuario_id": existente["id"],
+                "nome": existente["nome"],
+                "cpf": existente["cpf"],
+                "prontuarios": [{"id": p["id"], "numero": p["numero_prontuario"]} for p in pronts],
+            }
+
+    return JSONResponse(content=resultado)
