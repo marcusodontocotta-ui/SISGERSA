@@ -99,8 +99,43 @@ def criar_banco():
 
 
 def criar_admin_padrao():
-    from utils.auth import criar_usuario
+    from database.connection import db
+    engine = settings.DB_ENGINE
     try:
+        if engine == "postgresql":
+            import psycopg
+            conn = psycopg.connect(
+                host=settings.DB_HOST, port=settings.DB_PORT,
+                user=settings.DB_USER, password=settings.DB_PASSWORD,
+                dbname=settings.DB_NAME, sslmode="prefer",
+            )
+            conn.autocommit = True
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM usuarios WHERE email = %s", ("marcusodontocotta@gmail.com",))
+            count = cursor.fetchone()[0]
+            cursor.close()
+            conn.close()
+        else:
+            import pymysql
+            conn = pymysql.connect(
+                host=settings.DB_HOST, port=settings.DB_PORT,
+                user=settings.DB_USER, password=settings.DB_PASSWORD,
+                database=settings.DB_NAME, charset="utf8mb4", autocommit=True,
+            )
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM usuarios WHERE email = %s", ("marcusodontocotta@gmail.com",))
+            count = cursor.fetchone()[0]
+            cursor.close()
+            conn.close()
+
+        if count > 0:
+            logger.info(f"criar_admin: admin ja existe ({count} registros)")
+            if count > 1:
+                logger.info(f"criar_admin: limpando {count - 1} duplicatas...")
+                _limpar_admins_duplicados()
+            return
+
+        from utils.auth import criar_usuario
         admin_id = criar_usuario(
             nome="Administrador",
             email="marcusodontocotta@gmail.com",
@@ -111,6 +146,55 @@ def criar_admin_padrao():
         logger.info(f"criar_admin: criado ID={admin_id}")
     except Exception as e:
         logger.info(f"criar_admin: {e}")
+
+
+def _limpar_admins_duplicados():
+    engine = settings.DB_ENGINE
+    try:
+        if engine == "postgresql":
+            import psycopg
+            conn = psycopg.connect(
+                host=settings.DB_HOST, port=settings.DB_PORT,
+                user=settings.DB_USER, password=settings.DB_PASSWORD,
+                dbname=settings.DB_NAME, sslmode="prefer",
+            )
+            conn.autocommit = True
+            cursor = conn.cursor()
+            cursor.execute("""
+                DELETE FROM usuarios
+                WHERE email = 'marcusodontocotta@gmail.com'
+                AND id NOT IN (
+                    SELECT MIN(id) FROM usuarios
+                    WHERE email = 'marcusodontocotta@gmail.com'
+                )
+            """)
+            deleted = cursor.rowcount
+            cursor.close()
+            conn.close()
+        else:
+            import pymysql
+            conn = pymysql.connect(
+                host=settings.DB_HOST, port=settings.DB_PORT,
+                user=settings.DB_USER, password=settings.DB_PASSWORD,
+                database=settings.DB_NAME, charset="utf8mb4", autocommit=True,
+            )
+            cursor = conn.cursor()
+            cursor.execute("""
+                DELETE FROM usuarios
+                WHERE email = 'marcusodontocotta@gmail.com'
+                AND id NOT IN (
+                    SELECT min_id FROM (
+                        SELECT MIN(id) AS min_id FROM usuarios
+                        WHERE email = 'marcusodontocotta@gmail.com'
+                    ) t
+                )
+            """)
+            deleted = cursor.rowcount
+            cursor.close()
+            conn.close()
+        logger.info(f"criar_admin: {deleted} duplicatas removidas")
+    except Exception as e:
+        logger.warning(f"criar_admin: erro ao limpar duplicatas: {e}")
 
 
 def seed_planos():
