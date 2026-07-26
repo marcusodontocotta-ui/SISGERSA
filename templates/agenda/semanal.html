@@ -216,6 +216,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="/consultas/criar" id="formConsulta">
+                <input type="hidden" name="origem" value="agenda">
                 <div class="modal-body">
                     {% if estabelecimentos is defined and estabelecimentos %}
                     <div class="mb-3">

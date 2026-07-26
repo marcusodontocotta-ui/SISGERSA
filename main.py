@@ -1706,6 +1706,7 @@ def criar_consulta(
     procedimento_id: str = Form(""),
     observacoes: str = Form(None),
     estabelecimento_id: str = Form(None),
+    origem: str = Form(None),
     usuario=Depends(exigir_login),
 ):
     procedimento_id = int(procedimento_id) if procedimento_id and procedimento_id.strip() else None
@@ -1744,6 +1745,10 @@ def criar_consulta(
             (prontuario["id"], consulta_id_val, profissional_id, data_consulta),
         )
 
+    if origem == "agenda":
+        from datetime import datetime as _dt2
+        dt_consulta = _dt2.strptime(data_hora, "%Y-%m-%dT%H:%M") if "T" in data_hora else _dt2.strptime(data_hora, "%Y-%m-%d")
+        return RedirectResponse(f"/agenda?data={dt_consulta.strftime('%Y-%m-%d')}", status_code=302)
     return RedirectResponse("/consultas", status_code=302)
 
 
