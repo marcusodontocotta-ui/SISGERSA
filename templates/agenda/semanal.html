@@ -344,7 +344,7 @@
         };
         document.getElementById('detStatus').innerHTML = statusMap[c.status] || c.status;
         document.getElementById('detObservacoes').textContent = c.observacoes || '-';
-        document.getElementById('btnEditarConsulta').href = '/consultas/' + c.id + '/editar';
+        document.getElementById('btnEditarConsulta').href = '/consultas/' + c.id + '/editar?origem=agenda';
         new bootstrap.Modal(document.getElementById('modalDetalhes')).show();
     }
 

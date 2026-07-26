@@ -13,6 +13,9 @@
                     <strong>Profissional:</strong> {{ consulta.profissional_nome }}
                 </div>
                 <form method="POST" action="/consultas/{{ consulta.id }}/editar">
+                    {% if origem %}
+                    <input type="hidden" name="origem" value="{{ origem }}">
+                    {% endif %}
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Data e Hora *</label>
@@ -39,7 +42,7 @@
                                   placeholder="Observacoes da consulta...">{{ consulta.observacoes or '' }}</textarea>
                     </div>
                     <div class="d-flex gap-2">
-                        <a href="/consultas" class="btn btn-secondary">
+                        <a href="{{ '/agenda' if origem == 'agenda' else '/consultas' }}" class="btn btn-secondary">
                             <i class="bi bi-arrow-left"></i> Voltar
                         </a>
                         <button type="submit" class="btn btn-primary">

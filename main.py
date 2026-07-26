@@ -1741,7 +1741,7 @@ def criar_consulta(
 
 
 @app.get("/consultas/{consulta_id}/editar", response_class=HTMLResponse)
-def editar_consulta_form(consulta_id: int, request: Request, usuario=Depends(exigir_login)):
+def editar_consulta_form(consulta_id: int, request: Request, usuario=Depends(exigir_login), origem: str = Query(None)):
     exigir_permissao(usuario, "consultas", "editar")
     if usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
         raise HTTPException(status_code=403)
@@ -1760,14 +1760,13 @@ def editar_consulta_form(consulta_id: int, request: Request, usuario=Depends(exi
     if usuario["tipo"] == "profissional" and consulta["profissional_usuario_id"] != usuario["id"]:
         raise HTTPException(status_code=403)
 
-    estab_id = resolver_estabelecimento(request, usuario)
     procedimentos = db.fetch_all(
         "SELECT id, nome, duracao_minutos FROM procedimentos WHERE ativo = TRUE ORDER BY nome"
     )
 
     return templates.TemplateResponse(
         "consultas/editar.html",
-        {"request": request, "usuario": usuario, "consulta": consulta, "procedimentos": procedimentos},
+        {"request": request, "usuario": usuario, "consulta": consulta, "procedimentos": procedimentos, "origem": origem},
     )
 
 
@@ -1779,6 +1778,7 @@ def salvar_edicao_consulta(
     duracao: int = Form(30),
     procedimento_id: str = Form(""),
     observacoes: str = Form(None),
+    origem: str = Form(None),
     usuario=Depends(exigir_login),
 ):
     exigir_permissao(usuario, "consultas", "editar")
@@ -1812,7 +1812,8 @@ def salvar_edicao_consulta(
             (nova_data_date, consulta_id),
         )
 
-    return RedirectResponse("/consultas", status_code=302)
+    destino = "/agenda" if origem == "agenda" else "/consultas"
+    return RedirectResponse(destino, status_code=302)
 
 
 @app.post("/consultas/{consulta_id}/status")
