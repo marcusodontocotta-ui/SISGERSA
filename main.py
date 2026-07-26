@@ -2011,7 +2011,7 @@ def criar_prontuario(
             paciente_id_int = existente["id"]
         else:
             db.execute(
-                "INSERT INTO usuarios (nome, email, telefone, cpf, data_nascimento, senha_hash, tipo, ativo) VALUES (%s, %s, %s, %s, %s, %s, 'paciente', 1)",
+                "INSERT INTO usuarios (nome, email, telefone, cpf, data_nascimento, senha_hash, tipo, ativo) VALUES (%s, %s, %s, %s, %s, %s, 'paciente', TRUE)",
                 (novo_paciente_nome.strip(), novo_email, novo_paciente_telefone or None, novo_paciente_cpf or None, novo_paciente_nascimento or None, senha_hash),
             )
             paciente_id_int = db.fetch_one("SELECT id FROM usuarios WHERE email = %s AND tipo = 'paciente'", (novo_email,))["id"]
