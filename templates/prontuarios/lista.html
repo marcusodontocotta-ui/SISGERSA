@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block titulo %}Historico{% endblock %}
+{% block titulo %}Prontuarios{% endblock %}
 {% block conteudo %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-folder-medical"></i> Historico</h2>
+    <h2><i class="bi bi-folder-medical"></i> Prontuarios</h2>
     {% if usuario.tipo in ['admin', 'recepcionista', 'profissional'] %}
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoProntuario">
         <i class="bi bi-plus-circle"></i> Novo Registro
