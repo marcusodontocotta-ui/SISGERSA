@@ -1812,7 +1812,10 @@ def salvar_edicao_consulta(
             (nova_data_date, consulta_id),
         )
 
-    destino = "/agenda" if origem == "agenda" else "/consultas"
+    if origem == "agenda":
+        destino = f"/agenda?data={nova_data.strftime('%Y-%m-%d')}"
+    else:
+        destino = "/consultas"
     return RedirectResponse(destino, status_code=302)
 
 
