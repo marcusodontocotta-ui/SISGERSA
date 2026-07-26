@@ -117,6 +117,11 @@
                                 </form>
                                 {% endif %}
                                 {% endif %}
+                                {% if c.status not in ['concluida', 'cancelada', 'faltou'] %}
+                                <a href="/consultas/{{ c.id }}/editar" class="btn btn-outline-primary" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                {% endif %}
                                 {% if c.prontuario_id %}
                                 <a href="/prontuarios/{{ c.prontuario_id }}" class="btn btn-outline-secondary" title="Prontuario">
                                     <i class="bi bi-folder-medical"></i>

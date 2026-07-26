@@ -1740,6 +1740,81 @@ def criar_consulta(
     return RedirectResponse("/consultas", status_code=302)
 
 
+@app.get("/consultas/{consulta_id}/editar", response_class=HTMLResponse)
+def editar_consulta_form(consulta_id: int, request: Request, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "consultas", "editar")
+    if usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
+        raise HTTPException(status_code=403)
+
+    consulta = db.fetch_one(
+        """SELECT c.*, u.nome AS paciente_nome, p2.nome AS profissional_nome
+           FROM consultas c
+           JOIN usuarios u ON u.id = c.paciente_usuario_id
+           JOIN usuarios p2 ON p2.id = c.profissional_usuario_id
+           WHERE c.id = %s""",
+        (consulta_id,),
+    )
+    if not consulta:
+        raise HTTPException(status_code=404)
+
+    if usuario["tipo"] == "profissional" and consulta["profissional_usuario_id"] != usuario["id"]:
+        raise HTTPException(status_code=403)
+
+    estab_id = resolver_estabelecimento(request, usuario)
+    procedimentos = db.fetch_all(
+        "SELECT id, nome, duracao_minutos FROM procedimentos WHERE ativo = TRUE ORDER BY nome"
+    )
+
+    return templates.TemplateResponse(
+        "consultas/editar.html",
+        {"request": request, "usuario": usuario, "consulta": consulta, "procedimentos": procedimentos},
+    )
+
+
+@app.post("/consultas/{consulta_id}/editar")
+def salvar_edicao_consulta(
+    consulta_id: int,
+    request: Request,
+    data_hora: str = Form(...),
+    duracao: int = Form(30),
+    procedimento_id: str = Form(""),
+    observacoes: str = Form(None),
+    usuario=Depends(exigir_login),
+):
+    exigir_permissao(usuario, "consultas", "editar")
+    if is_write_limited(request, usuario, "edit"):
+        raise HTTPException(status_code=429, detail="Muitas requisicoes. Aguarde 1 minuto.")
+    if usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
+        raise HTTPException(status_code=403)
+
+    consulta = db.fetch_one("SELECT * FROM consultas WHERE id = %s", (consulta_id,))
+    if not consulta:
+        raise HTTPException(status_code=404)
+
+    if usuario["tipo"] == "profissional" and consulta["profissional_usuario_id"] != usuario["id"]:
+        raise HTTPException(status_code=403)
+
+    procedimento_id_val = int(procedimento_id) if procedimento_id and procedimento_id.strip() else None
+
+    from datetime import datetime as _dt
+    nova_data = _dt.strptime(data_hora, "%Y-%m-%dT%H:%M") if "T" in data_hora else _dt.strptime(data_hora, "%Y-%m-%d")
+    data_mudou = consulta["data_hora"] != nova_data
+
+    db.execute(
+        "UPDATE consultas SET data_hora = %s, duracao_minutos = %s, procedimento_id = %s, observacoes = %s WHERE id = %s",
+        (nova_data, duracao, procedimento_id_val, observacoes or None, consulta_id),
+    )
+
+    if data_mudou and consulta.get("prontuario_id"):
+        nova_data_date = nova_data.date()
+        db.execute(
+            "UPDATE evolucoes SET data = %s WHERE consulta_id = %s",
+            (nova_data_date, consulta_id),
+        )
+
+    return RedirectResponse("/consultas", status_code=302)
+
+
 @app.post("/consultas/{consulta_id}/status")
 def atualizar_status_consulta(
     consulta_id: int,

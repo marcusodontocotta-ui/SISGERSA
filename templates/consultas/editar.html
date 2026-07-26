@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block titulo %}Editar Consulta{% endblock %}
+{% block conteudo %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="bi bi-calendar-check"></i> Editar Consulta</h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-light mb-3">
+                    <strong>Paciente:</strong> {{ consulta.paciente_nome }}<br>
+                    <strong>Profissional:</strong> {{ consulta.profissional_nome }}
+                </div>
+                <form method="POST" action="/consultas/{{ consulta.id }}/editar">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Data e Hora *</label>
+                            <input type="datetime-local" class="form-control" name="data_hora" required
+                                   value="{{ consulta.data_hora.strftime('%Y-%m-%dT%H:%M') if consulta.data_hora else '' }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Duracao (minutos)</label>
+                            <input type="number" class="form-control" name="duracao" value="{{ consulta.duracao_minutos or 30 }}" min="10" max="240">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Procedimento</label>
+                        <select class="form-select" name="procedimento_id">
+                            <option value="">Selecione o procedimento...</option>
+                            {% for p in procedimentos %}
+                            <option value="{{ p.id }}" {% if p.id == consulta.procedimento_id %}selected{% endif %}>{{ p.nome }} ({{ p.duracao_minutos }} min)</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observacoes</label>
+                        <textarea class="form-control" name="observacoes" rows="3"
+                                  placeholder="Observacoes da consulta...">{{ consulta.observacoes or '' }}</textarea>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="/consultas" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Voltar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Salvar Alteracoes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
