@@ -951,7 +951,7 @@ def dashboard(request: Request, usuario=Depends(exigir_login)):
     if usuario["tipo"] == "admin" and usuario.get("is_super"):
         ctx["total_estabelecimentos"] = db.fetch_one("SELECT COUNT(*) AS total FROM estabelecimentos WHERE ativo = TRUE")
         ctx["total_usuarios"] = db.fetch_one("SELECT COUNT(*) AS total FROM usuarios WHERE ativo = TRUE")
-        ctx["total_pacientes"] = db.fetch_one("SELECT COUNT(*) AS total FROM usuarios WHERE tipo = 'paciente' AND ativo = TRUE")
+        ctx["total_pacientes"] = db.fetch_one("SELECT COUNT(*) AS total FROM prontuarios")
         ctx["total_profissionais"] = db.fetch_one("SELECT COUNT(*) AS total FROM usuarios WHERE tipo = 'profissional' AND ativo = TRUE")
         ctx["total_consultas_mes"] = db.fetch_one(
             f"SELECT COUNT(*) AS total FROM consultas WHERE {_mes_atual_filter()}"
@@ -1019,7 +1019,7 @@ def dashboard_stats(
     estabelecimentos = db.fetch_one("SELECT COUNT(*) AS total FROM estabelecimentos WHERE ativo = TRUE")
     if estab_id:
         pacientes = db.fetch_one(
-            "SELECT COUNT(*) AS total FROM usuarios u JOIN paciente_estabelecimento pe ON pe.usuario_id = u.id WHERE u.tipo = 'paciente' AND u.ativo = TRUE AND pe.estabelecimento_id = %s",
+            "SELECT COUNT(*) AS total FROM prontuarios WHERE estabelecimento_id = %s",
             (estab_id,),
         )
         profissionais = db.fetch_one(
@@ -1028,10 +1028,10 @@ def dashboard_stats(
         )
     else:
         pacientes = db.fetch_one(
-            "SELECT COUNT(*) AS total FROM usuarios WHERE tipo = 'paciente' AND ativo = TRUE"
+            "SELECT COUNT(*) AS total FROM prontuarios"
         )
         profissionais = db.fetch_one(
-            "SELECT COUNT(*) AS total FROM usuarios WHERE tipo = 'profissional' AND ativo = TRUE"
+            "SELECT COUNT(*) AS total FROM usuarios WHERE tipo = 'profissional' AND ativo = True"
         )
     convenios = db.fetch_one("SELECT COUNT(*) AS total FROM convenios WHERE ativo = TRUE")
     procedimentos = db.fetch_one("SELECT COUNT(*) AS total FROM procedimentos WHERE ativo = TRUE")
@@ -3605,3 +3605,42 @@ def api_verificar_duplicata(
             }
 
     return JSONResponse(content=resultado)
+
+
+@app.get("/api/fix-orphan-patients")
+def fix_orphan_patients(request: Request, usuario=Depends(exigir_login)):
+    if not usuario.get("is_super"):
+        raise HTTPException(status_code=403)
+
+    orfaos = db.fetch_all("""
+        SELECT u.id, u.nome, u.email FROM usuarios u
+        WHERE u.tipo = 'paciente' AND u.ativo = TRUE
+          AND NOT EXISTS (SELECT 1 FROM prontuarios p WHERE p.paciente_usuario_id = u.id)
+    """)
+
+    if not orfaos:
+        return JSONResponse({"mensagem": "Nenhum paciente orfo", "criados": 0})
+
+    estab = db.fetch_one("SELECT id FROM estabelecimentos WHERE ativo = TRUE ORDER BY id LIMIT 1")
+    if not estab:
+        return JSONResponse({"erro": "Nenhum estabelecimento ativo"}, status_code=400)
+
+    estab_id = estab["id"]
+    criados = []
+    for pac in orfaos:
+        count = db.fetch_one(
+            "SELECT COUNT(*) AS total FROM prontuarios WHERE estabelecimento_id = %s",
+            (estab_id,),
+        )
+        numero = f"PRONT-{int(count['total']) + 1:05d}"
+        db.execute(
+            "INSERT IGNORE INTO paciente_estabelecimento (usuario_id, estabelecimento_id) VALUES (%s, %s)",
+            (pac["id"], estab_id),
+        )
+        db.execute(
+            "INSERT INTO prontuarios (paciente_usuario_id, estabelecimento_id, numero_prontuario) VALUES (%s, %s, %s)",
+            (pac["id"], estab_id, numero),
+        )
+        criados.append({"nome": pac["nome"], "numero": numero})
+
+    return JSONResponse({"mensagem": f"{len(criados)} prontuarios criados", "criados": criados})
