@@ -59,7 +59,7 @@
                 {% if consultas %}
                 <div class="list-group list-group-flush">
                     {% for c in consultas %}
-                    <div class="list-group-item">
+                    <button type="button" class="list-group-item list-group-item-action btn-historico" data-consulta-id="{{ c.id }}" onclick="filtrarEvolucao({{ c.id }})" style="text-align:left;">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
                                 <strong>{{ c.data_hora.strftime('%d/%m/%Y %H:%M') if c.data_hora else '-' }}</strong>
@@ -87,17 +87,7 @@
                         {% elif c.procedimento_nome %}
                         <small class="text-muted"><i class="bi bi-calendar2-check"></i> Procedimento planejado: {{ c.procedimento_nome }}</small>
                         {% endif %}
-                        <div class="mt-2">
-                            <button class="btn btn-sm btn-outline-primary btn-ver-evolucao" data-consulta-id="{{ c.id }}" onclick="filtrarEvolucao({{ c.id }})">
-                                <i class="bi bi-journal-text"></i> Ver Evolucao
-                            </button>
-                            {% if c.prontuario_id %}
-                            <a href="/prontuarios/{{ c.prontuario_id }}" class="btn btn-sm btn-outline-secondary">
-                                <i class="bi bi-folder-medical"></i> Prontuario
-                            </a>
-                            {% endif %}
-                        </div>
-                    </div>
+                    </button>
                     {% endfor %}
                 </div>
                 {% else %}
@@ -194,7 +184,12 @@
                     {% endif %}
                 </div>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="corpoEvolucao">
+                <div id="evolucaoPlaceholder" class="text-center py-5 text-muted">
+                    <i class="bi bi-journal" style="font-size:2.5rem;"></i>
+                    <p class="mt-2">Selecione uma consulta no historico para ver a evolucao.</p>
+                </div>
+                <div id="evolucaoConteudo" style="display:none;">
                 {% if evolucoes %}
                     {% for ev in evolucoes %}
                     <div class="border-start border-primary border-3 ps-3 mb-4 evolucao-item" data-consulta-id="{{ ev.consulta_id or '' }}">
@@ -308,6 +303,7 @@
                     <p class="mt-2">Nenhuma evolucao registrada.</p>
                 </div>
                 {% endif %}
+                </div>
             </div>
         </div>
 
@@ -624,9 +620,16 @@ function filtrarEvolucao(consultaId) {
     document.querySelectorAll('.evolucao-item').forEach(function(el) {
         el.style.display = el.dataset.consultaId == consultaId ? '' : 'none';
     });
+    document.getElementById('evolucaoPlaceholder').style.display = 'none';
+    document.getElementById('evolucaoConteudo').style.display = '';
     document.getElementById('btnMostrarTodas').style.display = '';
-    document.querySelectorAll('.btn-ver-evolucao').forEach(function(btn) {
+    document.querySelectorAll('.btn-historico').forEach(function(btn) {
         btn.classList.toggle('active', btn.dataset.consultaId == consultaId);
+        if (btn.dataset.consultaId == consultaId) {
+            btn.classList.remove('list-group-item-action');
+        } else {
+            btn.classList.add('list-group-item-action');
+        }
     });
 }
 
@@ -634,9 +637,12 @@ function mostrarTodasEvolucoes() {
     document.querySelectorAll('.evolucao-item').forEach(function(el) {
         el.style.display = '';
     });
+    document.getElementById('evolucaoPlaceholder').style.display = '';
+    document.getElementById('evolucaoConteudo').style.display = 'none';
     document.getElementById('btnMostrarTodas').style.display = 'none';
-    document.querySelectorAll('.btn-ver-evolucao').forEach(function(btn) {
+    document.querySelectorAll('.btn-historico').forEach(function(btn) {
         btn.classList.remove('active');
+        btn.classList.add('list-group-item-action');
     });
 }
 </script>
