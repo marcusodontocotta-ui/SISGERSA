@@ -490,9 +490,9 @@ pront_ids_html = parse_prontuario_ids(html)
 check("Super admin (estab1) ve prontuario Maria", 1 in pront_ids_html)
 check("Super admin (estab1) ve prontuario Pedro", 2 in pront_ids_html)
 check("Super admin (estab1) ve prontuario Pai Ferreira", 4 in pront_ids_html)
-check("Super admin (estab1) NAO ve prontuario Joao (Hospital)", 3 not in pront_ids_html)
+check("Super admin (estab1) ve prontuario Joao (Hospital) tambem", 3 in pront_ids_html)
 
-# Super admin com cookie estab2 ve prontuarios do estab2
+# Super admin com cookie estab2 ve TODOS os prontuarios
 client.cookies.set("estabelecimento_id", str(estab2_id))
 r = client.get("/prontuarios")
 html = r.text
@@ -500,7 +500,7 @@ pront_ids_html = parse_prontuario_ids(html)
 
 check("Super admin (estab2) ve prontuario Joao Oliveira", 3 in pront_ids_html)
 check("Super admin (estab2) ve prontuario Ana Costa", 6 in pront_ids_html)
-check("Super admin (estab2) NAO ve prontuario Maria (Odonto)", 1 not in pront_ids_html)
+check("Super admin (estab2) ve prontuario Maria (Odonto) tambem", 1 in pront_ids_html)
 
 # Super admin pode acessar QUALQUER prontuario individualmente
 if pront_ids.get("Maria Silva"):

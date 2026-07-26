@@ -1797,6 +1797,18 @@ def listar_prontuarios(request: Request, usuario=Depends(exigir_login), paciente
             params.append(paciente_id_int)
         query += " ORDER BY p.criado_em DESC"
         prontuarios = db.fetch_all(query, tuple(params))
+    elif usuario.get("is_super"):
+        query = """SELECT p.*, u.nome AS paciente_nome,
+                          u.cpf AS paciente_cpf, u.telefone AS paciente_telefone, u.email AS paciente_email
+                   FROM prontuarios p
+                   JOIN usuarios u ON u.id = p.paciente_usuario_id
+                   WHERE 1=1"""
+        params = []
+        if paciente_id_int:
+            query += " AND p.paciente_usuario_id = %s"
+            params.append(paciente_id_int)
+        query += " ORDER BY p.criado_em DESC"
+        prontuarios = db.fetch_all(query, tuple(params))
     elif estab_id:
         query = """SELECT p.*, u.nome AS paciente_nome,
                           u.cpf AS paciente_cpf, u.telefone AS paciente_telefone, u.email AS paciente_email
@@ -1810,20 +1822,7 @@ def listar_prontuarios(request: Request, usuario=Depends(exigir_login), paciente
         query += " ORDER BY p.criado_em DESC"
         prontuarios = db.fetch_all(query, tuple(params))
     else:
-        if usuario.get("is_super"):
-            query = """SELECT p.*, u.nome AS paciente_nome,
-                              u.cpf AS paciente_cpf, u.telefone AS paciente_telefone, u.email AS paciente_email
-                       FROM prontuarios p
-                       JOIN usuarios u ON u.id = p.paciente_usuario_id
-                       WHERE 1=1"""
-            params = []
-            if paciente_id_int:
-                query += " AND p.paciente_usuario_id = %s"
-                params.append(paciente_id_int)
-            query += " ORDER BY p.criado_em DESC"
-            prontuarios = db.fetch_all(query, tuple(params))
-        else:
-            prontuarios = []
+        prontuarios = []
 
     pacientes = []
     estabelecimentos_list = []
