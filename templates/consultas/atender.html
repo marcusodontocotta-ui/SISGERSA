@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block titulo %}Atender - {{ consulta.paciente_nome }}{% endblock %}
+{% block conteudo %}
+<div class="row mb-4">
+    <div class="col">
+        <a href="/consultas" class="text-decoration-none">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+        <h2 class="mt-2">
+            <i class="bi bi-clipboard2-pulse"></i> Atender Consulta
+        </h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="bi bi-person"></i> Dados do Paciente</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Nome:</strong> {{ consulta.paciente_nome }}</p>
+                <p><strong>CPF:</strong> {{ consulta.paciente_cpf or '-' }}</p>
+                <p><strong>Email:</strong> {{ consulta.paciente_email or '-' }}</p>
+                <p><strong>Telefone:</strong> {{ consulta.paciente_telefone or '-' }}</p>
+                <p><strong>Nascimento:</strong> {{ consulta.paciente_nascimento.strftime('%d/%m/%Y') if consulta.paciente_nascimento else '-' }}</p>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="bi bi-calendar-check"></i> Detalhes da Consulta</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Profissional:</strong> {{ consulta.profissional_nome }}</p>
+                <p><strong>Data/Hora:</strong> {{ consulta.data_hora.strftime('%d/%m/%Y %H:%M') if consulta.data_hora else '-' }}</p>
+                <p><strong>Duracao:</strong> {{ consulta.duracao_minutos }} min</p>
+                <p><strong>Procedimento:</strong> {{ consulta.procedimento_nome or '-' }}</p>
+                <p><strong>Observacoes:</strong> {{ consulta.observacoes or '-' }}</p>
+                {% if consulta.prontuario_id %}
+                <p><a href="/prontuarios/{{ consulta.prontuario_id }}" class="text-decoration-none">
+                    <i class="bi bi-folder-medical"></i> Ver Prontuario
+                </a></p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-journal-text"></i> Evolucao Clinica</h5>
+            </div>
+            <div class="card-body">
+                {% if evolucao_existente %}
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-info-circle"></i> Esta consulta ja possui evolucao registrada.
+                    {% if consulta.prontuario_id %}
+                    <a href="/prontuarios/{{ consulta.prontuario_id }}" class="alert-link">Ver no prontuario</a>
+                    {% endif %}
+                </div>
+                {% else %}
+                <form method="POST" action="/consultas/{{ consulta.id }}/atender">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Queixa Principal</label>
+                        <textarea class="form-control" name="queixa" rows="3"
+                                  placeholder="Descreva a queixa do paciente..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Diagnostico</label>
+                        <textarea class="form-control" name="diagnostico" rows="3"
+                                  placeholder="Diagnostico medico/odontologico..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Procedimento Realizado</label>
+                        <textarea class="form-control" name="procedimento" rows="3"
+                                  placeholder="Procedimento realizado na consulta..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Observacoes</label>
+                        <textarea class="form-control" name="observacoes" rows="3"
+                                  placeholder="Observacoes adicionais, orientacoes ao paciente..."></textarea>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-check2-all"></i> Salvar e Concluir
+                        </button>
+                        <a href="/consultas" class="btn btn-outline-secondary btn-lg">
+                            <i class="bi bi-x-circle"></i> Cancelar
+                        </a>
+                    </div>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

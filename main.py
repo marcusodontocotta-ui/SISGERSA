@@ -1733,10 +1733,6 @@ def atualizar_status_consulta(
     consulta_id: int,
     request: Request,
     status: str = Form(...),
-    queixa: str = Form(None),
-    diagnostico: str = Form(None),
-    procedimento: str = Form(None),
-    observacoes_evolucao: str = Form(None),
     usuario=Depends(exigir_login),
 ):
     exigir_permissao(usuario, "consultas", "editar")
@@ -1758,29 +1754,98 @@ def atualizar_status_consulta(
 
     db.execute("UPDATE consultas SET status = %s WHERE id = %s", (status, consulta_id))
 
-    if status in ("concluida", "faltou", "cancelada") and consulta.get("prontuario_id"):
+    if status in ("faltou", "cancelada") and consulta.get("prontuario_id"):
         evolucao_ja_existe = db.fetch_one(
             "SELECT id FROM evolucoes WHERE consulta_id = %s", (consulta_id,)
         )
         if not evolucao_ja_existe:
-            prof_id = consulta["profissional_usuario_id"]
-            if status == "concluida":
-                queixa_final = queixa or None
-                diag_final = diagnostico or None
-                proc_final = procedimento or None
-                obs_final = observacoes_evolucao or None
-            else:
-                motivo = "Paciente faltou" if status == "faltou" else "Consulta cancelada"
-                queixa_final = None
-                diag_final = None
-                proc_final = motivo
-                obs_final = None
+            motivo = "Paciente faltou" if status == "faltou" else "Consulta cancelada"
+            db.execute(
+                """INSERT INTO evolucoes
+                   (prontuario_id, consulta_id, profissional_usuario_id, procedimento_realizado)
+                   VALUES (%s, %s, %s, %s)""",
+                (consulta["prontuario_id"], consulta_id, consulta["profissional_usuario_id"], motivo),
+            )
 
+    return RedirectResponse("/consultas", status_code=302)
+
+
+@app.get("/consultas/{consulta_id}/atender", response_class=HTMLResponse)
+def atender_consulta(consulta_id: int, request: Request, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "consultas", "editar")
+    if usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
+        raise HTTPException(status_code=403)
+
+    consulta = db.fetch_one(
+        """SELECT c.*, u.nome AS paciente_nome, u.email AS paciente_email,
+                  u.telefone AS paciente_telefone, u.cpf AS paciente_cpf,
+                  u.data_nascimento AS paciente_nascimento,
+                  p2.nome AS profissional_nome,
+                  proc.nome AS procedimento_nome
+           FROM consultas c
+           JOIN usuarios u ON u.id = c.paciente_usuario_id
+           JOIN usuarios p2 ON p2.id = c.profissional_usuario_id
+           LEFT JOIN procedimentos proc ON proc.id = c.procedimento_id
+           WHERE c.id = %s""",
+        (consulta_id,),
+    )
+    if not consulta:
+        raise HTTPException(status_code=404)
+
+    if usuario["tipo"] == "profissional" and consulta["profissional_usuario_id"] != usuario["id"]:
+        raise HTTPException(status_code=403)
+
+    evolucao_existente = None
+    if consulta.get("prontuario_id"):
+        evolucao_existente = db.fetch_one(
+            "SELECT id FROM evolucoes WHERE consulta_id = %s", (consulta_id,)
+        )
+
+    return templates.TemplateResponse(
+        "consultas/atender.html",
+        {"request": request, "usuario": usuario, "consulta": consulta, "evolucao_existente": evolucao_existente},
+    )
+
+
+@app.post("/consultas/{consulta_id}/atender")
+def salvar_atendimento(
+    consulta_id: int,
+    request: Request,
+    queixa: str = Form(None),
+    diagnostico: str = Form(None),
+    procedimento: str = Form(None),
+    observacoes: str = Form(None),
+    usuario=Depends(exigir_login),
+):
+    exigir_permissao(usuario, "consultas", "editar")
+    if is_write_limited(request, usuario, "create"):
+        raise HTTPException(status_code=429, detail="Muitas requisicoes. Aguarde 1 minuto.")
+    if usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
+        raise HTTPException(status_code=403)
+
+    consulta = db.fetch_one("SELECT * FROM consultas WHERE id = %s", (consulta_id,))
+    if not consulta:
+        raise HTTPException(status_code=404)
+
+    if usuario["tipo"] == "profissional" and consulta["profissional_usuario_id"] != usuario["id"]:
+        raise HTTPException(status_code=403)
+
+    if consulta.get("status") in ("concluida", "cancelada"):
+        return RedirectResponse("/consultas", status_code=302)
+
+    db.execute("UPDATE consultas SET status = 'concluida' WHERE id = %s", (consulta_id,))
+
+    if consulta.get("prontuario_id"):
+        evolucao_ja_existe = db.fetch_one(
+            "SELECT id FROM evolucoes WHERE consulta_id = %s", (consulta_id,)
+        )
+        if not evolucao_ja_existe:
             db.execute(
                 """INSERT INTO evolucoes
                    (prontuario_id, consulta_id, profissional_usuario_id, queixa_principal, diagnostico, procedimento_realizado, observacoes)
                    VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                (consulta["prontuario_id"], consulta_id, prof_id, queixa_final, diag_final, proc_final, obs_final),
+                (consulta["prontuario_id"], consulta_id, consulta["profissional_usuario_id"],
+                 queixa or None, diagnostico or None, procedimento or None, observacoes or None),
             )
 
     return RedirectResponse("/consultas", status_code=302)
