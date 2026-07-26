@@ -42,7 +42,7 @@
                                   placeholder="Observacoes da consulta...">{{ consulta.observacoes or '' }}</textarea>
                     </div>
                     <div class="d-flex gap-2">
-                        <a href="{{ '/agenda' if origem == 'agenda' else '/consultas' }}" class="btn btn-secondary">
+                        <a href="{{ '/agenda?data=' + consulta.data_hora.strftime('%Y-%m-%d') if origem == 'agenda' else '/consultas' }}" class="btn btn-secondary">
                             <i class="bi bi-arrow-left"></i> Voltar
                         </a>
                         <button type="submit" class="btn btn-primary">
