@@ -97,12 +97,32 @@
     .evento .evento-horario { font-weight: 600; }
     .evento .evento-titulo { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    .evento-agendada { background: #cfe2ff; border-left: 3px solid #0d6efd; color: #084298; }
-    .evento-confirmada { background: #d1e7dd; border-left: 3px solid #198754; color: #0f5132; }
-    .evento-em_andamento { background: #fff3cd; border-left: 3px solid #ffc107; color: #664d03; }
-    .evento-concluida { background: #d3d3d4; border-left: 3px solid #6c757d; color: #41464b; }
-    .evento-cancelada { background: #f8d7da; border-left: 3px solid #dc3545; color: #842029; text-decoration: line-through; }
-    .evento-faltou { background: #e2d9f3; border-left: 3px solid #6f42c1; color: #432874; }
+    .evento-agendada { border-left: 4px solid #0d6efd; color: #084298; }
+    .evento-confirmada { border-left: 4px solid #198754; color: #0f5132; }
+    .evento-em_andamento { border-left: 4px solid #ffc107; color: #664d03; }
+    .evento-concluida { border-left: 4px solid #6c757d; color: #41464b; }
+    .evento-cancelada { border-left: 4px solid #dc3545; color: #842029; text-decoration: line-through; }
+    .evento-faltou { border-left: 4px solid #6f42c1; color: #432874; }
+
+    .legenda-status {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        font-size: 0.75rem;
+    }
+    .legenda-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .legenda-cor {
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+        display: inline-block;
+    }
 
     .hour-line { border-bottom: 1px solid #e9ecef; }
     .half-hour-line { border-bottom: 1px dotted #f0f0f0; }
@@ -154,6 +174,16 @@
         </div>
     </form>
     {% endif %}
+
+    <div class="legenda-status">
+        <strong>Status:</strong>
+        <span class="legenda-item"><span class="legenda-cor" style="background:#0d6efd;"></span> Agendada</span>
+        <span class="legenda-item"><span class="legenda-cor" style="background:#198754;"></span> Confirmada</span>
+        <span class="legenda-item"><span class="legenda-cor" style="background:#ffc107;"></span> Em Andamento</span>
+        <span class="legenda-item"><span class="legenda-cor" style="background:#6c757d;"></span> Concluida</span>
+        <span class="legenda-item"><span class="legenda-cor" style="background:#dc3545;"></span> Cancelada</span>
+        <span class="legenda-item"><span class="legenda-cor" style="background:#6f42c1;"></span> Faltou</span>
+    </div>
 
     <div class="calendar-grid" id="calendarGrid">
         <div id="indicadorAgora" class="agora-indicator" style="display:none;"></div>
@@ -335,6 +365,9 @@
 
                     const evento = document.createElement('div');
                     evento.className = 'evento evento-' + c.status;
+                    var cor = c.cor_profissional || '#6c757d';
+                    var r = parseInt(cor.slice(1,3), 16), g = parseInt(cor.slice(3,5), 16), b = parseInt(cor.slice(5,7), 16);
+                    evento.style.backgroundColor = 'rgba(' + r + ',' + g + ',' + b + ', 0.15)';
                     const top = (minuto / 60) * 48;
                     const altura = Math.max((c.duracao / 60) * 48, 24);
                     evento.style.top = top + 'px';

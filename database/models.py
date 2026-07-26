@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS profissional_estabelecimento (
     especialidade VARCHAR(150),
     cargo VARCHAR(100),
     registro_profissional VARCHAR(50),
+    cor VARCHAR(7) DEFAULT '#6c757d',
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
     FOREIGN KEY (estabelecimento_id) REFERENCES estabelecimentos(id) ON DELETE CASCADE,
@@ -406,6 +407,7 @@ CREATE TABLE IF NOT EXISTS profissional_estabelecimento (
     especialidade VARCHAR(150),
     cargo VARCHAR(100),
     registro_profissional VARCHAR(50),
+    cor VARCHAR(7) DEFAULT '#6c757d',
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
     FOREIGN KEY (estabelecimento_id) REFERENCES estabelecimentos(id) ON DELETE CASCADE,
@@ -728,6 +730,7 @@ CREATE TABLE IF NOT EXISTS cupons (
 ALTER TABLE estabelecimentos ADD COLUMN IF NOT EXISTS cupom_id INT REFERENCES cupons(id);
 ALTER TABLE estabelecimentos ADD COLUMN IF NOT EXISTS plano_id INT REFERENCES planos(id);
 ALTER TABLE estabelecimentos ADD COLUMN IF NOT EXISTS plano_expira_em DATE;
+ALTER TABLE profissional_estabelecimento ADD COLUMN IF NOT EXISTS cor VARCHAR(7) DEFAULT '#6c757d';
 
 """
 
@@ -739,6 +742,7 @@ SCHEMA_ALTER_MYSQL = [
     "ALTER TABLE planos ADD COLUMN limite_prontuarios INT DEFAULT 50",
     "ALTER TABLE planos ADD COLUMN limite_orcamentos_mes INT DEFAULT 50",
     "ALTER TABLE planos ADD COLUMN limite_procedimentos INT DEFAULT 50",
+    "ALTER TABLE profissional_estabelecimento ADD COLUMN cor VARCHAR(7) DEFAULT '#6c757d'",
 ]
 
 

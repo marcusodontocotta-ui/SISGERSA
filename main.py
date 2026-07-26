@@ -1351,6 +1351,7 @@ def criar_profissional(
     cargo: str = Form(None),
     registro_profissional: str = Form(None),
     estabelecimento_id: str = Form(None),
+    cor: str = Form("#0d6efd"),
     usuario=Depends(exigir_login),
 ):
     exigir_permissao(usuario, "profissionais", "criar")
@@ -1374,8 +1375,8 @@ def criar_profissional(
 
     if estabelecimento_id and estabelecimento_id.strip():
         db.execute(
-            "INSERT INTO profissional_estabelecimento (usuario_id, estabelecimento_id, especialidade, cargo, registro_profissional) VALUES (%s, %s, %s, %s, %s)",
-            (user_id, int(estabelecimento_id), especialidade, cargo, registro_profissional),
+            "INSERT INTO profissional_estabelecimento (usuario_id, estabelecimento_id, especialidade, cargo, registro_profissional, cor) VALUES (%s, %s, %s, %s, %s, %s)",
+            (user_id, int(estabelecimento_id), especialidade, cargo, registro_profissional, cor or "#0d6efd"),
         )
 
     return RedirectResponse("/profissionais", status_code=302)
@@ -1419,6 +1420,7 @@ def salvar_profissional(
     cargo: str = Form(None),
     registro_profissional: str = Form(None),
     estabelecimento_id: str = Form(None),
+    cor: str = Form("#6c757d"),
     usuario=Depends(exigir_login),
 ):
     if usuario["tipo"] != "admin":
@@ -1437,12 +1439,17 @@ def salvar_profissional(
         if existing:
             db.execute(
                 """UPDATE profissional_estabelecimento
-                   SET estabelecimento_id = %s, especialidade = %s, cargo = %s, registro_profissional = %s
+                   SET estabelecimento_id = %s, especialidade = %s, cargo = %s, registro_profissional = %s, cor = %s
                    WHERE usuario_id = %s""",
-                (int(estabelecimento_id), especialidade, cargo, registro_profissional, prof_id),
+                (int(estabelecimento_id), especialidade, cargo, registro_profissional, cor or "#6c757d", prof_id),
             )
         else:
             vincular_profissional(prof_id, int(estabelecimento_id), especialidade, cargo, registro_profissional)
+            if cor and cor.strip():
+                db.execute(
+                    "UPDATE profissional_estabelecimento SET cor = %s WHERE usuario_id = %s",
+                    (cor, prof_id),
+                )
 
     return RedirectResponse("/profissionais", status_code=302)
 
@@ -2573,20 +2580,22 @@ def api_consultas(
 
     if usuario["tipo"] == "paciente":
         consultas = db.fetch_all(
-            """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome
+            """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome, COALESCE(pe.cor, '#6c757d') AS cor_profissional
                FROM consultas c
                JOIN usuarios u_prof ON u_prof.id = c.profissional_usuario_id
                JOIN usuarios u_pac ON u_pac.id = c.paciente_usuario_id
+               LEFT JOIN profissional_estabelecimento pe ON pe.usuario_id = c.profissional_usuario_id AND pe.estabelecimento_id = c.estabelecimento_id
                WHERE c.paciente_usuario_id = %s
                AND c.data_hora BETWEEN %s AND %s
                ORDER BY c.data_hora""",
             (usuario["id"], inicio, fim),
         )
     elif usuario["tipo"] == "profissional":
-        query = """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome
+        query = """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome, COALESCE(pe.cor, '#6c757d') AS cor_profissional
                    FROM consultas c
                    JOIN usuarios u_prof ON u_prof.id = c.profissional_usuario_id
                    JOIN usuarios u_pac ON u_pac.id = c.paciente_usuario_id
+                   LEFT JOIN profissional_estabelecimento pe ON pe.usuario_id = c.profissional_usuario_id AND pe.estabelecimento_id = c.estabelecimento_id
                    WHERE c.profissional_usuario_id = %s
                    AND c.data_hora BETWEEN %s AND %s"""
         params = [usuario["id"], inicio, fim]
@@ -2598,10 +2607,11 @@ def api_consultas(
         query += " ORDER BY c.data_hora"
         consultas = db.fetch_all(query, tuple(params))
     elif estab_id:
-        query = """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome
+        query = """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome, COALESCE(pe.cor, '#6c757d') AS cor_profissional
                    FROM consultas c
                    JOIN usuarios u_prof ON u_prof.id = c.profissional_usuario_id
                    JOIN usuarios u_pac ON u_pac.id = c.paciente_usuario_id
+                   LEFT JOIN profissional_estabelecimento pe ON pe.usuario_id = c.profissional_usuario_id AND pe.estabelecimento_id = c.estabelecimento_id
                    WHERE c.estabelecimento_id = %s
                    AND c.data_hora BETWEEN %s AND %s"""
         params = [estab_id, inicio, fim]
@@ -2614,10 +2624,11 @@ def api_consultas(
         query += " ORDER BY c.data_hora"
         consultas = db.fetch_all(query, tuple(params))
     else:
-        query = """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome
+        query = """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome, COALESCE(pe.cor, '#6c757d') AS cor_profissional
                    FROM consultas c
                    JOIN usuarios u_prof ON u_prof.id = c.profissional_usuario_id
                    JOIN usuarios u_pac ON u_pac.id = c.paciente_usuario_id
+                   LEFT JOIN profissional_estabelecimento pe ON pe.usuario_id = c.profissional_usuario_id AND pe.estabelecimento_id = c.estabelecimento_id
                    WHERE c.data_hora BETWEEN %s AND %s"""
         params = [inicio, fim]
         if profissional_id_int_api:
@@ -2636,6 +2647,7 @@ def api_consultas(
             "titulo": f"{c['paciente_nome']} - {c['profissional_nome']}",
             "paciente": c["paciente_nome"],
             "profissional": c["profissional_nome"],
+            "cor_profissional": c.get("cor_profissional") or "#6c757d",
             "data_hora": c["data_hora"].strftime("%Y-%m-%dT%H:%M") if c["data_hora"] else None,
             "duracao": c["duracao_minutos"],
             "status": c["status"],
@@ -2656,14 +2668,16 @@ def api_profissionais(
     estab_id = estabelecimento_id or resolver_estabelecimento(request, usuario)
     if estab_id:
         profissionais = db.fetch_all(
-            """SELECT u.id, u.nome FROM usuarios u
+            """SELECT u.id, u.nome, COALESCE(pe.cor, '#6c757d') as cor FROM usuarios u
                JOIN profissional_estabelecimento pe ON pe.usuario_id = u.id
                WHERE pe.estabelecimento_id = %s AND u.ativo = TRUE ORDER BY u.nome""",
             (estab_id,),
         )
     elif usuario.get("is_super"):
         profissionais = db.fetch_all(
-            "SELECT id, nome FROM usuarios WHERE tipo = 'profissional' AND ativo = TRUE ORDER BY nome"
+            """SELECT u.id, u.nome, COALESCE(pe.cor, '#6c757d') as cor FROM usuarios u
+               LEFT JOIN profissional_estabelecimento pe ON pe.usuario_id = u.id
+               WHERE u.tipo = 'profissional' AND u.ativo = TRUE ORDER BY u.nome"""
         )
     else:
         profissionais = []
