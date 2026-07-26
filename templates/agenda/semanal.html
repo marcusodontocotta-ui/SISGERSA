@@ -15,6 +15,27 @@
         border-radius: 0.5rem;
         overflow-y: auto;
         flex: 1;
+        position: relative;
+    }
+
+    .agora-indicator {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: #dc3545;
+        z-index: 10;
+        pointer-events: none;
+    }
+    .agora-indicator::before {
+        content: '';
+        position: absolute;
+        left: -5px;
+        top: -4px;
+        width: 10px;
+        height: 10px;
+        background: #dc3545;
+        border-radius: 50%;
     }
 
     .cal-header {
@@ -135,6 +156,7 @@
     {% endif %}
 
     <div class="calendar-grid" id="calendarGrid">
+        <div id="indicadorAgora" class="agora-indicator" style="display:none;"></div>
         <div class="cal-header" style="background:#fff;"></div>
         {% for dia in dias_semana %}
         <div class="cal-header {% if dia.eh_hoje %}hoje{% endif %}">
@@ -440,6 +462,33 @@
             });
     }
 
+    function posicionarIndicadorAgora() {
+        var el = document.getElementById('indicadorAgora');
+        var hojeCell = document.querySelector('.cal-cell.hoje-coluna');
+        if (!hojeCell || !el) { if (el) el.style.display = 'none'; return; }
+
+        var agora = new Date();
+        var hora = agora.getHours();
+        var minuto = agora.getMinutes();
+
+        if (hora < 7 || hora >= 21) { el.style.display = 'none'; return; }
+
+        el.style.display = 'block';
+
+        var grid = document.getElementById('calendarGrid');
+        var gridRect = grid.getBoundingClientRect();
+        var cellRect = hojeCell.getBoundingClientRect();
+
+        var topBase = (hora - 7) * 48 + (minuto / 60) * 48;
+        var scrollY = grid.scrollTop;
+        el.style.top = (topBase + scrollY - 1) + 'px';
+        el.style.left = (cellRect.left - gridRect.left) + 'px';
+        el.style.width = cellRect.width + 'px';
+    }
+
     carregarConsultas();
+    posicionarIndicadorAgora();
+    setInterval(posicionarIndicadorAgora, 60000);
+    document.getElementById('calendarGrid').addEventListener('scroll', posicionarIndicadorAgora);
 </script>
 {% endblock %}
