@@ -1725,6 +1725,18 @@ def criar_consulta(
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
         (paciente_id, profissional_id, estab_id, prontuario["id"] if prontuario else None, procedimento_id, data_hora, duracao, observacoes),
     )
+    consulta_id_val = db.fetch_one("SELECT id FROM consultas ORDER BY id DESC LIMIT 1")["id"]
+
+    if prontuario:
+        from datetime import datetime as _dt
+        data_consulta = _dt.strptime(data_hora, "%Y-%m-%dT%H:%M").date() if "T" in data_hora else _dt.strptime(data_hora, "%Y-%m-%d").date()
+        db.execute(
+            """INSERT INTO evolucoes
+               (prontuario_id, consulta_id, profissional_usuario_id, data)
+               VALUES (%s, %s, %s, %s)""",
+            (prontuario["id"], consulta_id_val, profissional_id, data_consulta),
+        )
+
     return RedirectResponse("/consultas", status_code=302)
 
 
@@ -1755,16 +1767,15 @@ def atualizar_status_consulta(
     db.execute("UPDATE consultas SET status = %s WHERE id = %s", (status, consulta_id))
 
     if status in ("faltou", "cancelada") and consulta.get("prontuario_id"):
-        evolucao_ja_existe = db.fetch_one(
-            "SELECT id FROM evolucoes WHERE consulta_id = %s", (consulta_id,)
+        evolucao = db.fetch_one(
+            "SELECT id, queixa_principal, diagnostico, procedimento_realizado FROM evolucoes WHERE consulta_id = %s",
+            (consulta_id,),
         )
-        if not evolucao_ja_existe:
+        if evolucao and not evolucao["queixa_principal"] and not evolucao["diagnostico"] and not evolucao["procedimento_realizado"]:
             motivo = "Paciente faltou" if status == "faltou" else "Consulta cancelada"
             db.execute(
-                """INSERT INTO evolucoes
-                   (prontuario_id, consulta_id, profissional_usuario_id, procedimento_realizado)
-                   VALUES (%s, %s, %s, %s)""",
-                (consulta["prontuario_id"], consulta_id, consulta["profissional_usuario_id"], motivo),
+                "UPDATE evolucoes SET procedimento_realizado = %s WHERE id = %s",
+                (motivo, evolucao["id"]),
             )
 
     return RedirectResponse("/consultas", status_code=302)
@@ -1795,15 +1806,16 @@ def atender_consulta(consulta_id: int, request: Request, usuario=Depends(exigir_
     if usuario["tipo"] == "profissional" and consulta["profissional_usuario_id"] != usuario["id"]:
         raise HTTPException(status_code=403)
 
-    evolucao_existente = None
+    evolucao_data = None
     if consulta.get("prontuario_id"):
-        evolucao_existente = db.fetch_one(
-            "SELECT id FROM evolucoes WHERE consulta_id = %s", (consulta_id,)
+        evolucao_data = db.fetch_one(
+            """SELECT id, queixa_principal, diagnostico, procedimento_realizado, observacoes
+               FROM evolucoes WHERE consulta_id = %s""", (consulta_id,),
         )
 
     return templates.TemplateResponse(
         "consultas/atender.html",
-        {"request": request, "usuario": usuario, "consulta": consulta, "evolucao_existente": evolucao_existente},
+        {"request": request, "usuario": usuario, "consulta": consulta, "evolucao": evolucao_data},
     )
 
 
@@ -1830,16 +1842,21 @@ def salvar_atendimento(
     if usuario["tipo"] == "profissional" and consulta["profissional_usuario_id"] != usuario["id"]:
         raise HTTPException(status_code=403)
 
-    if consulta.get("status") in ("concluida", "cancelada"):
+    if consulta.get("status") in ("cancelada",):
         return RedirectResponse("/consultas", status_code=302)
 
-    db.execute("UPDATE consultas SET status = 'concluida' WHERE id = %s", (consulta_id,))
-
     if consulta.get("prontuario_id"):
-        evolucao_ja_existe = db.fetch_one(
+        evolucao = db.fetch_one(
             "SELECT id FROM evolucoes WHERE consulta_id = %s", (consulta_id,)
         )
-        if not evolucao_ja_existe:
+        if evolucao:
+            db.execute(
+                """UPDATE evolucoes
+                   SET queixa_principal = %s, diagnostico = %s, procedimento_realizado = %s, observacoes = %s
+                   WHERE id = %s""",
+                (queixa or None, diagnostico or None, procedimento or None, observacoes or None, evolucao["id"]),
+            )
+        else:
             db.execute(
                 """INSERT INTO evolucoes
                    (prontuario_id, consulta_id, profissional_usuario_id, queixa_principal, diagnostico, procedimento_realizado, observacoes)
@@ -1848,7 +1865,10 @@ def salvar_atendimento(
                  queixa or None, diagnostico or None, procedimento or None, observacoes or None),
             )
 
-    return RedirectResponse("/consultas", status_code=302)
+    if consulta.get("status") != "concluida":
+        db.execute("UPDATE consultas SET status = 'concluida' WHERE id = %s", (consulta_id,))
+
+    return RedirectResponse(f"/prontuarios/{consulta['prontuario_id']}" if consulta.get("prontuario_id") else "/consultas", status_code=302)
 
 
 @app.get("/prontuarios", response_class=HTMLResponse)

@@ -77,6 +77,11 @@
                         <td>
                             <div class="btn-group btn-group-sm">
                                 {% if usuario.tipo in ['admin', 'recepcionista', 'profissional'] %}
+                                {% if c.status not in ['concluida', 'cancelada', 'faltou'] %}
+                                <a href="/consultas/{{ c.id }}/atender" class="btn btn-outline-success" title="Atender">
+                                    <i class="bi bi-clipboard2-pulse"></i> Atender
+                                </a>
+                                {% endif %}
                                 <form method="POST" action="/consultas/{{ c.id }}/status" class="d-inline">
                                     {% if c.status == 'agendada' %}
                                     <input type="hidden" name="status" value="confirmada">
@@ -89,9 +94,10 @@
                                         <i class="bi bi-play-circle"></i>
                                     </button>
                                     {% elif c.status == 'em_andamento' %}
-                                    <a href="/consultas/{{ c.id }}/atender" class="btn btn-outline-success" title="Atender">
-                                        <i class="bi bi-clipboard2-pulse"></i> Atender
-                                    </a>
+                                    <input type="hidden" name="status" value="concluida">
+                                    <button type="submit" class="btn btn-outline-success" title="Concluir">
+                                        <i class="bi bi-check2-all"></i>
+                                    </button>
                                     {% endif %}
                                 </form>
                                 {% if c.status not in ['concluida', 'cancelada', 'faltou'] %}

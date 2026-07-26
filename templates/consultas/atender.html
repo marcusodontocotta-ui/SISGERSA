@@ -52,11 +52,29 @@
                 <h5 class="mb-0"><i class="bi bi-journal-text"></i> Evolucao Clinica</h5>
             </div>
             <div class="card-body">
-                {% if evolucao_existente %}
-                <div class="alert alert-info mb-0">
-                    <i class="bi bi-info-circle"></i> Esta consulta ja possui evolucao registrada.
+                {% set q = evolucao.queixa_principal if evolucao else none %}
+                {% set d = evolucao.diagnostico if evolucao else none %}
+                {% set p = evolucao.procedimento_realizado if evolucao else none %}
+                {% set o = evolucao.observacoes if evolucao else none %}
+                {% set preenchida = q or d or p %}
+
+                {% if preenchida and consulta.status == 'concluida' %}
+                <div class="mb-3">
+                    <div class="alert alert-success mb-3">
+                        <i class="bi bi-check-circle"></i> Evolucao ja registrada e consulta concluida.
+                    </div>
+                    <table class="table table-bordered">
+                        <tbody>
+                            <tr><th style="width:200px">Queixa Principal</th><td>{{ q or '-' }}</td></tr>
+                            <tr><th>Diagnostico</th><td>{{ d or '-' }}</td></tr>
+                            <tr><th>Procedimento</th><td>{{ p or '-' }}</td></tr>
+                            <tr><th>Observacoes</th><td>{{ o or '-' }}</td></tr>
+                        </tbody>
+                    </table>
                     {% if consulta.prontuario_id %}
-                    <a href="/prontuarios/{{ consulta.prontuario_id }}" class="alert-link">Ver no prontuario</a>
+                    <a href="/prontuarios/{{ consulta.prontuario_id }}" class="btn btn-outline-primary">
+                        <i class="bi bi-folder-medical"></i> Ver no Prontuario
+                    </a>
                     {% endif %}
                 </div>
                 {% else %}
@@ -64,22 +82,22 @@
                     <div class="mb-3">
                         <label class="form-label fw-bold">Queixa Principal</label>
                         <textarea class="form-control" name="queixa" rows="3"
-                                  placeholder="Descreva a queixa do paciente..."></textarea>
+                                  placeholder="Descreva a queixa do paciente...">{{ q or '' }}</textarea>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Diagnostico</label>
                         <textarea class="form-control" name="diagnostico" rows="3"
-                                  placeholder="Diagnostico medico/odontologico..."></textarea>
+                                  placeholder="Diagnostico medico/odontologico...">{{ d or '' }}</textarea>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Procedimento Realizado</label>
                         <textarea class="form-control" name="procedimento" rows="3"
-                                  placeholder="Procedimento realizado na consulta..."></textarea>
+                                  placeholder="Procedimento realizado na consulta...">{{ p or '' }}</textarea>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Observacoes</label>
                         <textarea class="form-control" name="observacoes" rows="3"
-                                  placeholder="Observacoes adicionais, orientacoes ao paciente..."></textarea>
+                                  placeholder="Observacoes adicionais, orientacoes ao paciente...">{{ o or '' }}</textarea>
                     </div>
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-success btn-lg">
