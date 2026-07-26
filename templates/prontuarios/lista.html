@@ -99,21 +99,64 @@
                         </select>
                     </div>
                     {% endif %}
-                    <div class="mb-3">
-                        <label class="form-label">Paciente *</label>
-                        <select class="form-select" name="paciente_id" required id="selectPacienteProntuario">
-                            <option value="">Selecione...</option>
-                            {% for p in pacientes %}
-                            <option value="{{ p.id }}" data-email="{{ p.email|default('', true) }}">{{ p.nome }}</option>
-                            {% endfor %}
-                        </select>
+
+                    <div class="mb-2">
+                        <a href="#" class="text-decoration-none" id="toggleNovoPaciente" onclick="alternarNovoPaciente(); return false;">
+                            <i class="bi bi-person-plus"></i> Cadastrar novo paciente
+                        </a>
                     </div>
+
+                    <div id="secaoPacienteExistente">
+                        <div class="mb-3">
+                            <label class="form-label">Paciente *</label>
+                            <select class="form-select" name="paciente_id" id="selectPacienteProntuario">
+                                <option value="">Selecione...</option>
+                                {% for p in pacientes %}
+                                <option value="{{ p.id }}" data-email="{{ p.email|default('', true) }}">{{ p.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="secaoNovoPaciente" style="display:none;">
+                        <hr class="my-2">
+                        <h6 class="text-primary mb-3"><i class="bi bi-person-plus"></i> Novo Paciente</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Nome Completo *</label>
+                            <input type="text" class="form-control" name="novo_paciente_nome" id="novoPacienteNome">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email *</label>
+                            <input type="email" class="form-control" name="novo_paciente_email" id="novoPacienteEmail">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Senha *</label>
+                            <input type="password" class="form-control" name="novo_paciente_senha" id="novoPacienteSenha">
+                            <small class="text-muted">O paciente podera alterar no primeiro login.</small>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">CPF</label>
+                                <input type="text" class="form-control" name="novo_paciente_cpf" data-mask="cpf" placeholder="000.000.000-00">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Telefone</label>
+                                <input type="text" class="form-control" name="novo_paciente_telefone" data-mask="phone">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Data de Nascimento</label>
+                            <input type="date" class="form-control" name="novo_paciente_nascimento">
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label">Numero do Registro</label>
                         <input type="text" class="form-control" name="numero"
                                placeholder="Deixe vazio para gerar automatico">
                         <small class="text-muted">Se vazio, sera gerado automaticamente.</small>
                     </div>
+                    <input type="hidden" name="criar_novo_paciente" id="inputCriarNovoPaciente" value="0">
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -146,6 +189,28 @@
 </div>
 
 <script>
+var _novoPacienteAtivo = false;
+
+function alternarNovoPaciente() {
+    _novoPacienteAtivo = !_novoPacienteAtivo;
+    document.getElementById('secaoPacienteExistente').style.display = _novoPacienteAtivo ? 'none' : '';
+    document.getElementById('secaoNovoPaciente').style.display = _novoPacienteAtivo ? '' : 'none';
+    document.getElementById('inputCriarNovoPaciente').value = _novoPacienteAtivo ? '1' : '0';
+    document.getElementById('selectPacienteProntuario').removeAttribute('required');
+    if (_novoPacienteAtivo) {
+        document.getElementById('novoPacienteNome').setAttribute('required', '');
+        document.getElementById('novoPacienteEmail').setAttribute('required', '');
+        document.getElementById('novoPacienteSenha').setAttribute('required', '');
+        document.getElementById('toggleNovoPaciente').innerHTML = '<i class="bi bi-person-check"></i> Usar paciente existente';
+    } else {
+        document.getElementById('novoPacienteNome').removeAttribute('required');
+        document.getElementById('novoPacienteEmail').removeAttribute('required');
+        document.getElementById('novoPacienteSenha').removeAttribute('required');
+        document.getElementById('selectPacienteProntuario').setAttribute('required', '');
+        document.getElementById('toggleNovoPaciente').innerHTML = '<i class="bi bi-person-plus"></i> Cadastrar novo paciente';
+    }
+}
+
 function filtrarHistorico() {
     var termo = document.getElementById('buscaHistorico').value.toLowerCase();
     var linhas = document.querySelectorAll('#tabelaHistorico tbody tr');

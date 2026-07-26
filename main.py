@@ -1555,15 +1555,24 @@ def salvar_paciente(
     data_nascimento: str = Form(None),
     endereco: str = Form(None),
     foto_url: str = Form(None),
+    senha: str = Form(""),
     usuario=Depends(exigir_login),
 ):
     if usuario["tipo"] not in ("admin", "recepcionista"):
         raise HTTPException(status_code=403)
 
-    db.execute(
-        "UPDATE usuarios SET nome = %s, email = %s, telefone = %s, cpf = %s, data_nascimento = %s, endereco = %s, foto_url = %s WHERE id = %s",
-        (nome, email, telefone, cpf or None, data_nascimento or None, endereco or None, foto_url, pac_id),
-    )
+    if senha and senha.strip():
+        from utils.auth import hash_senha
+        senha_hash = hash_senha(senha.strip())
+        db.execute(
+            "UPDATE usuarios SET nome = %s, email = %s, telefone = %s, cpf = %s, data_nascimento = %s, endereco = %s, foto_url = %s, senha = %s WHERE id = %s",
+            (nome, email, telefone, cpf or None, data_nascimento or None, endereco or None, foto_url, senha_hash, pac_id),
+        )
+    else:
+        db.execute(
+            "UPDATE usuarios SET nome = %s, email = %s, telefone = %s, cpf = %s, data_nascimento = %s, endereco = %s, foto_url = %s WHERE id = %s",
+            (nome, email, telefone, cpf or None, data_nascimento or None, endereco or None, foto_url, pac_id),
+        )
     return RedirectResponse("/pacientes", status_code=302)
 
 
@@ -1977,9 +1986,16 @@ def ver_prontuario(prontuario_id: int, request: Request, usuario=Depends(exigir_
 @app.post("/prontuarios/criar")
 def criar_prontuario(
     request: Request,
-    paciente_id: int = Form(...),
+    paciente_id: str = Form(""),
     numero: str = Form(None),
     estabelecimento_id: str = Form(None),
+    criar_novo_paciente: str = Form("0"),
+    novo_paciente_nome: str = Form(None),
+    novo_paciente_email: str = Form(None),
+    novo_paciente_senha: str = Form(None),
+    novo_paciente_cpf: str = Form(None),
+    novo_paciente_telefone: str = Form(None),
+    novo_paciente_nascimento: str = Form(None),
     usuario=Depends(exigir_login),
 ):
     exigir_permissao(usuario, "prontuarios", "criar")
@@ -1988,6 +2004,28 @@ def criar_prontuario(
     estab_id = resolver_estabelecimento(request, usuario, estabelecimento_id)
     if not estab_id or usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
         raise HTTPException(status_code=403)
+
+    paciente_id_int = int(paciente_id) if paciente_id and paciente_id.isdigit() else None
+
+    if criar_novo_paciente == "1":
+        if not novo_paciente_nome or not novo_paciente_email or not novo_paciente_senha:
+            return RedirectResponse("/prontuarios?erro=Preencha nome, email e senha do paciente", status_code=302)
+        from utils.auth import hash_senha
+        senha_hash = hash_senha(novo_paciente_senha.strip())
+        novo_email = novo_paciente_email.strip().lower()
+        existente = db.fetch_one("SELECT id FROM usuarios WHERE email = %s AND tipo = 'paciente'", (novo_email,))
+        if existente:
+            paciente_id_int = existente["id"]
+        else:
+            db.execute(
+                "INSERT INTO usuarios (nome, email, telefone, cpf, data_nascimento, senha, tipo, ativo) VALUES (%s, %s, %s, %s, %s, %s, 'paciente', 1)",
+                (novo_paciente_nome.strip(), novo_email, novo_paciente_telefone or None, novo_paciente_cpf or None, novo_paciente_nascimento or None, senha_hash),
+            )
+            paciente_id_int = db.fetch_one("SELECT id FROM usuarios WHERE email = %s AND tipo = 'paciente'", (novo_email,))["id"]
+            vincular_paciente(paciente_id_int, estab_id)
+
+    if not paciente_id_int:
+        return RedirectResponse("/prontuarios?erro=Selecione ou cadastre um paciente", status_code=302)
 
     try:
         bloquear_se_limite(estab_id, "prontuarios")
@@ -2005,9 +2043,15 @@ def criar_prontuario(
 
     db.execute(
         "INSERT INTO prontuarios (paciente_usuario_id, estabelecimento_id, numero_prontuario) VALUES (%s, %s, %s)",
-        (paciente_id, estab_id, numero),
+        (int(paciente_id_int), int(estab_id), numero),
     )
-    return RedirectResponse("/prontuarios", status_code=302)
+    resp = RedirectResponse("/prontuarios", status_code=302)
+    cookie_kwargs = {"httponly": True, "samesite": "lax"}
+    is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    if is_https:
+        cookie_kwargs["secure"] = True
+    resp.set_cookie("estabelecimento_id", str(estab_id), **cookie_kwargs)
+    return resp
 
 
 @app.post("/prontuarios/{prontuario_id}/evolucao")
