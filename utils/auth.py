@@ -50,19 +50,36 @@ def criar_usuario(nome: str, email: str, senha: str, tipo: str, telefone: str = 
 
 
 def vincular_profissional(usuario_id: int, estabelecimento_id: int, especialidade: str = None, cargo: str = None, registro: str = None):
-    db.execute(
-        """INSERT INTO profissional_estabelecimento
-           (usuario_id, estabelecimento_id, especialidade, cargo, registro_profissional)
-           VALUES (%s, %s, %s, %s, %s)""",
-        (usuario_id, estabelecimento_id, especialidade, cargo, registro),
-    )
+    engine = settings.DB_ENGINE if hasattr(settings, 'DB_ENGINE') else 'mysql'
+    if engine == "postgresql":
+        db.execute(
+            """INSERT INTO profissional_estabelecimento
+               (usuario_id, estabelecimento_id, especialidade, cargo, registro_profissional)
+               VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING""",
+            (usuario_id, estabelecimento_id, especialidade, cargo, registro),
+        )
+    else:
+        db.execute(
+            """INSERT IGNORE INTO profissional_estabelecimento
+               (usuario_id, estabelecimento_id, especialidade, cargo, registro_profissional)
+               VALUES (%s, %s, %s, %s, %s)""",
+            (usuario_id, estabelecimento_id, especialidade, cargo, registro),
+        )
 
 
 def vincular_paciente(usuario_id: int, estabelecimento_id: int, observacoes: str = None):
-    db.execute(
-        "INSERT INTO paciente_estabelecimento (usuario_id, estabelecimento_id, observacoes) VALUES (%s, %s, %s)",
-        (usuario_id, estabelecimento_id, observacoes),
-    )
+    engine = settings.DB_ENGINE if hasattr(settings, 'DB_ENGINE') else 'mysql'
+    if engine == "postgresql":
+        db.execute(
+            """INSERT INTO paciente_estabelecimento (usuario_id, estabelecimento_id, observacoes)
+               VALUES (%s, %s, %s) ON CONFLICT DO NOTHING""",
+            (usuario_id, estabelecimento_id, observacoes),
+        )
+    else:
+        db.execute(
+            "INSERT IGNORE INTO paciente_estabelecimento (usuario_id, estabelecimento_id, observacoes) VALUES (%s, %s, %s)",
+            (usuario_id, estabelecimento_id, observacoes),
+        )
 
 
 def obter_estabelecimentos_usuario(usuario_id: int) -> list:

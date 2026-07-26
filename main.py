@@ -1520,6 +1520,10 @@ def criar_paciente(
 
     if estab_id:
         vincular_paciente(user_id, int(estab_id))
+    elif usuario.get("is_super"):
+        estabs = db.fetch_all("SELECT id FROM estabelecimentos WHERE ativo = TRUE")
+        for e in estabs:
+            vincular_paciente(user_id, int(e["id"]))
 
     return RedirectResponse("/pacientes", status_code=302)
 
