@@ -2,6 +2,13 @@
 {% block titulo %}Registro {{ prontuario.numero_prontuario }}{% endblock %}
 {% block styles %}
 <link rel="stylesheet" href="/static/css/odontograma.css">
+<style>
+    .btn-historico.active {
+        background-color: #e7f1ff !important;
+        border-color: #9ec5fe !important;
+        color: #084298 !important;
+    }
+</style>
 {% endblock %}
 {% block conteudo %}
 <div class="row mb-4">
@@ -637,8 +644,8 @@ function mostrarTodasEvolucoes() {
     document.querySelectorAll('.evolucao-item').forEach(function(el) {
         el.style.display = '';
     });
-    document.getElementById('evolucaoPlaceholder').style.display = '';
-    document.getElementById('evolucaoConteudo').style.display = 'none';
+    document.getElementById('evolucaoPlaceholder').style.display = 'none';
+    document.getElementById('evolucaoConteudo').style.display = '';
     document.getElementById('btnMostrarTodas').style.display = 'none';
     document.querySelectorAll('.btn-historico').forEach(function(btn) {
         btn.classList.remove('active');
