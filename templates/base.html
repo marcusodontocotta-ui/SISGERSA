@@ -122,11 +122,7 @@
                         <a class="nav-link" href="/orcamentos"><i class="bi bi-file-earmark-text"></i> Orcamentos</a>
                     </li>
                     {% endif %}
-                    {% if pode_acessar(usuario, 'prontuarios', 'ver', estab_cookie) %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="/prontuarios"><i class="bi bi-folder-medical"></i> Historico</a>
-                    </li>
-                    {% endif %}
+
                     {% if usuario.tipo == 'admin' and usuario.is_super %}
                     <li class="nav-item">
                         <a class="nav-link" href="/estabelecimentos"><i class="bi bi-building"></i> Estabelecimentos</a>
