@@ -237,6 +237,9 @@
                 <p><strong>Observacoes:</strong> <span id="detObservacoes"></span></p>
             </div>
             <div class="modal-footer">
+                <a id="btnEditarConsulta" href="#" class="btn btn-primary">
+                    <i class="bi bi-pencil"></i> Editar
+                </a>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
             </div>
         </div>
@@ -341,6 +344,7 @@
         };
         document.getElementById('detStatus').innerHTML = statusMap[c.status] || c.status;
         document.getElementById('detObservacoes').textContent = c.observacoes || '-';
+        document.getElementById('btnEditarConsulta').href = '/consultas/' + c.id + '/editar';
         new bootstrap.Modal(document.getElementById('modalDetalhes')).show();
     }
 
