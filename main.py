@@ -2527,6 +2527,7 @@ def agenda_semanal(request: Request, usuario=Depends(exigir_login), data: str = 
     if data:
         try:
             data_inicio = datetime.strptime(data, "%Y-%m-%d")
+            data_inicio -= timedelta(days=data_inicio.weekday())
         except ValueError:
             data_inicio = datetime.now() - timedelta(days=datetime.now().weekday())
     else:
