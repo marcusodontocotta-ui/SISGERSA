@@ -287,6 +287,7 @@
                 <p><strong>Horario:</strong> <span id="detHorario"></span></p>
                 <p><strong>Duracao:</strong> <span id="detDuracao"></span></p>
                 <p><strong>Status:</strong> <span id="detStatus"></span></p>
+                <p><strong>Procedimento:</strong> <span id="detProcedimento"></span></p>
                 <p><strong>Observacoes:</strong> <span id="detObservacoes"></span></p>
             </div>
             <div class="modal-footer d-flex flex-wrap gap-2">
@@ -419,7 +420,7 @@
     function mostrarDetalhes(c) {
         document.getElementById('detPaciente').textContent = c.paciente;
         document.getElementById('detProfissional').textContent = c.profissional;
-        document.getElementById('detData').textContent = new Date(c.data_hora + 'T12:00:00').toLocaleDateString('pt-BR');
+        document.getElementById('detData').textContent = new Date(c.data_hora).toLocaleDateString('pt-BR');
         document.getElementById('detHorario').textContent = c.horario_inicio + ' - ' + c.horario_fim;
         document.getElementById('detDuracao').textContent = c.duracao + ' minutos';
 
@@ -432,6 +433,7 @@
             'faltou': '<span class="badge bg-secondary">Faltou</span>'
         };
         document.getElementById('detStatus').innerHTML = statusMap[c.status] || c.status;
+        document.getElementById('detProcedimento').textContent = c.procedimento || '-';
         document.getElementById('detObservacoes').textContent = c.observacoes || '-';
         document.getElementById('btnEditarConsulta').href = '/consultas/' + c.id + '/editar?origem=agenda';
 

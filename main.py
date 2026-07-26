@@ -2586,22 +2586,24 @@ def api_consultas(
 
     if usuario["tipo"] == "paciente":
         consultas = db.fetch_all(
-            """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome, COALESCE(pe.cor, '#6c757d') AS cor_profissional
+            """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome, COALESCE(pe.cor, '#6c757d') AS cor_profissional, proc.nome AS procedimento_nome
                FROM consultas c
                JOIN usuarios u_prof ON u_prof.id = c.profissional_usuario_id
                JOIN usuarios u_pac ON u_pac.id = c.paciente_usuario_id
                LEFT JOIN profissional_estabelecimento pe ON pe.usuario_id = c.profissional_usuario_id AND pe.estabelecimento_id = c.estabelecimento_id
+               LEFT JOIN procedimentos proc ON proc.id = c.procedimento_id
                WHERE c.paciente_usuario_id = %s
                AND c.data_hora BETWEEN %s AND %s
                ORDER BY c.data_hora""",
             (usuario["id"], inicio, fim),
         )
     elif usuario["tipo"] == "profissional":
-        query = """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome, COALESCE(pe.cor, '#6c757d') AS cor_profissional
+        query = """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome, COALESCE(pe.cor, '#6c757d') AS cor_profissional, proc.nome AS procedimento_nome
                    FROM consultas c
                    JOIN usuarios u_prof ON u_prof.id = c.profissional_usuario_id
                    JOIN usuarios u_pac ON u_pac.id = c.paciente_usuario_id
                    LEFT JOIN profissional_estabelecimento pe ON pe.usuario_id = c.profissional_usuario_id AND pe.estabelecimento_id = c.estabelecimento_id
+                   LEFT JOIN procedimentos proc ON proc.id = c.procedimento_id
                    WHERE c.profissional_usuario_id = %s
                    AND c.data_hora BETWEEN %s AND %s"""
         params = [usuario["id"], inicio, fim]
@@ -2613,11 +2615,12 @@ def api_consultas(
         query += " ORDER BY c.data_hora"
         consultas = db.fetch_all(query, tuple(params))
     elif estab_id:
-        query = """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome, COALESCE(pe.cor, '#6c757d') AS cor_profissional
+        query = """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome, COALESCE(pe.cor, '#6c757d') AS cor_profissional, proc.nome AS procedimento_nome
                    FROM consultas c
                    JOIN usuarios u_prof ON u_prof.id = c.profissional_usuario_id
                    JOIN usuarios u_pac ON u_pac.id = c.paciente_usuario_id
                    LEFT JOIN profissional_estabelecimento pe ON pe.usuario_id = c.profissional_usuario_id AND pe.estabelecimento_id = c.estabelecimento_id
+                   LEFT JOIN procedimentos proc ON proc.id = c.procedimento_id
                    WHERE c.estabelecimento_id = %s
                    AND c.data_hora BETWEEN %s AND %s"""
         params = [estab_id, inicio, fim]
@@ -2630,11 +2633,12 @@ def api_consultas(
         query += " ORDER BY c.data_hora"
         consultas = db.fetch_all(query, tuple(params))
     else:
-        query = """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome, COALESCE(pe.cor, '#6c757d') AS cor_profissional
+        query = """SELECT c.*, u_prof.nome AS profissional_nome, u_pac.nome AS paciente_nome, COALESCE(pe.cor, '#6c757d') AS cor_profissional, proc.nome AS procedimento_nome
                    FROM consultas c
                    JOIN usuarios u_prof ON u_prof.id = c.profissional_usuario_id
                    JOIN usuarios u_pac ON u_pac.id = c.paciente_usuario_id
                    LEFT JOIN profissional_estabelecimento pe ON pe.usuario_id = c.profissional_usuario_id AND pe.estabelecimento_id = c.estabelecimento_id
+                   LEFT JOIN procedimentos proc ON proc.id = c.procedimento_id
                    WHERE c.data_hora BETWEEN %s AND %s"""
         params = [inicio, fim]
         if profissional_id_int_api:
@@ -2654,6 +2658,7 @@ def api_consultas(
             "paciente": c["paciente_nome"],
             "profissional": c["profissional_nome"],
             "cor_profissional": c.get("cor_profissional") or "#6c757d",
+            "procedimento": c.get("procedimento_nome") or "",
             "data_hora": c["data_hora"].strftime("%Y-%m-%dT%H:%M") if c["data_hora"] else None,
             "duracao": c["duracao_minutos"],
             "status": c["status"],
