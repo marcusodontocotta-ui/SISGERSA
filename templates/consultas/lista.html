@@ -89,18 +89,26 @@
                                         <i class="bi bi-play-circle"></i>
                                     </button>
                                     {% elif c.status == 'em_andamento' %}
-                                    <input type="hidden" name="status" value="concluida">
-                                    <button type="submit" class="btn btn-outline-success" title="Concluir">
+                                    <button type="button" class="btn btn-outline-success" title="Concluir"
+                                            data-consulta-id="{{ c.id }}" data-paciente-nome="{{ c.paciente_nome }}"
+                                            onclick="abrirModalConcluir(this)">
                                         <i class="bi bi-check2-all"></i>
                                     </button>
                                     {% endif %}
                                 </form>
-                                {% if c.status not in ['concluida', 'cancelada'] %}
+                                {% if c.status not in ['concluida', 'cancelada', 'faltou'] %}
                                 <form method="POST" action="/consultas/{{ c.id }}/status" class="d-inline">
                                     <input type="hidden" name="status" value="cancelada">
                                     <button type="submit" class="btn btn-outline-danger" title="Cancelar"
                                             onclick="return confirm('Cancelar esta consulta?')">
                                         <i class="bi bi-x-circle"></i>
+                                    </button>
+                                </form>
+                                <form method="POST" action="/consultas/{{ c.id }}/status" class="d-inline">
+                                    <input type="hidden" name="status" value="faltou">
+                                    <button type="submit" class="btn btn-outline-secondary" title="Faltou"
+                                            onclick="return confirm('Marcar como falta?')">
+                                        <i class="bi bi-person-x"></i>
                                     </button>
                                 </form>
                                 {% endif %}
@@ -149,5 +157,56 @@ function filtrarConsultas() {
     });
     document.getElementById('nenhumResultadoConsultas').style.display = visiveis === 0 ? '' : 'none';
 }
+
+function abrirModalConcluir(btn) {
+    var consultaId = btn.getAttribute('data-consulta-id');
+    var pacienteNome = btn.getAttribute('data-paciente-nome');
+    document.getElementById('consultaIdConcluir').value = consultaId;
+    document.getElementById('formConcluirConsulta').action = '/consultas/' + consultaId + '/status';
+    document.getElementById('nomePacienteConcluir').textContent = pacienteNome;
+    var modal = new bootstrap.Modal(document.getElementById('modalConcluirConsulta'));
+    modal.show();
+}
 </script>
+
+<div class="modal fade" id="modalConcluirConsulta" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-check2-all"></i> Concluir Consulta</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="" id="formConcluirConsulta">
+                <div class="modal-body">
+                    <input type="hidden" name="status" value="concluida">
+                    <input type="hidden" name="consulta_id" id="consultaIdConcluir">
+                    <p>Paciente: <strong id="nomePacienteConcluir"></strong></p>
+
+                    <div class="mb-3">
+                        <label class="form-label">Queixa Principal</label>
+                        <textarea class="form-control" name="queixa" rows="2" placeholder="Descreva a queixa do paciente..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Diagnostico</label>
+                        <textarea class="form-control" name="diagnostico" rows="2" placeholder="Diagnostico medico/odontologico..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Procedimento Realizado</label>
+                        <textarea class="form-control" name="procedimento" rows="2" placeholder="Procedimento realizado na consulta..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observacoes</label>
+                        <textarea class="form-control" name="observacoes_evolucao" rows="2" placeholder="Observacoes adicionais..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check2-all"></i> Concluir e Gerar Evolucao
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}

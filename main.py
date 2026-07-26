@@ -1733,6 +1733,10 @@ def atualizar_status_consulta(
     consulta_id: int,
     request: Request,
     status: str = Form(...),
+    queixa: str = Form(None),
+    diagnostico: str = Form(None),
+    procedimento: str = Form(None),
+    observacoes_evolucao: str = Form(None),
     usuario=Depends(exigir_login),
 ):
     exigir_permissao(usuario, "consultas", "editar")
@@ -1741,16 +1745,44 @@ def atualizar_status_consulta(
     if usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
         raise HTTPException(status_code=403)
 
-    if usuario["tipo"] == "profissional":
-        consulta = db.fetch_one("SELECT * FROM consultas WHERE id = %s", (consulta_id,))
-        if not consulta or consulta["profissional_usuario_id"] != usuario["id"]:
-            raise HTTPException(status_code=403)
+    consulta = db.fetch_one("SELECT * FROM consultas WHERE id = %s", (consulta_id,))
+    if not consulta:
+        raise HTTPException(status_code=404)
+
+    if usuario["tipo"] == "profissional" and consulta["profissional_usuario_id"] != usuario["id"]:
+        raise HTTPException(status_code=403)
 
     valid_statuses = {"agendada", "confirmada", "em_andamento", "concluida", "cancelada", "faltou"}
     if status not in valid_statuses:
         raise HTTPException(status_code=400, detail="Status invalido")
 
     db.execute("UPDATE consultas SET status = %s WHERE id = %s", (status, consulta_id))
+
+    if status in ("concluida", "faltou", "cancelada") and consulta.get("prontuario_id"):
+        evolucao_ja_existe = db.fetch_one(
+            "SELECT id FROM evolucoes WHERE consulta_id = %s", (consulta_id,)
+        )
+        if not evolucao_ja_existe:
+            prof_id = consulta["profissional_usuario_id"]
+            if status == "concluida":
+                queixa_final = queixa or None
+                diag_final = diagnostico or None
+                proc_final = procedimento or None
+                obs_final = observacoes_evolucao or None
+            else:
+                motivo = "Paciente faltou" if status == "faltou" else "Consulta cancelada"
+                queixa_final = None
+                diag_final = None
+                proc_final = motivo
+                obs_final = None
+
+            db.execute(
+                """INSERT INTO evolucoes
+                   (prontuario_id, consulta_id, profissional_usuario_id, queixa_principal, diagnostico, procedimento_realizado, observacoes)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                (consulta["prontuario_id"], consulta_id, prof_id, queixa_final, diag_final, proc_final, obs_final),
+            )
+
     return RedirectResponse("/consultas", status_code=302)
 
 
