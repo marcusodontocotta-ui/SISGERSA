@@ -317,6 +317,8 @@
                     const altura = Math.max((c.duracao / 60) * 48, 24);
                     evento.style.top = top + 'px';
                     evento.style.height = altura + 'px';
+                    evento.dataset.inicio = minuto;
+                    evento.dataset.fim = minuto + c.duracao;
                     evento.innerHTML =
                         '<div class="evento-horario">' + c.horario_inicio + '-' + c.horario_fim + '</div>' +
                         '<div class="evento-titulo">' + c.paciente + '</div>';
@@ -326,6 +328,34 @@
                         mostrarDetalhes(c);
                     };
                     cell.appendChild(evento);
+                });
+
+                document.querySelectorAll('.cal-cell').forEach(function(cell) {
+                    var eventos = Array.from(cell.querySelectorAll('.evento'));
+                    if (eventos.length <= 1) return;
+
+                    eventos.sort(function(a, b) {
+                        return parseInt(a.dataset.inicio) - parseInt(b.dataset.inicio);
+                    });
+
+                    var colunas = [];
+                    eventos.forEach(function(ev) {
+                        var ini = parseInt(ev.dataset.inicio);
+                        var col = 0;
+                        while (colunas[col] !== undefined && colunas[col] > ini) {
+                            col++;
+                        }
+                        ev._col = col;
+                        colunas[col] = parseInt(ev.dataset.fim);
+                    });
+
+                    var totalColunas = colunas.length;
+                    eventos.forEach(function(ev) {
+                        var w = 100 / totalColunas;
+                        ev.style.left = (ev._col * w) + '%';
+                        ev.style.width = w + '%';
+                        ev.style.right = 'auto';
+                    });
                 });
             });
     }
