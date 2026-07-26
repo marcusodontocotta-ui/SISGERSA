@@ -236,11 +236,14 @@
                 <p><strong>Status:</strong> <span id="detStatus"></span></p>
                 <p><strong>Observacoes:</strong> <span id="detObservacoes"></span></p>
             </div>
-            <div class="modal-footer">
-                <a id="btnEditarConsulta" href="#" class="btn btn-primary">
-                    <i class="bi bi-pencil"></i> Editar
-                </a>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            <div class="modal-footer d-flex flex-wrap gap-2">
+                <div id="detBotoesAcao" class="d-flex flex-wrap gap-1"></div>
+                <div class="ms-auto d-flex gap-1">
+                    <a id="btnEditarConsulta" href="#" class="btn btn-primary">
+                        <i class="bi bi-pencil"></i> Editar
+                    </a>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
             </div>
         </div>
     </div>
@@ -345,6 +348,28 @@
         document.getElementById('detStatus').innerHTML = statusMap[c.status] || c.status;
         document.getElementById('detObservacoes').textContent = c.observacoes || '-';
         document.getElementById('btnEditarConsulta').href = '/consultas/' + c.id + '/editar?origem=agenda';
+
+        var html = '';
+        var terminal = (c.status === 'concluida' || c.status === 'cancelada' || c.status === 'faltou');
+
+        if (!terminal) {
+            html += '<a href="/consultas/' + c.id + '/atender" class="btn btn-success btn-sm"><i class="bi bi-clipboard2-pulse"></i> Atender</a>';
+        }
+
+        if (c.status === 'agendada') {
+            html += '<form method="POST" action="/consultas/' + c.id + '/status" class="d-inline"><input type="hidden" name="status" value="confirmada"><input type="hidden" name="origem" value="agenda"><button type="submit" class="btn btn-outline-info btn-sm"><i class="bi bi-check-circle"></i> Confirmar</button></form>';
+        } else if (c.status === 'confirmada') {
+            html += '<form method="POST" action="/consultas/' + c.id + '/status" class="d-inline"><input type="hidden" name="status" value="em_andamento"><input type="hidden" name="origem" value="agenda"><button type="submit" class="btn btn-outline-warning btn-sm"><i class="bi bi-play-circle"></i> Iniciar</button></form>';
+        } else if (c.status === 'em_andamento') {
+            html += '<form method="POST" action="/consultas/' + c.id + '/status" class="d-inline"><input type="hidden" name="status" value="concluida"><input type="hidden" name="origem" value="agenda"><button type="submit" class="btn btn-outline-success btn-sm"><i class="bi bi-check2-all"></i> Concluir</button></form>';
+        }
+
+        if (!terminal) {
+            html += '<form method="POST" action="/consultas/' + c.id + '/status" class="d-inline"><input type="hidden" name="status" value="cancelada"><input type="hidden" name="origem" value="agenda"><button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm(\'Cancelar esta consulta?\')"><i class="bi bi-x-circle"></i> Cancelar</button></form>';
+            html += '<form method="POST" action="/consultas/' + c.id + '/status" class="d-inline"><input type="hidden" name="status" value="faltou"><input type="hidden" name="origem" value="agenda"><button type="submit" class="btn btn-outline-secondary btn-sm" onclick="return confirm(\'Marcar como falta?\')"><i class="bi bi-person-x"></i> Faltou</button></form>';
+        }
+
+        document.getElementById('detBotoesAcao').innerHTML = html;
         new bootstrap.Modal(document.getElementById('modalDetalhes')).show();
     }
 

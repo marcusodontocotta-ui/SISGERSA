@@ -1821,6 +1821,7 @@ def atualizar_status_consulta(
     consulta_id: int,
     request: Request,
     status: str = Form(...),
+    origem: str = Form(None),
     usuario=Depends(exigir_login),
 ):
     exigir_permissao(usuario, "consultas", "editar")
@@ -1854,7 +1855,8 @@ def atualizar_status_consulta(
                 (motivo, evolucao["id"]),
             )
 
-    return RedirectResponse("/consultas", status_code=302)
+    destino = "/agenda" if origem == "agenda" else "/consultas"
+    return RedirectResponse(destino, status_code=302)
 
 
 @app.get("/consultas/{consulta_id}/atender", response_class=HTMLResponse)
