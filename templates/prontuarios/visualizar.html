@@ -194,7 +194,7 @@
                     {% for ev in evolucoes %}
                     <div class="border-start border-primary border-3 ps-3 mb-4 evolucao-item" data-consulta-id="{{ ev.consulta_id or '' }}">
                         <div class="d-flex justify-content-between">
-                            <h6 class="text-primary">{{ ev.data.strftime('%d/%m/%Y') if ev.data else '-' }} - Dr(a). {{ ev.profissional_nome }}</h6>
+                            <h6 class="text-primary">{{ ev.data_exibicao.strftime('%d/%m/%Y') if ev.data_exibicao else (ev.data.strftime('%d/%m/%Y') if ev.data else '-') }} - Dr(a). {{ ev.profissional_nome }}</h6>
                         </div>
 
                         {% if ev.queixa_principal %}

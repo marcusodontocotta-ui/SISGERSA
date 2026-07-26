@@ -2065,11 +2065,13 @@ def ver_prontuario(prontuario_id: int, request: Request, usuario=Depends(exigir_
     verificar_acesso_registro(request, usuario, prontuario)
 
     evolucoes = db.fetch_all(
-        """SELECT e.*, u.nome AS profissional_nome
+        """SELECT e.*, u.nome AS profissional_nome,
+                  COALESCE(c.data_hora::date, e.data) AS data_exibicao
            FROM evolucoes e
            JOIN usuarios u ON u.id = e.profissional_usuario_id
+           LEFT JOIN consultas c ON c.id = e.consulta_id
            WHERE e.prontuario_id = %s
-           ORDER BY e.data DESC""",
+           ORDER BY COALESCE(c.data_hora, e.criado_em) DESC""",
         (prontuario_id,),
     )
 
