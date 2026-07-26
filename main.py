@@ -2080,9 +2080,12 @@ def ver_prontuario(prontuario_id: int, request: Request, usuario=Depends(exigir_
         )
 
     consultas = db.fetch_all(
-        """SELECT c.*, u.nome AS profissional_nome
+        """SELECT c.*, u.nome AS profissional_nome, proc.nome AS procedimento_nome,
+                  e.procedimento_realizado AS evolucao_procedimento
            FROM consultas c
            JOIN usuarios u ON u.id = c.profissional_usuario_id
+           LEFT JOIN procedimentos proc ON proc.id = c.procedimento_id
+           LEFT JOIN evolucoes e ON e.consulta_id = c.id
            WHERE c.prontuario_id = %s
            ORDER BY c.data_hora DESC""",
         (prontuario_id,),

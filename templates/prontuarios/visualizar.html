@@ -55,27 +55,43 @@
             <div class="card-header">
                 <h5><i class="bi bi-calendar3"></i> Historico de Consultas</h5>
             </div>
-            <div class="card-body">
+            <div class="card-body p-0">
                 {% if consultas %}
                 <div class="list-group list-group-flush">
                     {% for c in consultas %}
                     <div class="list-group-item">
-                        <div class="d-flex justify-content-between">
-                            <strong>{{ c.data_hora.strftime('%d/%m/%Y %H:%M') if c.data_hora else '-' }}</strong>
-                            {% if c.status == 'concluida' %}
-                                <span class="badge bg-success">Concluida</span>
-                            {% elif c.status == 'cancelada' %}
-                                <span class="badge bg-danger">Cancelada</span>
-                            {% else %}
-                                <span class="badge bg-primary">{{ c.status }}</span>
-                            {% endif %}
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>{{ c.data_hora.strftime('%d/%m/%Y %H:%M') if c.data_hora else '-' }}</strong>
+                                <br>
+                                <small class="text-muted">Dr(a). {{ c.profissional_nome }} &middot; {{ c.duracao_minutos }} min</small>
+                            </div>
+                            <div>
+                                {% if c.status == 'agendada' %}
+                                    <span class="badge bg-primary">Agendada</span>
+                                {% elif c.status == 'confirmada' %}
+                                    <span class="badge bg-info">Confirmada</span>
+                                {% elif c.status == 'em_andamento' %}
+                                    <span class="badge bg-warning text-dark">Em Andamento</span>
+                                {% elif c.status == 'concluida' %}
+                                    <span class="badge bg-success">Concluida</span>
+                                {% elif c.status == 'cancelada' %}
+                                    <span class="badge bg-danger">Cancelada</span>
+                                {% elif c.status == 'faltou' %}
+                                    <span class="badge bg-secondary">Faltou</span>
+                                {% endif %}
+                            </div>
                         </div>
-                        <small class="text-muted">Dr(a). {{ c.profissional_nome }}</small>
+                        {% if c.status == 'concluida' and c.evolucao_procedimento %}
+                        <small class="text-success"><i class="bi bi-check-circle"></i> Procedimento realizado: {{ c.evolucao_procedimento }}</small>
+                        {% elif c.procedimento_nome %}
+                        <small class="text-muted"><i class="bi bi-calendar2-check"></i> Procedimento planejado: {{ c.procedimento_nome }}</small>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
                 {% else %}
-                <p class="text-muted">Nenhuma consulta registrada.</p>
+                <p class="text-muted p-3">Nenhuma consulta registrada.</p>
                 {% endif %}
             </div>
         </div>

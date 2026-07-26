@@ -258,6 +258,12 @@
                         </div>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">Procedimento</label>
+                        <select class="form-select" name="procedimento_id" id="selectProcedimento" onchange="atualizarDuracao()">
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">Observacoes</label>
                         <textarea class="form-control" name="observacoes" rows="2"></textarea>
                     </div>
@@ -496,6 +502,35 @@
                     sel.innerHTML += '<option value="' + p.id + '">' + p.nome + '</option>';
                 });
             });
+
+        fetchRetry('/api/procedimentos')
+            .then(function(r) { return r.json(); })
+            .then(function(procs) {
+                var sel = document.getElementById('selectProcedimento');
+                sel.innerHTML = '<option value="">Selecione...</option>';
+                procs.forEach(function(p) {
+                    sel.innerHTML += '<option value="' + p.id + '" data-duracao="' + (p.duracao_minutos || 30) + '">' + p.nome + '</option>';
+                });
+            });
+    }
+
+    var duracoesPadrao = [15, 30, 45, 60, 90, 120];
+    function atualizarDuracao() {
+        var sel = document.getElementById('selectProcedimento');
+        var opt = sel.options[sel.selectedIndex];
+        if (opt && opt.dataset.duracao) {
+            var dur = parseInt(opt.dataset.duracao);
+            var selDur = document.getElementById('selectDuracao');
+            var match = false;
+            for (var i = 0; i < selDur.options.length; i++) {
+                if (parseInt(selDur.options[i].value) === dur) { selDur.selectedIndex = i; match = true; break; }
+            }
+            if (!match) {
+                var o = document.createElement('option');
+                o.value = dur; o.text = dur + ' min'; o.selected = true;
+                selDur.appendChild(o);
+            }
+        }
     }
 
     function posicionarIndicadorAgora() {
