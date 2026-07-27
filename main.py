@@ -1168,7 +1168,7 @@ def dashboard_stats(
         "convenios": convenios["total"],
         "procedimentos": procedimentos["total"],
         "consultas_total": consultas_periodo["total"],
-        "consultas_status": {r["status"]: r["total"] for r in consultas_status},
+        "consultas_status": [{"status": r["status"], "total": r["total"]} for r in consultas_status],
         "orc_rascunho": orc_rascunho["total"],
         "orc_enviados": orc_enviados["total"],
         "orc_aprovados": orc_aprovados["total"],
