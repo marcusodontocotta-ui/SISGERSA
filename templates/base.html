@@ -176,7 +176,7 @@
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav">
-                    {% if usuario.tipo == 'admin' and usuario.is_super %}
+                    {% if usuario.tipo == 'admin' %}
                     <li class="nav-item d-flex align-items-center">
                         <form id="form-selecionar-estab" action="/estabelecimento/selecionar" method="POST" class="d-flex align-items-center">
                             <select id="select-estab-filtro" name="estabelecimento_id" class="form-select form-select-sm bg-transparent text-light border-light" style="max-width:200px; font-size:0.8rem;">

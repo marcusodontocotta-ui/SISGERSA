@@ -701,7 +701,7 @@ def selecionar_estabelecimento(
     estabelecimento_id: str = Form(""),
     usuario=Depends(exigir_login),
 ):
-    if usuario["tipo"] != "admin" or not usuario.get("is_super"):
+    if usuario["tipo"] != "admin":
         raise HTTPException(status_code=403)
 
     redirect = request.headers.get("referer", "/dashboard")
@@ -1172,7 +1172,7 @@ def dashboard_stats(
 
 @app.get("/api/estabelecimentos")
 def api_estabelecimentos(usuario=Depends(exigir_login)):
-    if usuario["tipo"] != "admin" or not usuario.get("is_super"):
+    if usuario["tipo"] != "admin":
         raise HTTPException(status_code=403)
     estabs = db.fetch_all(
         "SELECT id, nome FROM estabelecimentos WHERE ativo = TRUE ORDER BY nome"
