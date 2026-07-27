@@ -45,6 +45,10 @@
         <a href="/prontuarios/{{ prontuario.id }}"><i class="bi bi-journal-medical"></i> Anamnese</a>
         <span class="opacity-25">|</span>
         {% endif %}
+        <a href="/orcamentos?paciente_id={{ pac.id }}"><i class="bi bi-receipt"></i> Orcamentos</a>
+        <span class="opacity-25">|</span>
+        <a href="/financeiro?paciente_id={{ pac.id }}"><i class="bi bi-cash-stack"></i> Historico</a>
+        <span class="opacity-25">|</span>
         <div class="text-white" style="font-size:1.05rem;"><strong>{{ pac.nome }}</strong></div>
         <div class="d-flex gap-2" style="margin-left:auto;">
             {% if usuario.tipo in ['admin', 'recepcionista'] %}
