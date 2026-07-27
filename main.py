@@ -3473,11 +3473,12 @@ def criar_orcamento(
     cursor = db.execute(
         """INSERT INTO orcamentos
            (paciente_usuario_id, profissional_usuario_id, estabelecimento_id, convenio_id, data_validade, observacoes)
-           VALUES (%s, %s, %s, %s, %s, %s)""",
+           VALUES (%s, %s, %s, %s, %s, %s)
+           RETURNING id""",
         (paciente_id, profissional_id, estab_id, conv_id, dv, observacoes),
     )
 
-    new_id = cursor.lastrowid
+    new_id = cursor.fetchone()[0]
     return RedirectResponse(f"/orcamentos/{new_id}", status_code=302)
 
 
@@ -4139,7 +4140,7 @@ def fix_orphan_patients(request: Request, usuario=Depends(exigir_login)):
         )
         numero = f"PRONT-{int(count['total']) + 1:05d}"
         db.execute(
-            "INSERT IGNORE INTO paciente_estabelecimento (usuario_id, estabelecimento_id) VALUES (%s, %s)",
+            "INSERT INTO paciente_estabelecimento (usuario_id, estabelecimento_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
             (pac["id"], estab_id),
         )
         db.execute(
