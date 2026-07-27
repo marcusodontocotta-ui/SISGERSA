@@ -15,13 +15,9 @@
     .prontuario-banner div { font-size: 0.88rem; }
     .prontuario-banner strong { opacity: 0.8; }
 
-    /* === Card headers coloridos === */
-    .card-header.evolucao { background: linear-gradient(135deg, #e7f1ff 0%, #dbeafe 100%); border-left: 4px solid #0d6efd; }
-    .card-header.historico { background: linear-gradient(135deg, #e7f1ff 0%, #dbeafe 100%); border-left: 4px solid #6c757d; }
-    .card-header.odontograma { background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border-left: 4px solid #198754; }
-    .card-header.imagens { background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%); border-left: 4px solid #ffc107; }
-    .card-header.orcamentos { background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); border-left: 4px solid #dc3545; }
-    .card-header h5 { font-size: 1rem; font-weight: 600; margin: 0; }
+    /* === Card headers unificados === */
+    .card-header.secao { background: linear-gradient(135deg, #d6e4f0 0%, #c5d8eb 100%); border-left: 4px solid #3b7dd8; }
+    .card-header h5 { font-size: 1rem; font-weight: 600; margin: 0; color: #1a3c5e; }
 
     /* === Historico: hover expressivo === */
     .btn-historico {
@@ -57,18 +53,21 @@
 
 <div class="prontuario-banner mb-4">
     <div class="d-flex align-items-center gap-4 flex-wrap">
-        <h4 class="mb-0 text-white"><i class="bi bi-folder-medical"></i> Registro: {{ prontuario.numero_prontuario or 'S/N' }}</h4>
-        <span class="opacity-50">|</span>
-        <div class="text-white"><strong>Nome:</strong> {{ prontuario.paciente_nome }}</div>
-        <div class="text-white-50"><strong>Email:</strong> {{ prontuario.paciente_email or '-' }}</div>
-        <div class="text-white-50"><strong>Telefone:</strong> {{ prontuario.paciente_telefone or '-' }}</div>
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-folder-medical text-white-50" style="font-size:0.9rem;"></i>
+            <small class="text-white-50" style="font-size:0.78rem; font-weight:500; text-transform:uppercase; letter-spacing:0.05em;">Registro {{ prontuario.numero_prontuario or 'S/N' }}</small>
+        </div>
+        <span class="opacity-25">|</span>
+        <div class="text-white" style="font-size:1.05rem;"><strong>{{ prontuario.paciente_nome }}</strong></div>
+        <div class="text-white-70" style="font-size:0.92rem;"><i class="bi bi-envelope me-1 opacity-75"></i>{{ prontuario.paciente_email or '-' }}</div>
+        <div class="text-white-70" style="font-size:0.92rem;"><i class="bi bi-telephone me-1 opacity-75"></i>{{ prontuario.paciente_telefone or '-' }}</div>
     </div>
 </div>
 
 <div class="row">
     <div class="col-md-6">
         <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center evolucao">
+            <div class="card-header d-flex justify-content-between align-items-center secao">
                 <h5 class="mb-0"><i class="bi bi-journal-text"></i> Evolucao Clinica</h5>
                 <div class="d-flex gap-2">
                     <button class="btn btn-sm btn-outline-secondary" id="btnMostrarTodas" style="display:none;" onclick="mostrarTodasEvolucoes()">
@@ -205,7 +204,7 @@
         </div>
 
         <div class="card mb-4">
-            <div class="card-header historico">
+            <div class="card-header secao">
                 <h5><i class="bi bi-calendar3"></i> Historico de Consultas</h5>
             </div>
             <div class="card-body p-0">
@@ -252,7 +251,7 @@
 
     <div class="col-md-6">
         <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center odontograma">
+            <div class="card-header d-flex justify-content-between align-items-center secao">
                 <h5 class="mb-0"><i class="bi bi-emoji-smile"></i> Odontograma</h5>
                 {% if usuario.tipo in ['admin', 'profissional'] %}
                 <button class="btn btn-sm btn-success btn-odontograma" data-bs-toggle="modal" data-bs-target="#modalOdontograma">
@@ -299,7 +298,7 @@
         </div>
 
         <div class="card mb-4">
-            <div class="card-header imagens">
+            <div class="card-header secao">
                 <h5><i class="bi bi-image"></i> Imagens</h5>
             </div>
             <div class="card-body">
@@ -321,7 +320,7 @@
 
         {% if orcamentos_paciente %}
         <div class="card mb-4">
-            <div class="card-header orcamentos">
+            <div class="card-header secao">
                 <h5><i class="bi bi-calculator"></i> Orcamentos</h5>
             </div>
             <div class="card-body p-0">
