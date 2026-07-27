@@ -1105,7 +1105,7 @@ def dashboard_stats(
             (estab_id,),
         )
         profissionais = db.fetch_one(
-            "SELECT COUNT(*) AS total FROM usuarios u JOIN profissional_estabelecimento pe ON pe.usuario_id = u.id WHERE u.tipo = 'profissional' AND u.ativo = TRUE AND pe.estabelecimento_id = %s",
+            "SELECT COUNT(*) AS total FROM profissional_estabelecimento pe JOIN usuarios u ON u.id = pe.usuario_id WHERE pe.estabelecimento_id = %s AND u.ativo = TRUE",
             (estab_id,),
         )
     else:
@@ -1113,7 +1113,7 @@ def dashboard_stats(
             "SELECT COUNT(*) AS total FROM prontuarios"
         )
         profissionais = db.fetch_one(
-            "SELECT COUNT(*) AS total FROM usuarios WHERE tipo = 'profissional' AND ativo = True"
+            "SELECT COUNT(*) AS total FROM profissional_estabelecimento pe JOIN usuarios u ON u.id = pe.usuario_id WHERE u.ativo = TRUE"
         )
     convenios = db.fetch_one("SELECT COUNT(*) AS total FROM convenios WHERE ativo = TRUE")
     procedimentos = db.fetch_one("SELECT COUNT(*) AS total FROM procedimentos WHERE ativo = TRUE")
