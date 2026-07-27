@@ -78,7 +78,7 @@
                         <td>{{ p.paciente_telefone or '-' }}</td>
                         <td>{{ p.criado_em.strftime('%d/%m/%Y') if p.criado_em else '-' }}</td>
                         <td>
-                            <a href="/pacientes/{{ p.paciente_usuario_id }}/editar" class="btn btn-sm btn-outline-primary">
+                            <a href="/prontuarios/{{ p.id }}" class="btn btn-sm btn-outline-primary">
                                 <i class="bi bi-eye"></i> Ver
                             </a>
                         </td>

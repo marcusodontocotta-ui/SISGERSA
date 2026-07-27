@@ -100,6 +100,11 @@
         <div class="text-white" style="font-size:1.05rem;"><strong>{{ prontuario.paciente_nome }}</strong></div>
         <div class="text-white-70" style="font-size:0.92rem;"><i class="bi bi-envelope me-1 opacity-75"></i>{{ prontuario.paciente_email or '-' }}</div>
         <div class="text-white-70" style="font-size:0.92rem;"><i class="bi bi-telephone me-1 opacity-75"></i>{{ prontuario.paciente_telefone or '-' }}</div>
+        {% if usuario.tipo in ['admin', 'recepcionista'] %}
+        <a href="/pacientes/{{ prontuario.paciente_usuario_id }}/editar" class="btn-voltar ms-auto">
+            <i class="bi bi-pencil-square"></i> Editar
+        </a>
+        {% endif %}
     </div>
 </div>
 
