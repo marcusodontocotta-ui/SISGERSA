@@ -70,18 +70,14 @@
                 </thead>
                 <tbody>
                     {% for p in prontuarios %}
-                    <tr data-paciente="{{ p.paciente_nome|lower }}" data-cpf="{{ (p.paciente_cpf or '')|lower }}" data-email="{{ (p.paciente_email or '')|lower }}" data-telefone="{{ (p.paciente_telefone or '')|lower }}">
+                    <tr data-paciente="{{ p.paciente_nome|lower }}" data-cpf="{{ (p.paciente_cpf or '')|lower }}" data-email="{{ (p.paciente_email or '')|lower }}" data-telefone="{{ (p.paciente_telefone or '')|lower }}" style="cursor:pointer;" onclick="window.location='/prontuarios/{{ p.id }}'">
                         <td><code>{{ p.numero_prontuario or 'S/N' }}</code></td>
                         <td>{{ p.paciente_nome }}</td>
                         <td>{{ p.paciente_cpf or '-' }}</td>
                         <td>{{ p.paciente_email or '-' }}</td>
                         <td>{{ p.paciente_telefone or '-' }}</td>
                         <td>{{ p.criado_em.strftime('%d/%m/%Y') if p.criado_em else '-' }}</td>
-                        <td>
-                            <a href="/prontuarios/{{ p.id }}" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-eye"></i> Ver
-                            </a>
-                        </td>
+                        <td class="text-muted"><i class="bi bi-chevron-right"></i></td>
                     </tr>
                     {% endfor %}
                 </tbody>
