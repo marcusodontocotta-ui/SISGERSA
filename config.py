@@ -25,7 +25,9 @@ class Settings:
     SMTP_USER: str = os.getenv("SMTP_USER", "")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "SISGERSA")
+    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "")
     EMAIL_HABILITADO: bool = os.getenv("EMAIL_HABILITADO", "false").lower() == "true"
+    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
 
     def __init__(self):
         database_url = os.getenv("DATABASE_URL", "")

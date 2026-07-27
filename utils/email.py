@@ -1,7 +1,7 @@
-import smtplib
+import json
 import logging
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import urllib.request
+import urllib.error
 from config import settings
 
 logger = logging.getLogger("email")
@@ -11,28 +11,40 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str) -> bool:
     if not settings.EMAIL_HABILITADO:
         logger.info("Email desabilitado. Envio ignorado.")
         return False
-    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        logger.warning("SMTP_USER ou SMTP_PASSWORD nao configurados.")
+    if not settings.RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY nao configurada.")
         return False
     if not destinatario:
         logger.warning("Destinatario vazio. Envio ignorado.")
         return False
 
-    msg = MIMEMultipart("alternative")
-    msg["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_USER}>"
-    msg["To"] = destinatario
-    msg["Subject"] = assunto
-    msg.attach(MIMEText(corpo_html, "html", "utf-8"))
+    from_email = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
+    payload = json.dumps({
+        "from": from_email,
+        "to": [destinatario],
+        "subject": assunto,
+        "html": corpo_html,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
 
     try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.sendmail(settings.SMTP_USER, destinatario, msg.as_string())
-        logger.info(f"Email enviado para {destinatario}: {assunto}")
-        return True
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+            logger.info(f"Email enviado para {destinatario}: {assunto} (id={data.get('id')})")
+            return True
+    except urllib.error.HTTPError as e:
+        body = e.read().decode() if e.fp else ""
+        logger.error(f"Resend API erro {e.code} para {destinatario}: {body}")
+        return False
     except Exception as e:
         logger.error(f"Erro ao enviar email para {destinatario}: {e}")
         return False
@@ -80,7 +92,7 @@ def montar_confirmacao_agendamento(
     </div>
 
     <div style="padding:28px 30px;">
-        <p style="font-size:15px;color:#333;margin:0 0 20px;">Olá <strong>{paciente_nome}</strong>,</p>
+        <p style="font-size:15px;color:#333;margin:0 0 20px;">Ola <strong>{paciente_nome}</strong>,</p>
         <p style="font-size:14px;color:#555;margin:0 0 20px;">Sua consulta foi confirmada com sucesso. Confira os detalhes abaixo:</p>
 
         <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
