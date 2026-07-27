@@ -38,22 +38,65 @@
                         <input type="email" class="form-control" name="email" value="{{ pac.email }}" required>
                     </div>
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Codigo do Paciente</label>
+                            <input type="text" class="form-control" name="codigo_paciente" value="{{ pac.codigo_paciente or '' }}" placeholder="Ex: 841">
+                        </div>
+                        <div class="col-md-4 mb-3">
                             <label class="form-label">CPF</label>
                             <input type="text" class="form-control" name="cpf" value="{{ pac.cpf or '' }}" data-mask="cpf" placeholder="000.000.000-00">
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label">Telefone</label>
                             <input type="text" class="form-control" name="telefone" value="{{ pac.telefone or '' }}" data-mask="phone">
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Data de Nascimento</label>
-                        <input type="date" class="form-control" name="data_nascimento" value="{{ pac.data_nascimento.strftime('%Y-%m-%d') if pac.data_nascimento else '' }}">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Data de Nascimento</label>
+                            <input type="date" class="form-control" name="data_nascimento" value="{{ pac.data_nascimento.strftime('%Y-%m-%d') if pac.data_nascimento else '' }}">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Estado Civil</label>
+                            <select class="form-select" name="estado_civil">
+                                <option value="">Selecione...</option>
+                                <option value="Solteiro(a)" {{ 'selected' if pac.estado_civil == 'Solteiro(a)' }}>Solteiro(a)</option>
+                                <option value="Casado(a)" {{ 'selected' if pac.estado_civil == 'Casado(a)' }}>Casado(a)</option>
+                                <option value="Divorciado(a)" {{ 'selected' if pac.estado_civil == 'Divorciado(a)' }}>Divorciado(a)</option>
+                                <option value="Viuvo(a)" {{ 'selected' if pac.estado_civil == 'Viuvo(a)' }}>Viuvo(a)</option>
+                                <option value="Uniao Estavel" {{ 'selected' if pac.estado_civil == 'Uniao Estavel' }}>Uniao Estavel</option>
+                                <option value="Disquitado(a)" {{ 'selected' if pac.estado_civil == 'Disquitado(a)' }}>Disquitado(a)</option>
+                                <option value="Outro" {{ 'selected' if pac.estado_civil == 'Outro' }}>Outro</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Profissao</label>
+                            <input type="text" class="form-control" name="profissao" value="{{ pac.profissao or '' }}">
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Endereco</label>
                         <input type="text" class="form-control" name="endereco" value="{{ pac.endereco or '' }}">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Nome do Pai</label>
+                            <input type="text" class="form-control" name="nome_pai" value="{{ pac.nome_pai or '' }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Nome da Mae</label>
+                            <input type="text" class="form-control" name="nome_mae" value="{{ pac.nome_mae or '' }}">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Indicacao</label>
+                            <input type="text" class="form-control" name="indicacao" value="{{ pac.indicacao or '' }}" placeholder="Quem indicou?">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">N. Documentacao</label>
+                            <input type="text" class="form-control" name="numero_documentacao" value="{{ pac.numero_documentacao or '' }}">
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Tipo</label>

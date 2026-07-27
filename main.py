@@ -1628,22 +1628,38 @@ def salvar_paciente(
     endereco: str = Form(None),
     foto_url: str = Form(None),
     senha: str = Form(""),
+    codigo_paciente: str = Form(None),
+    numero_documentacao: str = Form(None),
+    indicacao: str = Form(None),
+    estado_civil: str = Form(None),
+    profissao: str = Form(None),
+    nome_pai: str = Form(None),
+    nome_mae: str = Form(None),
     usuario=Depends(exigir_login),
 ):
     if usuario["tipo"] not in ("admin", "recepcionista"):
         raise HTTPException(status_code=403)
 
+    base_fields = """nome = %s, email = %s, telefone = %s, cpf = %s, data_nascimento = %s,
+                     endereco = %s, foto_url = %s, codigo_paciente = %s, numero_documentacao = %s,
+                     indicacao = %s, estado_civil = %s, profissao = %s, nome_pai = %s, nome_mae = %s"""
+    base_params = (
+        nome, email, telefone, cpf or None, data_nascimento or None,
+        endereco or None, foto_url, codigo_paciente or None, numero_documentacao or None,
+        indicacao or None, estado_civil or None, profissao or None, nome_pai or None, nome_mae or None,
+    )
+
     if senha and senha.strip():
         from utils.auth import hash_senha
         senha_hash = hash_senha(senha.strip())
         db.execute(
-            "UPDATE usuarios SET nome = %s, email = %s, telefone = %s, cpf = %s, data_nascimento = %s, endereco = %s, foto_url = %s, senha = %s WHERE id = %s",
-            (nome, email, telefone, cpf or None, data_nascimento or None, endereco or None, foto_url, senha_hash, pac_id),
+            f"UPDATE usuarios SET {base_fields}, senha = %s WHERE id = %s",
+            (*base_params, senha_hash, pac_id),
         )
     else:
         db.execute(
-            "UPDATE usuarios SET nome = %s, email = %s, telefone = %s, cpf = %s, data_nascimento = %s, endereco = %s, foto_url = %s WHERE id = %s",
-            (nome, email, telefone, cpf or None, data_nascimento or None, endereco or None, foto_url, pac_id),
+            f"UPDATE usuarios SET {base_fields} WHERE id = %s",
+            (*base_params, pac_id),
         )
     return RedirectResponse("/prontuarios", status_code=302)
 

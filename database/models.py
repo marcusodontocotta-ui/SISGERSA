@@ -32,9 +32,17 @@ CREATE TABLE IF NOT EXISTS usuarios (
     data_nascimento DATE,
     endereco VARCHAR(500),
     foto_url VARCHAR(500),
+    codigo_paciente VARCHAR(20),
+    numero_documentacao VARCHAR(50),
+    indicacao VARCHAR(200),
+    estado_civil VARCHAR(30),
+    profissao VARCHAR(100),
+    nome_pai VARCHAR(200),
+    nome_mae VARCHAR(200),
     ativo BOOLEAN DEFAULT TRUE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_codigo_paciente (codigo_paciente)
 );
 
 CREATE TABLE IF NOT EXISTS profissional_estabelecimento (
@@ -405,9 +413,17 @@ CREATE TABLE IF NOT EXISTS usuarios (
     data_nascimento DATE,
     endereco VARCHAR(500),
     foto_url VARCHAR(500),
+    codigo_paciente VARCHAR(20),
+    numero_documentacao VARCHAR(50),
+    indicacao VARCHAR(200),
+    estado_civil VARCHAR(30),
+    profissao VARCHAR(100),
+    nome_pai VARCHAR(200),
+    nome_mae VARCHAR(200),
     ativo BOOLEAN DEFAULT TRUE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (codigo_paciente)
 );
 
 CREATE TABLE IF NOT EXISTS profissional_estabelecimento (
@@ -743,6 +759,13 @@ ALTER TABLE estabelecimentos ADD COLUMN IF NOT EXISTS plano_id INT REFERENCES pl
 ALTER TABLE estabelecimentos ADD COLUMN IF NOT EXISTS plano_expira_em DATE;
 ALTER TABLE profissional_estabelecimento ADD COLUMN IF NOT EXISTS cor VARCHAR(7) DEFAULT '#6c757d';
 ALTER TABLE consultas ADD COLUMN IF NOT EXISTS lembrete_enviado BOOLEAN DEFAULT FALSE;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS codigo_paciente VARCHAR(20);
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS numero_documentacao VARCHAR(50);
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS indicacao VARCHAR(200);
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS estado_civil VARCHAR(30);
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS profissao VARCHAR(100);
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS nome_pai VARCHAR(200);
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS nome_mae VARCHAR(200);
 
 CREATE TABLE IF NOT EXISTS config_sistema (
     chave VARCHAR(100) PRIMARY KEY,
@@ -762,6 +785,18 @@ SCHEMA_ALTER_MYSQL = [
     "ALTER TABLE profissional_estabelecimento ADD COLUMN cor VARCHAR(7) DEFAULT '#6c757d'",
     "ALTER TABLE consultas ADD COLUMN lembrete_enviado BOOLEAN DEFAULT FALSE",
 ]
+
+def _get_mysql_alter_safe():
+    """Return ALTER statements that safely check column existence via Python."""
+    return [
+        ("usuarios", "codigo_paciente", "VARCHAR(20)"),
+        ("usuarios", "numero_documentacao", "VARCHAR(50)"),
+        ("usuarios", "indicacao", "VARCHAR(200)"),
+        ("usuarios", "estado_civil", "VARCHAR(30)"),
+        ("usuarios", "profissao", "VARCHAR(100)"),
+        ("usuarios", "nome_pai", "VARCHAR(200)"),
+        ("usuarios", "nome_mae", "VARCHAR(200)"),
+    ]
 
 
 def get_schema():
