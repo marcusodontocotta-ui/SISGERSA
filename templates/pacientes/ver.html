@@ -269,7 +269,7 @@
 
 {% elif tab == 'anamnese' %}
     {% if prontuario %}
-    <iframe src="/prontuarios/{{ prontuario.id }}" class="tab-iframe" id="iframeAnamnese"></iframe>
+    <iframe src="/prontuarios/{{ prontuario.id }}?embedded=1" class="tab-iframe" id="iframeAnamnese"></iframe>
     {% else %}
     <div class="text-center py-5 text-muted">
         <i class="bi bi-journal-x fs-1"></i>
@@ -278,10 +278,10 @@
     {% endif %}
 
 {% elif tab == 'orcamentos' %}
-    <iframe src="/orcamentos?paciente_id={{ pac.id }}" class="tab-iframe" id="iframeOrcamentos"></iframe>
+    <iframe src="/orcamentos?paciente_id={{ pac.id }}&embedded=1" class="tab-iframe" id="iframeOrcamentos"></iframe>
 
 {% elif tab == 'historico' %}
-    <iframe src="/financeiro?paciente_id={{ pac.id }}" class="tab-iframe" id="iframeHistorico"></iframe>
+    <iframe src="/financeiro?paciente_id={{ pac.id }}&embedded=1" class="tab-iframe" id="iframeHistorico"></iframe>
 
 {% endif %}
 

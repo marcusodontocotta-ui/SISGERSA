@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% if embedded %}{% extends "base_embedded.html" %}{% else %}{% extends "base.html" %}{% endif %}
 {% block titulo %}Anamnese - {{ prontuario.paciente_nome }}{% endblock %}
 {% block styles %}
 <link rel="stylesheet" href="/static/css/odontograma.css">

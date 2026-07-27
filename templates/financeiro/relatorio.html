@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% if embedded %}{% extends "base_embedded.html" %}{% else %}{% extends "base.html" %}{% endif %}
 {% block titulo %}Relatorio Financeiro - SISGERSA{% endblock %}
 {% block conteudo %}
 <div class="d-flex justify-content-between align-items-center mb-4">

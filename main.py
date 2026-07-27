@@ -2276,7 +2276,7 @@ def listar_prontuarios(request: Request, usuario=Depends(exigir_login), paciente
 
 
 @app.get("/prontuarios/{prontuario_id}", response_class=HTMLResponse)
-def ver_prontuario(prontuario_id: int, request: Request, usuario=Depends(exigir_login)):
+def ver_prontuario(prontuario_id: int, request: Request, usuario=Depends(exigir_login), embedded: str = Query(None)):
     exigir_permissao(usuario, "prontuarios", "ver")
     prontuario = db.fetch_one(
         """SELECT p.*,
@@ -2422,6 +2422,7 @@ def ver_prontuario(prontuario_id: int, request: Request, usuario=Depends(exigir_
             "procedimentos": procedimentos,
             "orcamento_disponivel_id": orcamento_disponivel_id,
             "odontograma": odontograma,
+            "embedded": embedded == "1",
         },
     )
 
@@ -3324,7 +3325,7 @@ def remover_paciente_convenio(pac_id: int, vc_id: int, usuario=Depends(exigir_lo
 
 
 @app.get("/orcamentos", response_class=HTMLResponse)
-def listar_orcamentos(request: Request, usuario=Depends(exigir_login), paciente_id: str = Query(None)):
+def listar_orcamentos(request: Request, usuario=Depends(exigir_login), paciente_id: str = Query(None), embedded: str = Query(None)):
     estab_id = resolver_estabelecimento(request, usuario)
     exigir_permissao(usuario, "orcamentos", "ver", estab_id)
     pacientes_filtro = obter_pacientes_para_filtro(usuario, estab_id)
@@ -3404,7 +3405,8 @@ def listar_orcamentos(request: Request, usuario=Depends(exigir_login), paciente_
     return templates.TemplateResponse(
         "orcamentos/lista.html",
         {"request": request, "usuario": usuario, "orcamentos": orcamentos,
-         "pacientes_filtro": pacientes_filtro, "paciente_id": paciente_id_int},
+         "pacientes_filtro": pacientes_filtro, "paciente_id": paciente_id_int,
+         "embedded": embedded == "1"},
     )
 
 
@@ -3848,7 +3850,7 @@ def nota_fiscal(orc_id: int, request: Request, usuario=Depends(exigir_login)):
 
 
 @app.get("/financeiro", response_class=HTMLResponse)
-def relatorio_financeiro(request: Request, usuario=Depends(exigir_login), paciente_id: str = Query(None)):
+def relatorio_financeiro(request: Request, usuario=Depends(exigir_login), paciente_id: str = Query(None), embedded: str = Query(None)):
     exigir_permissao(usuario, "financeiro", "ver")
     if usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
         raise HTTPException(status_code=403)
@@ -3930,7 +3932,8 @@ def relatorio_financeiro(request: Request, usuario=Depends(exigir_login), pacien
         "financeiro/relatorio.html",
         {"request": request, "usuario": usuario, "periodo": periodo,
          "pagamentos": pagamentos, "resumo": resumo, "por_metodo": por_metodo, "por_profissional": por_profissional,
-         "pacientes_filtro": pacientes_filtro, "paciente_id": paciente_id_int},
+         "pacientes_filtro": pacientes_filtro, "paciente_id": paciente_id_int,
+         "embedded": embedded == "1"},
     )
 
 
