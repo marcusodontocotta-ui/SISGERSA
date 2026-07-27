@@ -7,17 +7,62 @@
     .prontuario-banner {
         background: linear-gradient(135deg, #1a5276 0%, #2e86c1 50%, #3498db 100%);
         border-radius: 0.5rem;
-        padding: 1rem 1.25rem;
+        padding: 0.9rem 1.25rem;
         box-shadow: 0 4px 15px rgba(30,80,130,0.3);
         color: #fff;
     }
-    .prontuario-banner h4 { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.02em; }
-    .prontuario-banner div { font-size: 0.88rem; }
-    .prontuario-banner strong { opacity: 0.8; }
+    .prontuario-banner .btn-voltar {
+        color: rgba(255,255,255,0.7);
+        border: 1px solid rgba(255,255,255,0.25);
+        background: rgba(255,255,255,0.1);
+        font-size: 0.82rem;
+        padding: 4px 12px;
+        border-radius: 6px;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+    }
+    .prontuario-banner .btn-voltar:hover {
+        background: rgba(255,255,255,0.95);
+        color: #1a5276;
+        border-color: rgba(255,255,255,0.6);
+    }
 
-    /* === Card headers unificados === */
-    .card-header.secao { background: linear-gradient(135deg, #d6e4f0 0%, #c5d8eb 100%); border-left: 4px solid #3b7dd8; }
-    .card-header h5 { font-size: 1rem; font-weight: 600; margin: 0; color: #1a3c5e; }
+    /* === Card headers escuros === */
+    .card-header.secao {
+        background: linear-gradient(135deg, #1a3c5e 0%, #244f76 100%);
+        border-left: 4px solid #5dade2;
+        color: #fff;
+    }
+    .card-header.secao h5 { font-size: 1rem; font-weight: 600; margin: 0; color: #fff; }
+    .card-header.secao h5 i { opacity: 0.85; }
+    .card-header.secao .btn-outline-secondary {
+        color: rgba(255,255,255,0.8);
+        border-color: rgba(255,255,255,0.3);
+    }
+    .card-header.secao .btn-outline-secondary:hover {
+        background: rgba(255,255,255,0.15);
+        color: #fff;
+        border-color: rgba(255,255,255,0.5);
+    }
+    .card-header.secao .btn-success {
+        background: rgba(25,135,84,0.85);
+        border-color: rgba(25,135,84,0.85);
+    }
+    .card-header.secao .btn-success:hover {
+        background: #fff;
+        color: #198754;
+        border-color: #fff;
+    }
+    .card-header.secao .btn-primary {
+        background: rgba(13,110,253,0.9);
+        border-color: rgba(13,110,253,0.9);
+    }
+    .card-header.secao .btn-primary:hover {
+        background: #fff;
+        color: #0d6efd;
+        border-color: #fff;
+    }
 
     /* === Historico: hover expressivo === */
     .btn-historico {
@@ -43,16 +88,10 @@
 </style>
 {% endblock %}
 {% block conteudo %}
-<div class="row mb-4">
-    <div class="col">
-        <a href="/prontuarios" class="text-decoration-none">
-            <i class="bi bi-arrow-left"></i> Voltar
-        </a>
-    </div>
-</div>
-
 <div class="prontuario-banner mb-4">
-    <div class="d-flex align-items-center gap-4 flex-wrap">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+        <a href="/prontuarios" class="btn-voltar"><i class="bi bi-arrow-left"></i> Voltar</a>
+        <span class="opacity-25">|</span>
         <div class="d-flex align-items-center gap-2">
             <i class="bi bi-folder-medical text-white-50" style="font-size:0.9rem;"></i>
             <small class="text-white-50" style="font-size:0.78rem; font-weight:500; text-transform:uppercase; letter-spacing:0.05em;">Registro {{ prontuario.numero_prontuario or 'S/N' }}</small>
