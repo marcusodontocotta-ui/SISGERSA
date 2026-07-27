@@ -27,6 +27,7 @@ for i, h in enumerate(headers):
     elif h.strip() == 'CIDADE': COL['cidade'] = i
     elif h.strip() == 'ESTADO': COL['estado'] = i
     elif h.strip() == 'CEP_c': COL['cep'] = i
+    elif h.strip() == 'Numero_c': COL['numero'] = i
     elif 'cel' in hl and 'telefone' in hl: COL['tel_cel'] = i
     elif h.strip() == 'TelefoneR_c' and 'tel_res' not in COL: COL['tel_res'] = i
     elif 'indica' in hl and 'indicacao' not in COL: COL['indicacao'] = i
@@ -101,12 +102,13 @@ for row in ws.iter_rows(min_row=2, values_only=True):
 
         dn = pd(row[g('data_nasc')]) if g('data_nasc') is not None else None
 
-        ep = []
-        for f in ['logradouro', 'bairro', 'cidade', 'estado']:
-            if g(f) is not None:
-                v = s(row[g(f)])
-                if v: ep.append(v)
-        endereco = ', '.join(ep) if ep else None
+        logradouro = s(row[g('logradouro')]) if g('logradouro') is not None else None
+        bairro = s(row[g('bairro')]) if g('bairro') is not None else None
+        cidade = s(row[g('cidade')]) if g('cidade') is not None else None
+        estado_val = s(row[g('estado')]) if g('estado') is not None else None
+        cep_val = s(row[g('cep')]) if g('cep') is not None else None
+        if cep_val: cep_val = str(cep_val).replace('.', '').replace('-', '').strip()
+        numero_val = s(row[g('numero')]) if g('numero') is not None else None
 
         indicacao = s(row[g('indicacao')]) if g('indicacao') is not None else None
         ec = s(row[g('estado_civil')]) if g('estado_civil') is not None else None
@@ -116,7 +118,8 @@ for row in ws.iter_rows(min_row=2, values_only=True):
         ndoc = s(row[g('num_doc')]) if g('num_doc') is not None else None
 
         all_rows.append((nome_completo, email, DEFAULT_HASH, tel, cpf, dn,
-                          endereco, codigo, ndoc, indicacao, ec, prof, pai, mae))
+                          logradouro, numero_val, bairro, cidade, estado_val, cep_val,
+                          codigo, ndoc, indicacao, ec, prof, pai, mae))
     except Exception as e:
         errors += 1
         if errors <= 3: print(f"ERRO parse: {e}")
@@ -131,7 +134,7 @@ existing_codes = {r[0] for r in cur.fetchall()}
 print(f"   {len(existing_codes)} codigos ja existentes")
 sys.stdout.flush()
 
-to_insert = [r for r in all_rows if not r[7] or r[7] not in existing_codes]
+to_insert = [r for r in all_rows if not r[12] or r[12] not in existing_codes]
 print(f"   {len(to_insert)} realmente para inserir")
 sys.stdout.flush()
 
@@ -149,9 +152,10 @@ for i in range(0, len(to_insert), BATCH):
         for r in batch:
             cur.execute("""
                 INSERT INTO usuarios (nome, email, senha_hash, tipo, telefone, cpf, data_nascimento,
-                                      endereco, codigo_paciente, numero_documentacao, indicacao,
+                                      logradouro, numero, bairro, cidade, estado, cep,
+                                      codigo_paciente, numero_documentacao, indicacao,
                                       estado_civil, profissao, nome_pai, nome_mae, ativo)
-                VALUES (%s,%s,%s,'paciente',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE)
+                VALUES (%s,%s,%s,'paciente',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE)
                 RETURNING id
             """, r)
             user_ids.append(cur.fetchone()[0])

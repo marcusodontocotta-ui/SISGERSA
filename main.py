@@ -1554,6 +1554,13 @@ def criar_paciente(
     cpf: str = Form(None),
     data_nascimento: str = Form(None),
     endereco: str = Form(None),
+    logradouro: str = Form(None),
+    numero: str = Form(None),
+    complemento: str = Form(None),
+    bairro: str = Form(None),
+    cidade: str = Form(None),
+    estado: str = Form(None),
+    cep: str = Form(None),
     senha: str = Form(...),
     foto_url: str = Form(None),
     estabelecimento_id: str = Form(None),
@@ -1577,8 +1584,12 @@ def criar_paciente(
     except Exception:
         return RedirectResponse("/prontuarios?erro=email_duplicado", status_code=302)
     db.execute(
-        "UPDATE usuarios SET cpf = %s, data_nascimento = %s, endereco = %s WHERE id = %s",
-        (cpf or None, data_nascimento or None, endereco or None, user_id),
+        """UPDATE usuarios SET cpf = %s, data_nascimento = %s, endereco = %s,
+           logradouro = %s, numero = %s, complemento = %s, bairro = %s,
+           cidade = %s, estado = %s, cep = %s WHERE id = %s""",
+        (cpf or None, data_nascimento or None, endereco or None,
+         logradouro or None, numero or None, complemento or None, bairro or None,
+         cidade or None, estado or None, cep or None, user_id),
     )
     if foto_url:
         db.execute("UPDATE usuarios SET foto_url = %s WHERE id = %s", (foto_url, user_id))
@@ -1637,6 +1648,13 @@ def salvar_paciente(
     cpf: str = Form(None),
     data_nascimento: str = Form(None),
     endereco: str = Form(None),
+    logradouro: str = Form(None),
+    numero: str = Form(None),
+    complemento: str = Form(None),
+    bairro: str = Form(None),
+    cidade: str = Form(None),
+    estado: str = Form(None),
+    cep: str = Form(None),
     foto_url: str = Form(None),
     senha: str = Form(""),
     codigo_paciente: str = Form(None),
@@ -1652,11 +1670,15 @@ def salvar_paciente(
         raise HTTPException(status_code=403)
 
     base_fields = """nome = %s, email = %s, telefone = %s, cpf = %s, data_nascimento = %s,
-                     endereco = %s, foto_url = %s, codigo_paciente = %s, numero_documentacao = %s,
+                     endereco = %s, logradouro = %s, numero = %s, complemento = %s,
+                     bairro = %s, cidade = %s, estado = %s, cep = %s,
+                     foto_url = %s, codigo_paciente = %s, numero_documentacao = %s,
                      indicacao = %s, estado_civil = %s, profissao = %s, nome_pai = %s, nome_mae = %s"""
     base_params = (
         nome, email, telefone, cpf or None, data_nascimento or None,
-        endereco or None, foto_url, codigo_paciente or None, numero_documentacao or None,
+        endereco or None, logradouro or None, numero or None, complemento or None,
+        bairro or None, cidade or None, estado or None, cep or None,
+        foto_url, codigo_paciente or None, numero_documentacao or None,
         indicacao or None, estado_civil or None, profissao or None, nome_pai or None, nome_mae or None,
     )
 
@@ -1664,7 +1686,7 @@ def salvar_paciente(
         from utils.auth import hash_senha
         senha_hash = hash_senha(senha.strip())
         db.execute(
-            f"UPDATE usuarios SET {base_fields}, senha = %s WHERE id = %s",
+            f"UPDATE usuarios SET {base_fields}, senha_hash = %s WHERE id = %s",
             (*base_params, senha_hash, pac_id),
         )
     else:
@@ -3113,6 +3135,30 @@ def api_procedimento_valor(
         )
 
     return JSONResponse(content={"valor": float(resultado["valor"]) if resultado else None})
+
+
+@app.get("/api/cep/{cep}")
+def api_buscar_cep(cep: str):
+    import re
+    cep_limpo = re.sub(r'\D', '', cep)
+    if len(cep_limpo) != 8:
+        return JSONResponse(status_code=400, content={"erro": "CEP invalido"})
+    try:
+        import urllib.request
+        import json
+        url = f"https://brasilapi.com.br/api/cep/v2/{cep_limpo}"
+        req = urllib.request.Request(url, headers={"User-Agent": "SISGERSA/1.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+        return JSONResponse(content={
+            "cep": data.get("cep", ""),
+            "logradouro": data.get("street", ""),
+            "bairro": data.get("neighborhood", ""),
+            "cidade": data.get("city", ""),
+            "estado": data.get("state", ""),
+        })
+    except Exception as e:
+        return JSONResponse(status_code=404, content={"erro": f"CEP nao encontrado: {e}"})
 
 
 @app.get("/api/convenios-paciente")

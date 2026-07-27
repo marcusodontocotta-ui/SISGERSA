@@ -67,6 +67,25 @@ def criar_banco():
                 logger.warning(f"criar_banco: erro alter: {e}")
             criadas += 1
 
+    if engine == "postgresql":
+        pg_alts = [
+            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS logradouro VARCHAR(255)",
+            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS numero VARCHAR(20)",
+            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS complemento VARCHAR(100)",
+            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS bairro VARCHAR(150)",
+            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS cidade VARCHAR(150)",
+            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS estado VARCHAR(5)",
+            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS cep VARCHAR(9)",
+        ]
+        for alt in pg_alts:
+            try:
+                cursor.execute(alt)
+                criadas += 1
+            except Exception as e:
+                if "already exists" not in str(e):
+                    logger.warning(f"criar_banco: erro pg alter: {e}")
+                criadas += 1
+
     if engine == "mysql":
         try:
             cursor.execute("SHOW INDEX FROM usuarios WHERE Column_name = 'email' AND Key_name != 'PRIMARY'")

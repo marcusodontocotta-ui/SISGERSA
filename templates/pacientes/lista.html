@@ -146,9 +146,47 @@ function filtrarProntuarios() {
                         <label class="form-label">Data de Nascimento</label>
                         <input type="date" class="form-control" name="data_nascimento">
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Endereco</label>
-                        <input type="text" class="form-control" name="endereco">
+                    <div class="card-header" style="background:#1a1a2e;color:#fff;">
+                        <h6 class="mb-0"><i class="bi bi-geo-alt"></i> Endereco</h6>
+                    </div>
+                    <div class="row px-3">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">CEP</label>
+                            <input type="text" class="form-control" name="cep" id="pac-novo-cep" maxlength="9" placeholder="00000-000" onblur="buscarCEP(this.value, 'pac-novo')">
+                        </div>
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">Logradouro</label>
+                            <input type="text" class="form-control" name="logradouro" id="pac-novo-logradouro" placeholder="Rua, Avenida, etc.">
+                        </div>
+                    </div>
+                    <div class="row px-3">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Numero</label>
+                            <input type="text" class="form-control" name="numero" id="pac-novo-numero">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Complemento</label>
+                            <input type="text" class="form-control" name="complemento" id="pac-novo-complemento" placeholder="Apto, Bloco, etc.">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Bairro</label>
+                            <input type="text" class="form-control" name="bairro" id="pac-novo-bairro">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Estado (UF)</label>
+                            <select class="form-select" name="estado" id="pac-novo-estado">
+                                <option value="">UF</option>
+                                {% for uf in ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'] %}
+                                <option value="{{ uf }}">{{ uf }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row px-3">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Cidade</label>
+                            <input type="text" class="form-control" name="cidade" id="pac-novo-cidade">
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Senha Temporaria</label>
@@ -246,6 +284,22 @@ function submeterPacienteForcado() {
     _skipEmailCheckPac = true;
     bootstrap.Modal.getInstance(document.getElementById('modalEmailDuplicadoPaciente')).hide();
     document.getElementById('formNovoPaciente').submit();
+}
+
+function buscarCEP(cep, prefix) {
+    var c = cep.replace(/\D/g, '');
+    if (c.length !== 8) return;
+    fetch('/api/cep/' + c)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.erro) return;
+        document.getElementById(prefix + '-logradouro').value = d.logradouro || '';
+        document.getElementById(prefix + '-bairro').value = d.bairro || '';
+        document.getElementById(prefix + '-cidade').value = d.cidade || '';
+        document.getElementById(prefix + '-estado').value = d.estado || '';
+        document.getElementById(prefix + '-numero').focus();
+    })
+    .catch(function() {});
 }
 </script>
 {% endblock %}
