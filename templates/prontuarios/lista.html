@@ -59,25 +59,23 @@
             <table class="table table-hover" id="tabelaHistorico">
                 <thead>
                     <tr>
-                        <th>Registro</th>
+                        <th>#</th>
                         <th>Paciente</th>
                         <th>CPF</th>
                         <th>Email</th>
                         <th>Telefone</th>
                         <th>Data de Criacao</th>
-                        <th>Acoes</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for p in prontuarios %}
                     <tr data-paciente="{{ p.paciente_nome|lower }}" data-cpf="{{ (p.paciente_cpf or '')|lower }}" data-email="{{ (p.paciente_email or '')|lower }}" data-telefone="{{ (p.paciente_telefone or '')|lower }}" style="cursor:pointer;" onclick="window.location='/pacientes/{{ p.paciente_usuario_id }}'">
-                        <td><code>{{ p.numero_prontuario or 'S/N' }}</code></td>
+                        <td><code>{{ p.paciente_usuario_id }}</code></td>
                         <td>{{ p.paciente_nome }}</td>
                         <td>{{ p.paciente_cpf|format_cpf or '-' }}</td>
                         <td>{{ p.paciente_email or '-' }}</td>
                         <td>{{ p.paciente_telefone|format_phone or '-' }}</td>
                         <td>{{ p.criado_em.strftime('%d/%m/%Y') if p.criado_em else '-' }}</td>
-                        <td class="text-muted"><i class="bi bi-chevron-right"></i></td>
                     </tr>
                     {% endfor %}
                 </tbody>
