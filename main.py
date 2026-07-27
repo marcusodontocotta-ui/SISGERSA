@@ -2466,7 +2466,8 @@ def criar_prontuario(
                 "INSERT INTO pacientes (nome, email, telefone, cpf, data_nascimento, senha_hash, tipo_pagamento, ativo) VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE) RETURNING id",
                 (novo_paciente_nome.strip(), novo_email, novo_paciente_telefone or None, novo_paciente_cpf or None, novo_paciente_nascimento or None, senha_hash, novo_paciente_tipo_pagamento or 'particular'),
             )
-            paciente_id_int = cursor.fetchone()[0]
+            row = cursor.fetchone()
+            paciente_id_int = row['id'] if isinstance(row, dict) else row[0]
             vincular_paciente(paciente_id_int, estab_id)
 
     if not paciente_id_int:
@@ -3487,7 +3488,8 @@ def criar_orcamento(
         (paciente_id, profissional_id, estab_id, conv_id, dv, observacoes),
     )
 
-    new_id = cursor.fetchone()[0]
+    row = cursor.fetchone()
+    new_id = row['id'] if isinstance(row, dict) else row[0]
     return RedirectResponse(f"/orcamentos/{new_id}", status_code=302)
 
 

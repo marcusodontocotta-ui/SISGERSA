@@ -74,7 +74,8 @@ def criar_paciente(
            RETURNING id""",
         (nome, email, hash_pwd, telefone, cpf, data_nascimento, tipo_pagamento),
     )
-    return cursor.fetchone()[0]
+    row = cursor.fetchone()
+    return row['id'] if isinstance(row, dict) else row[0]
 
 
 def criar_profissional(
@@ -95,7 +96,8 @@ def criar_profissional(
          is_dentista, is_medico, is_enfermeiro,
          is_admin_geral, is_admin_estabelecimento, is_recepcionista, is_super),
     )
-    return cursor.fetchone()[0]
+    row = cursor.fetchone()
+    return row['id'] if isinstance(row, dict) else row[0]
 
 
 def criar_usuario(nome: str, email: str, senha: str, tipo: str, telefone: str = None, is_super: bool = False) -> int:
