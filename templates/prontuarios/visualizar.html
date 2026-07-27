@@ -3,11 +3,47 @@
 {% block styles %}
 <link rel="stylesheet" href="/static/css/odontograma.css">
 <style>
-    .btn-historico.active {
-        background-color: #e7f1ff !important;
-        border-color: #9ec5fe !important;
-        color: #084298 !important;
+    /* === Faixa do paciente === */
+    .prontuario-banner {
+        background: linear-gradient(135deg, #1a5276 0%, #2e86c1 50%, #3498db 100%);
+        border-radius: 0.5rem;
+        padding: 1rem 1.25rem;
+        box-shadow: 0 4px 15px rgba(30,80,130,0.3);
+        color: #fff;
     }
+    .prontuario-banner h4 { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.02em; }
+    .prontuario-banner div { font-size: 0.88rem; }
+    .prontuario-banner strong { opacity: 0.8; }
+
+    /* === Card headers coloridos === */
+    .card-header.evolucao { background: linear-gradient(135deg, #e7f1ff 0%, #dbeafe 100%); border-left: 4px solid #0d6efd; }
+    .card-header.historico { background: linear-gradient(135deg, #e7f1ff 0%, #dbeafe 100%); border-left: 4px solid #6c757d; }
+    .card-header.odontograma { background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border-left: 4px solid #198754; }
+    .card-header.imagens { background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%); border-left: 4px solid #ffc107; }
+    .card-header.orcamentos { background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); border-left: 4px solid #dc3545; }
+    .card-header h5 { font-size: 1rem; font-weight: 600; margin: 0; }
+
+    /* === Historico: hover expressivo === */
+    .btn-historico {
+        transition: all 0.2s ease !important;
+        border-left: 3px solid transparent;
+    }
+    .btn-historico:hover {
+        background-color: #dce7f5 !important;
+        border-left-color: #0d6efd !important;
+        transform: translateX(4px);
+        box-shadow: 0 2px 8px rgba(13,110,253,0.1);
+    }
+    .btn-historico.active {
+        background: #e7f1ff !important;
+        border: #9ec5fe !important;
+        border-left: 3px solid #0d6efd !important;
+        color: #084298 !important;
+        box-shadow: 0 2px 10px rgba(13,110,253,0.15);
+    }
+
+    /* === Evolucao: borda lateral azul nas datas === */
+    .evolucao-item { border-left-color: #0d6efd !important; }
 </style>
 {% endblock %}
 {% block conteudo %}
@@ -19,22 +55,20 @@
     </div>
 </div>
 
-<div class="card mb-4 border-primary">
-    <div class="card-body py-3">
-        <div class="d-flex align-items-center gap-4 flex-wrap">
-            <h4 class="mb-0"><i class="bi bi-folder-medical text-primary"></i> Registro: {{ prontuario.numero_prontuario or 'S/N' }}</h4>
-            <span class="text-muted">|</span>
-            <div><strong>Nome:</strong> {{ prontuario.paciente_nome }}</div>
-            <div><strong>Email:</strong> {{ prontuario.paciente_email or '-' }}</div>
-            <div><strong>Telefone:</strong> {{ prontuario.paciente_telefone or '-' }}</div>
-        </div>
+<div class="prontuario-banner mb-4">
+    <div class="d-flex align-items-center gap-4 flex-wrap">
+        <h4 class="mb-0 text-white"><i class="bi bi-folder-medical"></i> Registro: {{ prontuario.numero_prontuario or 'S/N' }}</h4>
+        <span class="opacity-50">|</span>
+        <div class="text-white"><strong>Nome:</strong> {{ prontuario.paciente_nome }}</div>
+        <div class="text-white-50"><strong>Email:</strong> {{ prontuario.paciente_email or '-' }}</div>
+        <div class="text-white-50"><strong>Telefone:</strong> {{ prontuario.paciente_telefone or '-' }}</div>
     </div>
 </div>
 
 <div class="row">
     <div class="col-md-6">
         <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header d-flex justify-content-between align-items-center evolucao">
                 <h5 class="mb-0"><i class="bi bi-journal-text"></i> Evolucao Clinica</h5>
                 <div class="d-flex gap-2">
                     <button class="btn btn-sm btn-outline-secondary" id="btnMostrarTodas" style="display:none;" onclick="mostrarTodasEvolucoes()">
@@ -171,7 +205,7 @@
         </div>
 
         <div class="card mb-4">
-            <div class="card-header">
+            <div class="card-header historico">
                 <h5><i class="bi bi-calendar3"></i> Historico de Consultas</h5>
             </div>
             <div class="card-body p-0">
@@ -218,7 +252,7 @@
 
     <div class="col-md-6">
         <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header d-flex justify-content-between align-items-center odontograma">
                 <h5 class="mb-0"><i class="bi bi-emoji-smile"></i> Odontograma</h5>
                 {% if usuario.tipo in ['admin', 'profissional'] %}
                 <button class="btn btn-sm btn-success btn-odontograma" data-bs-toggle="modal" data-bs-target="#modalOdontograma">
@@ -265,7 +299,7 @@
         </div>
 
         <div class="card mb-4">
-            <div class="card-header">
+            <div class="card-header imagens">
                 <h5><i class="bi bi-image"></i> Imagens</h5>
             </div>
             <div class="card-body">
@@ -287,7 +321,7 @@
 
         {% if orcamentos_paciente %}
         <div class="card mb-4">
-            <div class="card-header">
+            <div class="card-header orcamentos">
                 <h5><i class="bi bi-calculator"></i> Orcamentos</h5>
             </div>
             <div class="card-body p-0">

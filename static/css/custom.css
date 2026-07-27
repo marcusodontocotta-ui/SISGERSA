@@ -3,11 +3,15 @@
 :root {
     --primary: #0d6efd;
     --sidebar-width: 250px;
+    --bg-page: #eef2f7;
+    --shadow-card: 0 2px 8px rgba(0,0,0,0.08);
+    --shadow-card-hover: 0 6px 20px rgba(0,0,0,0.12);
+    --transition-smooth: all 0.2s ease;
 }
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f8f9fa;
+    background-color: var(--bg-page);
     min-height: 100vh;
 }
 
@@ -15,37 +19,71 @@ body {
     font-weight: 600;
 }
 
+/* === Cards === */
 .card {
     border: none;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    box-shadow: var(--shadow-card);
     border-radius: 0.5rem;
+    transition: var(--transition-smooth);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-card-hover);
 }
 
 .card-header {
     background-color: #fff;
     border-bottom: 1px solid #dee2e6;
+    border-radius: 0.5rem 0.5rem 0 0 !important;
 }
 
+/* === Table === */
 .table th {
     font-weight: 600;
     color: #495057;
     border-bottom-width: 2px;
 }
 
+/* === Buttons: hover expressivo === */
 .btn {
     border-radius: 0.375rem;
+    transition: var(--transition-smooth);
 }
 
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+}
+
+.btn:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.btn-primary:hover {
+    background-color: #0b5ed7;
+    box-shadow: 0 4px 14px rgba(13,110,253,0.35);
+}
+
+.btn-success:hover {
+    box-shadow: 0 4px 14px rgba(25,135,84,0.3);
+}
+
+.btn-outline-primary:hover {
+    box-shadow: 0 4px 14px rgba(13,110,253,0.25);
+}
+
+/* === Modals === */
 .modal-content {
     border-radius: 0.75rem;
 }
 
-/* Login */
+/* === Login === */
 .card.shadow {
     border-radius: 1rem;
 }
 
-/* Stats cards */
+/* === Stats cards === */
 .card.text-bg-primary,
 .card.text-bg-success,
 .card.text-bg-info,
@@ -53,7 +91,7 @@ body {
     color: white;
 }
 
-/* Responsive */
+/* === Responsive === */
 @media (max-width: 768px) {
     .container-fluid {
         padding-left: 1rem;
