@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block titulo %}Prontuario - {{ pac.nome }}{% endblock %}
+{% block conteudo %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="prontuario-banner mb-4" style="background:linear-gradient(135deg,#1a5276 0%,#2e86c1 50%,#3498db 100%);border-radius:0.5rem;padding:0.9rem 1.25rem;color:#fff;box-shadow:0 4px 15px rgba(30,80,130,0.3);">
+            <div class="d-flex align-items-center gap-3 flex-wrap mb-2">
+                <a href="/prontuarios" class="btn-voltar" style="color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.1);font-size:0.82rem;padding:4px 12px;border-radius:6px;text-decoration:none;"><i class="bi bi-arrow-left"></i> Voltar</a>
+                <span class="opacity-25">|</span>
+                {% if prontuario %}
+                <a href="/prontuarios/{{ prontuario.id }}" style="color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.1);font-size:0.82rem;padding:4px 12px;border-radius:6px;text-decoration:none;">
+                    <i class="bi bi-journal-medical"></i> Anamnese
+                </a>
+                <span class="opacity-25">|</span>
+                {% endif %}
+                <div class="text-white" style="font-size:1.05rem;"><strong>{{ pac.nome }}</strong></div>
+                {% if usuario.tipo in ['admin', 'recepcionista'] %}
+                <a href="/pacientes/{{ pac.id }}/editar" style="color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.1);font-size:0.82rem;padding:4px 12px;border-radius:6px;text-decoration:none;margin-left:auto;">
+                    <i class="bi bi-pencil-square"></i> Editar
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header" style="background:linear-gradient(135deg,#1a3c5e 0%,#244f76 100%);color:#fff;border-left:4px solid #5dade2;">
+                <h5 class="mb-0"><i class="bi bi-person"></i> Dados Cadastrais</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label text-muted small">Nome Completo</label>
+                        <div class="fw-semibold">{{ pac.nome }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-muted small">Email</label>
+                        <div class="fw-semibold">{{ pac.email }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-muted small">Telefone</label>
+                        <div class="fw-semibold">{{ pac.telefone or '-' }}</div>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label text-muted small">CPF</label>
+                        <div class="fw-semibold">{{ pac.cpf or '-' }}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-muted small">Data de Nascimento</label>
+                        <div class="fw-semibold">{{ pac.data_nascimento.strftime('%d/%m/%Y') if pac.data_nascimento else '-' }}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-muted small">Estado Civil</label>
+                        <div class="fw-semibold">{{ pac.estado_civil or '-' }}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-muted small">Profissao</label>
+                        <div class="fw-semibold">{{ pac.profissao or '-' }}</div>
+                    </div>
+                </div>
+                {% if pac.logradouro or pac.cidade %}
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label text-muted small">CEP</label>
+                        <div class="fw-semibold">{{ pac.cep or '-' }}</div>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label text-muted small">Logradouro</label>
+                        <div class="fw-semibold">{{ pac.logradouro or '-' }}{% if pac.numero %}, {{ pac.numero }}{% endif %}{% if pac.complemento %} - {{ pac.complemento }}{% endif %}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-muted small">Bairro</label>
+                        <div class="fw-semibold">{{ pac.bairro or '-' }}</div>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Cidade</label>
+                        <div class="fw-semibold">{{ pac.cidade or '-' }}</div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label text-muted small">UF</label>
+                        <div class="fw-semibold">{{ pac.estado or '-' }}</div>
+                    </div>
+                </div>
+                {% endif %}
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label text-muted small">Codigo do Paciente</label>
+                        <div class="fw-semibold">{{ pac.codigo_paciente or '-' }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-muted small">Indicacao</label>
+                        <div class="fw-semibold">{{ pac.indicacao or '-' }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-muted small">N. Documentacao</label>
+                        <div class="fw-semibold">{{ pac.numero_documentacao or '-' }}</div>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Nome do Pai</label>
+                        <div class="fw-semibold">{{ pac.nome_pai or '-' }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Nome da Mae</label>
+                        <div class="fw-semibold">{{ pac.nome_mae or '-' }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if consultas_recentes %}
+        <div class="card mb-4">
+            <div class="card-header" style="background:linear-gradient(135deg,#1a3c5e 0%,#244f76 100%);color:#fff;border-left:4px solid #28a745;">
+                <h5 class="mb-0"><i class="bi bi-calendar-check"></i> Consultas Recentes</h5>
+            </div>
+            <div class="card-body">
+                {% for c in consultas_recentes %}
+                <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                    <div>
+                        <strong>{{ c.data_hora.strftime('%d/%m/%Y %H:%M') if c.data_hora else '-' }}</strong>
+                        <span class="text-muted ms-2">Dr(a). {{ c.profissional_nome }}</span>
+                    </div>
+                    <span class="badge bg-{% if c.status == 'concluida' %}success{% elif c.status == 'cancelada' %}danger{% elif c.status == 'faltou' %}secondary{% else %}primary{% endif %}">{{ c.status }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titulo %}Registro {{ prontuario.numero_prontuario }}{% endblock %}
+{% block titulo %}Anamnese - {{ prontuario.paciente_nome }}{% endblock %}
 {% block styles %}
 <link rel="stylesheet" href="/static/css/odontograma.css">
 <style>
@@ -90,16 +90,16 @@
 {% block conteudo %}
 <div class="prontuario-banner mb-4">
     <div class="d-flex align-items-center gap-3 flex-wrap mb-2">
-        <a href="/prontuarios" class="btn-voltar"><i class="bi bi-arrow-left"></i> Voltar</a>
+        <a href="/pacientes/{{ prontuario.paciente_usuario_id }}" class="btn-voltar"><i class="bi bi-arrow-left"></i> Voltar</a>
         <span class="opacity-25">|</span>
         <div class="d-flex align-items-center gap-2">
-            <i class="bi bi-folder-medical text-white-50" style="font-size:0.9rem;"></i>
-            <small class="text-white-50" style="font-size:0.78rem; font-weight:500; text-transform:uppercase; letter-spacing:0.05em;">Registro {{ prontuario.numero_prontuario or 'S/N' }}</small>
+            <i class="bi bi-journal-medical text-white-50" style="font-size:0.9rem;"></i>
+            <small class="text-white-50" style="font-size:0.78rem; font-weight:500; text-transform:uppercase; letter-spacing:0.05em;">Anamnese</small>
         </div>
         <span class="opacity-25">|</span>
         <div class="text-white" style="font-size:1.05rem;"><strong>{{ prontuario.paciente_nome }}</strong></div>
         {% if usuario.tipo in ['admin', 'recepcionista'] %}
-        <a href="/pacientes/{{ prontuario.paciente_usuario_id }}/editar" class="btn-voltar ms-auto">
+        <a href="/pacientes/{{ prontuario.paciente_usuario_id }}/editar" class="btn-voltar">
             <i class="bi bi-pencil-square"></i> Editar
         </a>
         {% endif %}

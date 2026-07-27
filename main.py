@@ -1632,6 +1632,42 @@ def criar_paciente(
     return RedirectResponse("/prontuarios", status_code=302)
 
 
+@app.get("/pacientes/{pac_id}", response_class=HTMLResponse)
+def ver_paciente(pac_id: int, request: Request, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "ver")
+    pac = db.fetch_one(
+        """SELECT u.*,
+                  (SELECT COUNT(*) FROM prontuarios pr WHERE pr.paciente_usuario_id = u.id AND pr.estabelecimento_id = %s) AS total_prontuarios
+           FROM usuarios u WHERE u.id = %s AND u.tipo = 'paciente'""",
+        (resolver_estabelecimento(request, usuario), pac_id),
+    )
+    if not pac:
+        raise HTTPException(status_code=404)
+
+    estab_id = resolver_estabelecimento(request, usuario)
+    prontuario = None
+    if estab_id:
+        prontuario = db.fetch_one(
+            "SELECT * FROM prontuarios WHERE paciente_usuario_id = %s AND estabelecimento_id = %s",
+            (pac_id, estab_id),
+        )
+
+    consultas_recentes = []
+    if estab_id:
+        consultas_recentes = db.fetch_all(
+            """SELECT c.*, u.nome AS profissional_nome FROM consultas c
+               JOIN usuarios u ON u.id = c.profissional_usuario_id
+               WHERE c.paciente_usuario_id = %s AND c.estabelecimento_id = %s
+               ORDER BY c.data_hora DESC LIMIT 5""",
+            (pac_id, estab_id),
+        )
+
+    return templates.TemplateResponse("pacientes/ver.html", {
+        "request": request, "usuario": usuario, "pac": pac,
+        "prontuario": prontuario, "consultas_recentes": consultas_recentes,
+    })
+
+
 @app.get("/pacientes/{pac_id}/editar", response_class=HTMLResponse)
 def editar_paciente(pac_id: int, request: Request, usuario=Depends(exigir_login)):
     exigir_permissao(usuario, "pacientes", "editar")
