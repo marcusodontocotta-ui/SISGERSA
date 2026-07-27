@@ -16,167 +16,23 @@
         <a href="/prontuarios" class="text-decoration-none">
             <i class="bi bi-arrow-left"></i> Voltar
         </a>
-        <h2 class="mt-2">
-            <i class="bi bi-folder-medical"></i>
-            Registro: {{ prontuario.numero_prontuario or 'S/N' }}
-        </h2>
+    </div>
+</div>
+
+<div class="card mb-4 border-primary">
+    <div class="card-body py-3">
+        <div class="d-flex align-items-center gap-4 flex-wrap">
+            <h4 class="mb-0"><i class="bi bi-folder-medical text-primary"></i> Registro: {{ prontuario.numero_prontuario or 'S/N' }}</h4>
+            <span class="text-muted">|</span>
+            <div><strong>Nome:</strong> {{ prontuario.paciente_nome }}</div>
+            <div><strong>Email:</strong> {{ prontuario.paciente_email or '-' }}</div>
+            <div><strong>Telefone:</strong> {{ prontuario.paciente_telefone or '-' }}</div>
+        </div>
     </div>
 </div>
 
 <div class="row">
-    <div class="col-md-4">
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5><i class="bi bi-person"></i> Dados do Prontuario</h5>
-            </div>
-            <div class="card-body">
-                <p><strong>Nome:</strong> {{ prontuario.paciente_nome }}</p>
-                <p><strong>Email:</strong> {{ prontuario.paciente_email or '-' }}</p>
-                <p><strong>Telefone:</strong> {{ prontuario.paciente_telefone or '-' }}</p>
-                <p><strong>Registro:</strong> <code>{{ prontuario.numero_prontuario }}</code></p>
-            </div>
-        </div>
-
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5><i class="bi bi-image"></i> Imagens</h5>
-            </div>
-            <div class="card-body">
-                {% if imagens %}
-                <div class="list-group list-group-flush">
-                    {% for img in imagens %}
-                    <div class="list-group-item">
-                        <i class="bi bi-file-earmark-image"></i>
-                        {{ img.descricao or img.tipo }}
-                        <small class="text-muted d-block">{{ img.data.strftime('%d/%m/%Y') if img.data else '' }}</small>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <p class="text-muted">Nenhuma imagem cadastrada.</p>
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5><i class="bi bi-calendar3"></i> Historico de Consultas</h5>
-            </div>
-            <div class="card-body p-0">
-                {% if consultas %}
-                <div class="list-group list-group-flush">
-                    {% for c in consultas %}
-                    <button type="button" class="list-group-item list-group-item-action btn-historico" data-consulta-id="{{ c.id }}" onclick="filtrarEvolucao({{ c.id }})" style="text-align:left;">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <strong>{{ c.data_hora.strftime('%d/%m/%Y %H:%M') if c.data_hora else '-' }}</strong>
-                                <br>
-                                <small class="text-muted">Dr(a). {{ c.profissional_nome }} &middot; {{ c.duracao_minutos }} min</small>
-                            </div>
-                            <div>
-                                {% if c.status == 'agendada' %}
-                                    <span class="badge bg-primary">Agendada</span>
-                                {% elif c.status == 'confirmada' %}
-                                    <span class="badge bg-info">Confirmada</span>
-                                {% elif c.status == 'em_andamento' %}
-                                    <span class="badge bg-warning text-dark">Em Andamento</span>
-                                {% elif c.status == 'concluida' %}
-                                    <span class="badge bg-success">Concluida</span>
-                                {% elif c.status == 'cancelada' %}
-                                    <span class="badge bg-danger">Cancelada</span>
-                                {% elif c.status == 'faltou' %}
-                                    <span class="badge bg-secondary">Faltou</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% if c.status == 'concluida' and c.evolucao_procedimento %}
-                        <small class="text-success"><i class="bi bi-check-circle"></i> Procedimento realizado: {{ c.evolucao_procedimento }}</small>
-                        {% elif c.procedimento_nome %}
-                        <small class="text-muted"><i class="bi bi-calendar2-check"></i> Procedimento planejado: {{ c.procedimento_nome }}</small>
-                        {% endif %}
-                    </button>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <p class="text-muted p-3">Nenhuma consulta registrada.</p>
-                {% endif %}
-            </div>
-        </div>
-
-        {% if orcamentos_paciente %}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5><i class="bi bi-calculator"></i> Orcamentos</h5>
-            </div>
-            <div class="card-body p-0">
-                <div class="list-group list-group-flush">
-                    {% for orc in orcamentos_paciente %}
-                    <div class="list-group-item">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <a href="/orcamentos/{{ orc.id }}" class="fw-bold text-decoration-none">
-                                    Orcamento #{{ orc.id }}
-                                </a>
-                                <br>
-                                <small class="text-muted">R$ {{ '%.2f'|format(orc.valor_total|float) }}</small>
-                            </div>
-                            <div>
-                                {% if orc.status == 'aprovado' %}
-                                    <span class="badge bg-success">Aprovado</span>
-                                {% elif orc.status == 'enviado' %}
-                                    <span class="badge bg-info">Enviado</span>
-                                {% elif orc.status == 'rascunho' %}
-                                    <span class="badge bg-secondary">Rascunho</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">{{ orc.status }}</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% if orc.itens %}
-                        <div class="mt-2">
-                            {% if orc.total_itens > 0 %}
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <small class="text-muted">Itens realizados:</small>
-                                <small class="fw-bold {% if orc.realizados == orc.total_itens %}text-success{% elif orc.realizados > 0 %}text-warning{% else %}text-muted{% endif %}">
-                                    {{ orc.realizados }}/{{ orc.total_itens }}
-                                </small>
-                            </div>
-                            {% set pct = (orc.realizados / orc.total_itens * 100)|int if orc.total_itens > 0 else 0 %}
-                            <div class="progress mb-2" style="height:6px;">
-                                <div class="progress-bar {% if orc.realizados == orc.total_itens %}bg-success{% elif orc.realizados > 0 %}bg-warning{% else %}bg-secondary{% endif %}"
-                                     style="width:{{ pct }}%"></div>
-                            </div>
-                            {% endif %}
-                            <ul class="list-unstyled mb-0 ms-2">
-                                {% for item in orc.itens %}
-                                <li class="small">
-                                    <i class="bi bi-circle-fill" style="font-size:0.3rem; vertical-align:middle;"></i>
-                                    {{ item.descricao }}
-                                    {% set ns2 = namespace(item_realizado=false) %}
-                                    {% for t in tratamentos_realizados %}
-                                        {% if t.procedimento_id == item.procedimento_id and item.procedimento_id is not none %}
-                                            {% set ns2.item_realizado = true %}
-                                        {% endif %}
-                                    {% endfor %}
-                                    {% if ns2.item_realizado %}
-                                        <span class="badge bg-success ms-1" style="font-size:0.6rem;">
-                                            <i class="bi bi-check-lg"></i> Realizado
-                                        </span>
-                                    {% endif %}
-                                </li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
-    </div>
-
-    <div class="col-md-8">
+    <div class="col-md-6">
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-journal-text"></i> Evolucao Clinica</h5>
@@ -315,6 +171,53 @@
         </div>
 
         <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="bi bi-calendar3"></i> Historico de Consultas</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if consultas %}
+                <div class="list-group list-group-flush">
+                    {% for c in consultas %}
+                    <button type="button" class="list-group-item list-group-item-action btn-historico" data-consulta-id="{{ c.id }}" onclick="filtrarEvolucao({{ c.id }})" style="text-align:left;">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>{{ c.data_hora.strftime('%d/%m/%Y %H:%M') if c.data_hora else '-' }}</strong>
+                                <br>
+                                <small class="text-muted">Dr(a). {{ c.profissional_nome }} &middot; {{ c.duracao_minutos }} min</small>
+                            </div>
+                            <div>
+                                {% if c.status == 'agendada' %}
+                                    <span class="badge bg-primary">Agendada</span>
+                                {% elif c.status == 'confirmada' %}
+                                    <span class="badge bg-info">Confirmada</span>
+                                {% elif c.status == 'em_andamento' %}
+                                    <span class="badge bg-warning text-dark">Em Andamento</span>
+                                {% elif c.status == 'concluida' %}
+                                    <span class="badge bg-success">Concluida</span>
+                                {% elif c.status == 'cancelada' %}
+                                    <span class="badge bg-danger">Cancelada</span>
+                                {% elif c.status == 'faltou' %}
+                                    <span class="badge bg-secondary">Faltou</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if c.status == 'concluida' and c.evolucao_procedimento %}
+                        <small class="text-success"><i class="bi bi-check-circle"></i> Procedimento realizado: {{ c.evolucao_procedimento }}</small>
+                        {% elif c.procedimento_nome %}
+                        <small class="text-muted"><i class="bi bi-calendar2-check"></i> Procedimento planejado: {{ c.procedimento_nome }}</small>
+                        {% endif %}
+                    </button>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted p-3">Nenhuma consulta registrada.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-emoji-smile"></i> Odontograma</h5>
                 {% if usuario.tipo in ['admin', 'profissional'] %}
@@ -360,6 +263,99 @@
                 </div>
             </div>
         </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="bi bi-image"></i> Imagens</h5>
+            </div>
+            <div class="card-body">
+                {% if imagens %}
+                <div class="list-group list-group-flush">
+                    {% for img in imagens %}
+                    <div class="list-group-item">
+                        <i class="bi bi-file-earmark-image"></i>
+                        {{ img.descricao or img.tipo }}
+                        <small class="text-muted d-block">{{ img.data.strftime('%d/%m/%Y') if img.data else '' }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted">Nenhuma imagem cadastrada.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if orcamentos_paciente %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="bi bi-calculator"></i> Orcamentos</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for orc in orcamentos_paciente %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <a href="/orcamentos/{{ orc.id }}" class="fw-bold text-decoration-none">
+                                    Orcamento #{{ orc.id }}
+                                </a>
+                                <br>
+                                <small class="text-muted">R$ {{ '%.2f'|format(orc.valor_total|float) }}</small>
+                            </div>
+                            <div>
+                                {% if orc.status == 'aprovado' %}
+                                    <span class="badge bg-success">Aprovado</span>
+                                {% elif orc.status == 'enviado' %}
+                                    <span class="badge bg-info">Enviado</span>
+                                {% elif orc.status == 'rascunho' %}
+                                    <span class="badge bg-secondary">Rascunho</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ orc.status }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if orc.itens %}
+                        <div class="mt-2">
+                            {% if orc.total_itens > 0 %}
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <small class="text-muted">Itens realizados:</small>
+                                <small class="fw-bold {% if orc.realizados == orc.total_itens %}text-success{% elif orc.realizados > 0 %}text-warning{% else %}text-muted{% endif %}">
+                                    {{ orc.realizados }}/{{ orc.total_itens }}
+                                </small>
+                            </div>
+                            {% set pct = (orc.realizados / orc.total_itens * 100)|int if orc.total_itens > 0 else 0 %}
+                            <div class="progress mb-2" style="height:6px;">
+                                <div class="progress-bar {% if orc.realizados == orc.total_itens %}bg-success{% elif orc.realizados > 0 %}bg-warning{% else %}bg-secondary{% endif %}"
+                                     style="width:{{ pct }}%"></div>
+                            </div>
+                            {% endif %}
+                            <ul class="list-unstyled mb-0 ms-2">
+                                {% for item in orc.itens %}
+                                <li class="small">
+                                    <i class="bi bi-circle-fill" style="font-size:0.3rem; vertical-align:middle;"></i>
+                                    {{ item.descricao }}
+                                    {% set ns2 = namespace(item_realizado=false) %}
+                                    {% for t in tratamentos_realizados %}
+                                        {% if t.procedimento_id == item.procedimento_id and item.procedimento_id is not none %}
+                                            {% set ns2.item_realizado = true %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if ns2.item_realizado %}
+                                        <span class="badge bg-success ms-1" style="font-size:0.6rem;">
+                                            <i class="bi bi-check-lg"></i> Realizado
+                                        </span>
+                                    {% endif %}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 
