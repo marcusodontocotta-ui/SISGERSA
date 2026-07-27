@@ -138,11 +138,9 @@ def resolver_estabelecimento(request: Request, usuario: dict, estab_id_form: str
         ativo = db.fetch_one("SELECT id FROM estabelecimentos WHERE id = %s AND ativo = TRUE", (estab_id,))
         if not ativo:
             estab_id = None
-    if not estab_id and usuario["tipo"] == "admin":
+    if not estab_id and usuario["tipo"] == "admin" and not usuario.get("is_super"):
         todos = db.fetch_all("SELECT id FROM estabelecimentos WHERE ativo = TRUE")
         if len(todos) == 1:
-            estab_id = str(todos[0]["id"])
-        elif len(todos) > 1 and not estab_id_form:
             estab_id = str(todos[0]["id"])
     return estab_id
 
