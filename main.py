@@ -363,7 +363,7 @@ def _login_usuario(request: Request, usuario: dict):
     token = criar_token(usuario["id"], usuario["tipo"], bool(usuario.get("is_super", False)))
 
     estabelecimentos = []
-    if usuario["tipo"] in ("profissional", "recepcionista"):
+    if usuario["tipo"] in ("admin", "profissional", "recepcionista"):
         estabelecimentos = obter_estabelecimentos_usuario(usuario["id"])
 
     cookie_kwargs = dict(httponly=True, max_age=172800, samesite="lax")
