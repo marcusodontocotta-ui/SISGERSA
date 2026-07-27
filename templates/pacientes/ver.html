@@ -25,6 +25,37 @@
         color: #1a5276;
         border-color: rgba(255,255,255,0.6);
     }
+    .nav-tabs-paciente {
+        border-bottom: 2px solid #dee2e6;
+        background: #f8f9fa;
+        border-radius: 0.5rem 0.5rem 0 0;
+        padding: 0.5rem 0.5rem 0 0.5rem;
+    }
+    .nav-tabs-paciente .nav-link {
+        color: #495057;
+        font-size: 0.88rem;
+        font-weight: 500;
+        padding: 0.5rem 1.2rem;
+        border: none;
+        border-radius: 0.4rem 0.4rem 0 0;
+        transition: all 0.2s ease;
+    }
+    .nav-tabs-paciente .nav-link:hover {
+        color: #1a5276;
+        background: rgba(26,82,118,0.08);
+    }
+    .nav-tabs-paciente .nav-link.active {
+        color: #1a5276;
+        font-weight: 600;
+        background: #fff;
+        border-bottom: 2px solid #1a5276;
+    }
+    .tab-content-paciente {
+        background: #fff;
+        border-radius: 0 0 0.5rem 0.5rem;
+        padding: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
     .card-header.secao {
         background: linear-gradient(135deg, #1a3c5e 0%, #244f76 100%);
         border-left: 4px solid #5dade2;
@@ -35,19 +66,12 @@
     .info-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: #6c757d; margin-bottom: 2px; }
     .info-value { font-weight: 600; font-size: 0.92rem; color: #2c3e50; }
     .info-value.muted { color: #adb5bd; }
+    .tab-iframe { width: 100%; min-height: 70vh; border: none; }
 </style>
 
-<div class="prontuario-banner mb-4">
-    <div class="d-flex align-items-center gap-3 flex-wrap mb-2">
+<div class="prontuario-banner mb-3">
+    <div class="d-flex align-items-center gap-3 flex-wrap mb-0">
         <a href="/prontuarios"><i class="bi bi-arrow-left"></i> Voltar</a>
-        <span class="opacity-25">|</span>
-        {% if prontuario %}
-        <a href="/prontuarios/{{ prontuario.id }}"><i class="bi bi-journal-medical"></i> Anamnese</a>
-        <span class="opacity-25">|</span>
-        {% endif %}
-        <a href="/orcamentos?paciente_id={{ pac.id }}"><i class="bi bi-receipt"></i> Orcamentos</a>
-        <span class="opacity-25">|</span>
-        <a href="/financeiro?paciente_id={{ pac.id }}"><i class="bi bi-cash-stack"></i> Historico</a>
         <span class="opacity-25">|</span>
         <div class="text-white" style="font-size:1.05rem;"><strong>{{ pac.nome }}</strong></div>
         <div class="d-flex gap-2" style="margin-left:auto;">
@@ -58,8 +82,37 @@
     </div>
 </div>
 
-<div class="row g-3">
+<ul class="nav nav-tabs-paciente mb-0" id="tabsPaciente" role="tablist">
+    <li class="nav-item">
+        <a class="nav-link {% if tab == 'prontuario' or not tab %}active{% endif %}"
+           href="?tab=prontuario" role="tab">
+            <i class="bi bi-person"></i> Prontuario
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if tab == 'anamnese' %}active{% endif %}"
+           href="?tab=anamnese" role="tab">
+            <i class="bi bi-journal-medical"></i> Anamnese
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if tab == 'orcamentos' %}active{% endif %}"
+           href="?tab=orcamentos" role="tab">
+            <i class="bi bi-receipt"></i> Orcamentos
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if tab == 'historico' %}active{% endif %}"
+           href="?tab=historico" role="tab">
+            <i class="bi bi-cash-stack"></i> Historico
+        </a>
+    </li>
+</ul>
 
+<div class="tab-content-paciente">
+
+{% if not tab or tab == 'prontuario' %}
+<div class="row g-3">
     <div class="col-md-6">
         <div class="card mb-3 h-100">
             <div class="card-header secao"><h5><i class="bi bi-person"></i> Dados Pessoais</h5></div>
@@ -152,7 +205,7 @@
 
     <div class="col-md-6">
         <div class="card mb-3 h-100">
-            <div class="card-header secao"><h5><i class="bi bi-people"></i> Filiação</h5></div>
+            <div class="card-header secao"><h5><i class="bi bi-people"></i> Filiacao</h5></div>
             <div class="card-body">
                 <div class="row g-3">
                     <div class="col-sm-6">
@@ -212,6 +265,42 @@
             </div>
         </div>
     </div>
+</div>
+
+{% elif tab == 'anamnese' %}
+    {% if prontuario %}
+    <iframe src="/prontuarios/{{ prontuario.id }}" class="tab-iframe" id="iframeAnamnese"></iframe>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+        <i class="bi bi-journal-x fs-1"></i>
+        <p class="mt-2">Nenhum prontuario encontrado para este paciente neste estabelecimento.</p>
+    </div>
+    {% endif %}
+
+{% elif tab == 'orcamentos' %}
+    <iframe src="/orcamentos?paciente_id={{ pac.id }}" class="tab-iframe" id="iframeOrcamentos"></iframe>
+
+{% elif tab == 'historico' %}
+    <iframe src="/financeiro?paciente_id={{ pac.id }}" class="tab-iframe" id="iframeHistorico"></iframe>
+
+{% endif %}
 
 </div>
+
+{% if tab in ['anamnese', 'orcamentos', 'historico'] %}
+<script>
+function autoResizeIframe(iframe) {
+    try {
+        var body = iframe.contentDocument.body;
+        if (body) {
+            iframe.style.height = (body.scrollHeight + 40) + 'px';
+        }
+    } catch(e) {}
+}
+document.querySelectorAll('.tab-iframe').forEach(function(iframe) {
+    iframe.addEventListener('load', function() { autoResizeIframe(this); });
+    setInterval(function() { autoResizeIframe(iframe); }, 2000);
+});
+</script>
+{% endif %}
 {% endblock %}

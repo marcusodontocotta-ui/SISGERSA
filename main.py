@@ -1654,7 +1654,7 @@ def criar_paciente(
 
 
 @app.get("/pacientes/{pac_id}", response_class=HTMLResponse)
-def ver_paciente(pac_id: int, request: Request, usuario=Depends(exigir_login)):
+def ver_paciente(pac_id: int, request: Request, usuario=Depends(exigir_login), tab: str = Query(None)):
     exigir_permissao(usuario, "prontuarios", "ver")
     pac = db.fetch_one(
         """SELECT u.*,
@@ -1694,7 +1694,7 @@ def ver_paciente(pac_id: int, request: Request, usuario=Depends(exigir_login)):
     return templates.TemplateResponse("pacientes/ver.html", {
         "request": request, "usuario": usuario, "pac": pac,
         "prontuario": prontuario, "consultas_recentes": consultas_recentes,
-        "cpf_fmt": cpf_fmt,
+        "cpf_fmt": cpf_fmt, "tab": tab or "prontuario",
     })
 
 
