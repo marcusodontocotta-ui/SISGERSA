@@ -89,7 +89,7 @@
 {% endblock %}
 {% block conteudo %}
 <div class="prontuario-banner mb-4">
-    <div class="d-flex align-items-center gap-3 flex-wrap">
+    <div class="d-flex align-items-center gap-3 flex-wrap mb-2">
         <a href="/prontuarios" class="btn-voltar"><i class="bi bi-arrow-left"></i> Voltar</a>
         <span class="opacity-25">|</span>
         <div class="d-flex align-items-center gap-2">
@@ -98,14 +98,36 @@
         </div>
         <span class="opacity-25">|</span>
         <div class="text-white" style="font-size:1.05rem;"><strong>{{ prontuario.paciente_nome }}</strong></div>
-        <div class="text-white-70" style="font-size:0.92rem;"><i class="bi bi-envelope me-1 opacity-75"></i>{{ prontuario.paciente_email or '-' }}</div>
-        <div class="text-white-70" style="font-size:0.92rem;"><i class="bi bi-telephone me-1 opacity-75"></i>{{ prontuario.paciente_telefone or '-' }}</div>
         {% if usuario.tipo in ['admin', 'recepcionista'] %}
         <a href="/pacientes/{{ prontuario.paciente_usuario_id }}/editar" class="btn-voltar ms-auto">
             <i class="bi bi-pencil-square"></i> Editar
         </a>
         {% endif %}
     </div>
+    <div class="row" style="font-size:0.85rem;">
+        <div class="col-auto"><i class="bi bi-envelope me-1 opacity-75"></i>{{ prontuario.paciente_email or '-' }}</div>
+        <div class="col-auto"><i class="bi bi-telephone me-1 opacity-75"></i>{{ prontuario.paciente_telefone or '-' }}</div>
+        {% if prontuario.paciente_cpf %}
+        <div class="col-auto"><i class="bi bi-person-vcard me-1 opacity-75"></i>CPF: {{ prontuario.paciente_cpf }}</div>
+        {% endif %}
+        {% if prontuario.paciente_nascimento %}
+        <div class="col-auto"><i class="bi bi-calendar-event me-1 opacity-75"></i>{{ prontuario.paciente_nascimento.strftime('%d/%m/%Y') }}</div>
+        {% endif %}
+        {% if prontuario.paciente_estado_civil %}
+        <div class="col-auto"><i class="bi bi-heart me-1 opacity-75"></i>{{ prontuario.paciente_estado_civil }}</div>
+        {% endif %}
+        {% if prontuario.paciente_profissao %}
+        <div class="col-auto"><i class="bi bi-briefcase me-1 opacity-75"></i>{{ prontuario.paciente_profissao }}</div>
+        {% endif %}
+    </div>
+    {% if prontuario.paciente_logradouro or prontuario.paciente_cidade %}
+    <div class="mt-1" style="font-size:0.82rem;">
+        <i class="bi bi-geo-alt me-1 opacity-75"></i>
+        {{ [prontuario.paciente_logradouro, prontuario.paciente_numero, prontuario.paciente_complemento, prontuario.paciente_bairro] | select | join(', ') }}
+        {% if prontuario.paciente_cidade %} - {{ prontuario.paciente_cidade }}{% endif %}{% if prontuario.paciente_estado %}/{{ prontuario.paciente_estado }}{% endif %}
+        {% if prontuario.paciente_cep %} - CEP: {{ prontuario.paciente_cep }}{% endif %}
+    </div>
+    {% endif %}
 </div>
 
 <div class="row">

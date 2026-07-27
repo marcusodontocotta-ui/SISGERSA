@@ -2210,7 +2210,16 @@ def listar_prontuarios(request: Request, usuario=Depends(exigir_login), paciente
 def ver_prontuario(prontuario_id: int, request: Request, usuario=Depends(exigir_login)):
     exigir_permissao(usuario, "prontuarios", "ver")
     prontuario = db.fetch_one(
-        """SELECT p.*, u.nome AS paciente_nome, u.email AS paciente_email, u.telefone AS paciente_telefone
+        """SELECT p.*,
+                  u.nome AS paciente_nome, u.email AS paciente_email, u.telefone AS paciente_telefone,
+                  u.cpf AS paciente_cpf, u.data_nascimento AS paciente_nascimento,
+                  u.logradouro AS paciente_logradouro, u.numero AS paciente_numero,
+                  u.complemento AS paciente_complemento, u.bairro AS paciente_bairro,
+                  u.cidade AS paciente_cidade, u.estado AS paciente_estado, u.cep AS paciente_cep,
+                  u.estado_civil AS paciente_estado_civil, u.profissao AS paciente_profissao,
+                  u.codigo_paciente AS paciente_codigo, u.numero_documentacao AS paciente_num_doc,
+                  u.indicacao AS paciente_indicacao, u.nome_pai AS paciente_nome_pai,
+                  u.nome_mae AS paciente_nome_mae
            FROM prontuarios p
            JOIN usuarios u ON u.id = p.paciente_usuario_id
            WHERE p.id = %s""",
