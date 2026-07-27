@@ -53,6 +53,26 @@ templates = Jinja2Templates(directory="templates")
 templates.env.globals["MODULOS_INFO"] = MODULOS
 templates.env.globals["pode_acessar"] = pode_acessar
 
+def format_cpf(value):
+    if not value:
+        return None
+    digits = "".join(c for c in str(value) if c.isdigit())
+    if len(digits) == 11:
+        return f"{digits[:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:]}"
+    return str(value)
+templates.env.filters["format_cpf"] = format_cpf
+
+def format_phone(value):
+    if not value:
+        return None
+    digits = "".join(c for c in str(value) if c.isdigit())
+    if len(digits) == 11:
+        return f"({digits[:2]}) {digits[2:7]}-{digits[7:]}"
+    if len(digits) == 10:
+        return f"({digits[:2]}) {digits[2:6]}-{digits[6:]}"
+    return str(value)
+templates.env.filters["format_phone"] = format_phone
+
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -1574,6 +1594,7 @@ def criar_paciente(
     senha: str = Form(...),
     foto_url: str = Form(None),
     estabelecimento_id: str = Form(None),
+    tipo_pagamento: str = Form(None),
     usuario=Depends(exigir_login),
 ):
     exigir_permissao(usuario, "pacientes", "criar")
@@ -1596,10 +1617,10 @@ def criar_paciente(
     db.execute(
         """UPDATE usuarios SET cpf = %s, data_nascimento = %s, endereco = %s,
            logradouro = %s, numero = %s, complemento = %s, bairro = %s,
-           cidade = %s, estado = %s, cep = %s WHERE id = %s""",
+           cidade = %s, estado = %s, cep = %s, tipo_pagamento = %s WHERE id = %s""",
         (cpf or None, data_nascimento or None, endereco or None,
          logradouro or None, numero or None, complemento or None, bairro or None,
-         cidade or None, estado or None, cep or None, user_id),
+         cidade or None, estado or None, cep or None, tipo_pagamento or 'particular', user_id),
     )
     if foto_url:
         db.execute("UPDATE usuarios SET foto_url = %s WHERE id = %s", (foto_url, user_id))
@@ -1662,9 +1683,18 @@ def ver_paciente(pac_id: int, request: Request, usuario=Depends(exigir_login)):
             (pac_id, estab_id),
         )
 
+    cpf_fmt = None
+    if pac and pac["cpf"]:
+        cpf_raw = "".join(c for c in str(pac["cpf"]) if c.isdigit())
+        if len(cpf_raw) == 11:
+            cpf_fmt = f"{cpf_raw[:3]}.{cpf_raw[3:6]}.{cpf_raw[6:9]}-{cpf_raw[9:]}"
+        else:
+            cpf_fmt = pac["cpf"]
+
     return templates.TemplateResponse("pacientes/ver.html", {
         "request": request, "usuario": usuario, "pac": pac,
         "prontuario": prontuario, "consultas_recentes": consultas_recentes,
+        "cpf_fmt": cpf_fmt,
     })
 
 
@@ -1710,6 +1740,7 @@ def salvar_paciente(
     profissao: str = Form(None),
     nome_pai: str = Form(None),
     nome_mae: str = Form(None),
+    tipo_pagamento: str = Form(None),
     usuario=Depends(exigir_login),
 ):
     if usuario["tipo"] not in ("admin", "recepcionista"):
@@ -1719,13 +1750,15 @@ def salvar_paciente(
                      endereco = %s, logradouro = %s, numero = %s, complemento = %s,
                      bairro = %s, cidade = %s, estado = %s, cep = %s,
                      foto_url = %s, codigo_paciente = %s, numero_documentacao = %s,
-                     indicacao = %s, estado_civil = %s, profissao = %s, nome_pai = %s, nome_mae = %s"""
+                     indicacao = %s, estado_civil = %s, profissao = %s, nome_pai = %s, nome_mae = %s,
+                     tipo_pagamento = %s"""
     base_params = (
         nome, email, telefone, cpf or None, data_nascimento or None,
         endereco or None, logradouro or None, numero or None, complemento or None,
         bairro or None, cidade or None, estado or None, cep or None,
         foto_url, codigo_paciente or None, numero_documentacao or None,
         indicacao or None, estado_civil or None, profissao or None, nome_pai or None, nome_mae or None,
+        tipo_pagamento or 'particular',
     )
 
     if senha and senha.strip():
@@ -2406,6 +2439,7 @@ def criar_prontuario(
     novo_paciente_cpf: str = Form(None),
     novo_paciente_telefone: str = Form(None),
     novo_paciente_nascimento: str = Form(None),
+    novo_paciente_tipo_pagamento: str = Form(None),
     usuario=Depends(exigir_login),
 ):
     exigir_permissao(usuario, "prontuarios", "criar")
@@ -2428,8 +2462,8 @@ def criar_prontuario(
             paciente_id_int = existente["id"]
         else:
             db.execute(
-                "INSERT INTO usuarios (nome, email, telefone, cpf, data_nascimento, senha_hash, tipo, ativo) VALUES (%s, %s, %s, %s, %s, %s, 'paciente', TRUE)",
-                (novo_paciente_nome.strip(), novo_email, novo_paciente_telefone or None, novo_paciente_cpf or None, novo_paciente_nascimento or None, senha_hash),
+                "INSERT INTO usuarios (nome, email, telefone, cpf, data_nascimento, senha_hash, tipo, tipo_pagamento, ativo) VALUES (%s, %s, %s, %s, %s, %s, 'paciente', %s, TRUE)",
+                (novo_paciente_nome.strip(), novo_email, novo_paciente_telefone or None, novo_paciente_cpf or None, novo_paciente_nascimento or None, senha_hash, novo_paciente_tipo_pagamento or 'particular'),
             )
             paciente_id_int = db.fetch_one("SELECT id FROM usuarios WHERE email = %s AND tipo = 'paciente'", (novo_email,))["id"]
             vincular_paciente(paciente_id_int, estab_id)

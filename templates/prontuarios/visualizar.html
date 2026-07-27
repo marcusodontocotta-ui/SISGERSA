@@ -106,9 +106,9 @@
     </div>
     <div class="row" style="font-size:0.85rem;">
         <div class="col-auto"><i class="bi bi-envelope me-1 opacity-75"></i>{{ prontuario.paciente_email or '-' }}</div>
-        <div class="col-auto"><i class="bi bi-telephone me-1 opacity-75"></i>{{ prontuario.paciente_telefone or '-' }}</div>
+        <div class="col-auto"><i class="bi bi-telephone me-1 opacity-75"></i>{{ prontuario.paciente_telefone|format_phone or '-' }}</div>
         {% if prontuario.paciente_cpf %}
-        <div class="col-auto"><i class="bi bi-person-vcard me-1 opacity-75"></i>CPF: {{ prontuario.paciente_cpf }}</div>
+        <div class="col-auto"><i class="bi bi-person-vcard me-1 opacity-75"></i>CPF: {{ prontuario.paciente_cpf|format_cpf }}</div>
         {% endif %}
         {% if prontuario.paciente_nascimento %}
         <div class="col-auto"><i class="bi bi-calendar-event me-1 opacity-75"></i>{{ prontuario.paciente_nascimento.strftime('%d/%m/%Y') }}</div>

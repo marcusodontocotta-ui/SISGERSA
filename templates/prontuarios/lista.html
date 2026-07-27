@@ -73,9 +73,9 @@
                     <tr data-paciente="{{ p.paciente_nome|lower }}" data-cpf="{{ (p.paciente_cpf or '')|lower }}" data-email="{{ (p.paciente_email or '')|lower }}" data-telefone="{{ (p.paciente_telefone or '')|lower }}" style="cursor:pointer;" onclick="window.location='/pacientes/{{ p.paciente_usuario_id }}'">
                         <td><code>{{ p.numero_prontuario or 'S/N' }}</code></td>
                         <td>{{ p.paciente_nome }}</td>
-                        <td>{{ p.paciente_cpf or '-' }}</td>
+                        <td>{{ p.paciente_cpf|format_cpf or '-' }}</td>
                         <td>{{ p.paciente_email or '-' }}</td>
-                        <td>{{ p.paciente_telefone or '-' }}</td>
+                        <td>{{ p.paciente_telefone|format_phone or '-' }}</td>
                         <td>{{ p.criado_em.strftime('%d/%m/%Y') if p.criado_em else '-' }}</td>
                         <td class="text-muted"><i class="bi bi-chevron-right"></i></td>
                     </tr>
@@ -145,6 +145,13 @@
                     <div class="mb-3">
                         <label class="form-label">Data de Nascimento</label>
                         <input type="date" class="form-control" name="novo_paciente_nascimento">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Pagamento</label>
+                        <select class="form-select" name="novo_paciente_tipo_pagamento">
+                            <option value="particular">Particular</option>
+                            <option value="convenio">Convenio</option>
+                        </select>
                     </div>
 
                     <div class="mb-3">

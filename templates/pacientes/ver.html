@@ -1,123 +1,198 @@
 {% extends "base.html" %}
 {% block titulo %}Prontuario - {{ pac.nome }}{% endblock %}
 {% block conteudo %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="prontuario-banner mb-4" style="background:linear-gradient(135deg,#1a5276 0%,#2e86c1 50%,#3498db 100%);border-radius:0.5rem;padding:0.9rem 1.25rem;color:#fff;box-shadow:0 4px 15px rgba(30,80,130,0.3);">
-            <div class="d-flex align-items-center gap-3 flex-wrap mb-2">
-                <a href="/prontuarios" class="btn-voltar" style="color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.1);font-size:0.82rem;padding:4px 12px;border-radius:6px;text-decoration:none;"><i class="bi bi-arrow-left"></i> Voltar</a>
-                <span class="opacity-25">|</span>
-                {% if prontuario %}
-                <a href="/prontuarios/{{ prontuario.id }}" style="color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.1);font-size:0.82rem;padding:4px 12px;border-radius:6px;text-decoration:none;">
-                    <i class="bi bi-journal-medical"></i> Anamnese
-                </a>
-                <span class="opacity-25">|</span>
-                {% endif %}
-                <div class="text-white" style="font-size:1.05rem;"><strong>{{ pac.nome }}</strong></div>
-                {% if usuario.tipo in ['admin', 'recepcionista'] %}
-                <a href="/pacientes/{{ pac.id }}/editar" style="color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.1);font-size:0.82rem;padding:4px 12px;border-radius:6px;text-decoration:none;margin-left:auto;">
-                    <i class="bi bi-pencil-square"></i> Editar
-                </a>
-                {% endif %}
-            </div>
-        </div>
+<style>
+    .prontuario-banner {
+        background: linear-gradient(135deg, #1a5276 0%, #2e86c1 50%, #3498db 100%);
+        border-radius: 0.5rem;
+        padding: 0.9rem 1.25rem;
+        box-shadow: 0 4px 15px rgba(30,80,130,0.3);
+        color: #fff;
+    }
+    .prontuario-banner a {
+        color: rgba(255,255,255,0.7);
+        border: 1px solid rgba(255,255,255,0.25);
+        background: rgba(255,255,255,0.1);
+        font-size: 0.82rem;
+        padding: 4px 12px;
+        border-radius: 6px;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+    }
+    .prontuario-banner a:hover {
+        background: rgba(255,255,255,0.95);
+        color: #1a5276;
+        border-color: rgba(255,255,255,0.6);
+    }
+    .card-header.secao {
+        background: linear-gradient(135deg, #1a3c5e 0%, #244f76 100%);
+        border-left: 4px solid #5dade2;
+        color: #fff;
+    }
+    .card-header.secao h5 { font-size: 0.92rem; font-weight: 600; margin: 0; color: #fff; }
+    .card-header.secao i { opacity: 0.85; }
+    .info-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: #6c757d; margin-bottom: 2px; }
+    .info-value { font-weight: 600; font-size: 0.92rem; color: #2c3e50; }
+    .info-value.muted { color: #adb5bd; }
+</style>
 
-        <div class="card mb-4">
-            <div class="card-header" style="background:linear-gradient(135deg,#1a3c5e 0%,#244f76 100%);color:#fff;border-left:4px solid #5dade2;">
-                <h5 class="mb-0"><i class="bi bi-person"></i> Dados Cadastrais</h5>
-            </div>
+<div class="prontuario-banner mb-4">
+    <div class="d-flex align-items-center gap-3 flex-wrap mb-2">
+        <a href="/prontuarios"><i class="bi bi-arrow-left"></i> Voltar</a>
+        <span class="opacity-25">|</span>
+        {% if prontuario %}
+        <a href="/prontuarios/{{ prontuario.id }}"><i class="bi bi-journal-medical"></i> Anamnese</a>
+        <span class="opacity-25">|</span>
+        {% endif %}
+        <div class="text-white" style="font-size:1.05rem;"><strong>{{ pac.nome }}</strong></div>
+        <div class="d-flex gap-2" style="margin-left:auto;">
+            {% if usuario.tipo in ['admin', 'recepcionista'] %}
+            <a href="/pacientes/{{ pac.id }}/editar"><i class="bi bi-pencil-square"></i> Editar</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+
+    <div class="col-md-6">
+        <div class="card mb-3 h-100">
+            <div class="card-header secao"><h5><i class="bi bi-person"></i> Dados Pessoais</h5></div>
             <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label text-muted small">Nome Completo</label>
-                        <div class="fw-semibold">{{ pac.nome }}</div>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <div class="info-label">Nome Completo</div>
+                        <div class="info-value">{{ pac.nome }}</div>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label text-muted small">Email</label>
-                        <div class="fw-semibold">{{ pac.email }}</div>
+                    <div class="col-sm-6">
+                        <div class="info-label">CPF</div>
+                        <div class="info-value {{ 'muted' if not pac.cpf }}">{{ cpf_fmt or '-' }}</div>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label text-muted small">Telefone</label>
-                        <div class="fw-semibold">{{ pac.telefone or '-' }}</div>
+                    <div class="col-sm-6">
+                        <div class="info-label">Data de Nascimento</div>
+                        <div class="info-value {{ 'muted' if not pac.data_nascimento }}">{{ pac.data_nascimento.strftime('%d/%m/%Y') if pac.data_nascimento else '-' }}</div>
                     </div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-3">
-                        <label class="form-label text-muted small">CPF</label>
-                        <div class="fw-semibold">{{ pac.cpf or '-' }}</div>
+                    <div class="col-sm-6">
+                        <div class="info-label">Estado Civil</div>
+                        <div class="info-value {{ 'muted' if not pac.estado_civil }}">{{ pac.estado_civil or '-' }}</div>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label text-muted small">Data de Nascimento</label>
-                        <div class="fw-semibold">{{ pac.data_nascimento.strftime('%d/%m/%Y') if pac.data_nascimento else '-' }}</div>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label text-muted small">Estado Civil</label>
-                        <div class="fw-semibold">{{ pac.estado_civil or '-' }}</div>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label text-muted small">Profissao</label>
-                        <div class="fw-semibold">{{ pac.profissao or '-' }}</div>
-                    </div>
-                </div>
-                {% if pac.logradouro or pac.cidade %}
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label text-muted small">CEP</label>
-                        <div class="fw-semibold">{{ pac.cep or '-' }}</div>
-                    </div>
-                    <div class="col-md-5">
-                        <label class="form-label text-muted small">Logradouro</label>
-                        <div class="fw-semibold">{{ pac.logradouro or '-' }}{% if pac.numero %}, {{ pac.numero }}{% endif %}{% if pac.complemento %} - {{ pac.complemento }}{% endif %}</div>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label text-muted small">Bairro</label>
-                        <div class="fw-semibold">{{ pac.bairro or '-' }}</div>
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label text-muted small">Cidade</label>
-                        <div class="fw-semibold">{{ pac.cidade or '-' }}</div>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label text-muted small">UF</label>
-                        <div class="fw-semibold">{{ pac.estado or '-' }}</div>
-                    </div>
-                </div>
-                {% endif %}
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label text-muted small">Codigo do Paciente</label>
-                        <div class="fw-semibold">{{ pac.codigo_paciente or '-' }}</div>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label text-muted small">Indicacao</label>
-                        <div class="fw-semibold">{{ pac.indicacao or '-' }}</div>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label text-muted small">N. Documentacao</label>
-                        <div class="fw-semibold">{{ pac.numero_documentacao or '-' }}</div>
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label text-muted small">Nome do Pai</label>
-                        <div class="fw-semibold">{{ pac.nome_pai or '-' }}</div>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label text-muted small">Nome da Mae</label>
-                        <div class="fw-semibold">{{ pac.nome_mae or '-' }}</div>
+                    <div class="col-sm-6">
+                        <div class="info-label">Profissao</div>
+                        <div class="info-value {{ 'muted' if not pac.profissao }}">{{ pac.profissao or '-' }}</div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        {% if consultas_recentes %}
-        <div class="card mb-4">
-            <div class="card-header" style="background:linear-gradient(135deg,#1a3c5e 0%,#244f76 100%);color:#fff;border-left:4px solid #28a745;">
-                <h5 class="mb-0"><i class="bi bi-calendar-check"></i> Consultas Recentes</h5>
+    <div class="col-md-6">
+        <div class="card mb-3 h-100">
+            <div class="card-header secao"><h5><i class="bi bi-telephone"></i> Contato</h5></div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <div class="info-label">Telefone</div>
+                        <div class="info-value {{ 'muted' if not pac.telefone }}">{{ pac.telefone|format_phone or '-' }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="info-label">Email</div>
+                        <div class="info-value {{ 'muted' if not pac.email or '@nao.' in pac.email }}">{{ pac.email or '-' }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="info-label">Tipo de Pagamento</div>
+                        <div class="info-value">
+                            {% if pac.tipo_pagamento == 'convenio' %}
+                            <span class="badge bg-info"><i class="bi bi-building"></i> Convenio</span>
+                            {% else %}
+                            <span class="badge bg-outline-secondary border"><i class="bi bi-person"></i> Particular</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if pac.logradouro or pac.cidade %}
+    <div class="col-md-6">
+        <div class="card mb-3 h-100">
+            <div class="card-header secao"><h5><i class="bi bi-geo-alt"></i> Endereco</h5></div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-sm-4">
+                        <div class="info-label">CEP</div>
+                        <div class="info-value {{ 'muted' if not pac.cep }}">{{ pac.cep or '-' }}</div>
+                    </div>
+                    <div class="col-sm-8">
+                        <div class="info-label">Logradouro</div>
+                        <div class="info-value {{ 'muted' if not pac.logradouro }}">{{ pac.logradouro or '-' }}{% if pac.numero %}, {{ pac.numero }}{% endif %}{% if pac.complemento %} - {{ pac.complemento }}{% endif %}</div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="info-label">Bairro</div>
+                        <div class="info-value {{ 'muted' if not pac.bairro }}">{{ pac.bairro or '-' }}</div>
+                    </div>
+                    <div class="col-sm-5">
+                        <div class="info-label">Cidade</div>
+                        <div class="info-value {{ 'muted' if not pac.cidade }}">{{ pac.cidade or '-' }}</div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="info-label">UF</div>
+                        <div class="info-value {{ 'muted' if not pac.estado }}">{{ pac.estado or '-' }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="col-md-6">
+        <div class="card mb-3 h-100">
+            <div class="card-header secao"><h5><i class="bi bi-people"></i> Filiação</h5></div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <div class="info-label">Nome do Pai</div>
+                        <div class="info-value {{ 'muted' if not pac.nome_pai }}">{{ pac.nome_pai or '-' }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="info-label">Nome da Mae</div>
+                        <div class="info-value {{ 'muted' if not pac.nome_mae }}">{{ pac.nome_mae or '-' }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card mb-3 h-100">
+            <div class="card-header secao"><h5><i class="bi bi-upc-scan"></i> Documentacao</h5></div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <div class="info-label">Codigo do Paciente</div>
+                        <div class="info-value {{ 'muted' if not pac.codigo_paciente }}">{{ pac.codigo_paciente or '-' }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="info-label">N. Documentacao</div>
+                        <div class="info-value {{ 'muted' if not pac.numero_documentacao }}">{{ pac.numero_documentacao or '-' }}</div>
+                    </div>
+                    <div class="col-12">
+                        <div class="info-label">Indicacao</div>
+                        <div class="info-value {{ 'muted' if not pac.indicacao }}">{{ pac.indicacao or '-' }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card mb-3">
+            <div class="card-header secao" style="border-left-color:#28a745;">
+                <h5><i class="bi bi-calendar-check"></i> Consultas Recentes</h5>
             </div>
             <div class="card-body">
+                {% if consultas_recentes %}
                 {% for c in consultas_recentes %}
                 <div class="d-flex justify-content-between align-items-center border-bottom py-2">
                     <div>
@@ -127,9 +202,12 @@
                     <span class="badge bg-{% if c.status == 'concluida' %}success{% elif c.status == 'cancelada' %}danger{% elif c.status == 'faltou' %}secondary{% else %}primary{% endif %}">{{ c.status }}</span>
                 </div>
                 {% endfor %}
+                {% else %}
+                <p class="text-muted mb-0">Nenhuma consulta registrada.</p>
+                {% endif %}
             </div>
         </div>
-        {% endif %}
     </div>
+
 </div>
 {% endblock %}

@@ -126,6 +126,16 @@
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
+                            <label class="form-label">Tipo de Pagamento</label>
+                            <select class="form-select" name="tipo_pagamento">
+                                <option value="particular" {{ 'selected' if pac.tipo_pagamento == 'particular' }}>Particular</option>
+                                <option value="convenio" {{ 'selected' if pac.tipo_pagamento == 'convenio' }}>Convenio</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3"></div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Indicacao</label>
                             <input type="text" class="form-control" name="indicacao" value="{{ pac.indicacao or '' }}" placeholder="Quem indicou?">
                         </div>

@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
     profissao VARCHAR(100),
     nome_pai VARCHAR(200),
     nome_mae VARCHAR(200),
+    tipo_pagamento VARCHAR(20) DEFAULT 'particular',
     ativo BOOLEAN DEFAULT TRUE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -434,6 +435,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
     profissao VARCHAR(100),
     nome_pai VARCHAR(200),
     nome_mae VARCHAR(200),
+    tipo_pagamento VARCHAR(20) DEFAULT 'particular',
     ativo BOOLEAN DEFAULT TRUE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -780,6 +782,7 @@ ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS estado_civil VARCHAR(30);
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS profissao VARCHAR(100);
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS nome_pai VARCHAR(200);
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS nome_mae VARCHAR(200);
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS tipo_pagamento VARCHAR(20) DEFAULT 'particular';
 
 CREATE TABLE IF NOT EXISTS config_sistema (
     chave VARCHAR(100) PRIMARY KEY,
@@ -810,6 +813,7 @@ def _get_mysql_alter_safe():
         ("usuarios", "profissao", "VARCHAR(100)"),
         ("usuarios", "nome_pai", "VARCHAR(200)"),
         ("usuarios", "nome_mae", "VARCHAR(200)"),
+        ("usuarios", "tipo_pagamento", "VARCHAR(20)"),
         ("usuarios", "logradouro", "VARCHAR(255)"),
         ("usuarios", "numero", "VARCHAR(20)"),
         ("usuarios", "complemento", "VARCHAR(100)"),
