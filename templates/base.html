@@ -104,7 +104,7 @@
                     {% set estab_cookie = request.cookies.get('estabelecimento_id') %}
                     {% if pode_acessar(usuario, 'pacientes', 'ver', estab_cookie) %}
                     <li class="nav-item">
-                        <a class="nav-link" href="/prontuarios"><i class="bi bi-people"></i> Prontuarios</a>
+                        <a class="nav-link" href="/prontuarios"><i class="bi bi-people"></i> Pacientes</a>
                     </li>
                     {% endif %}
                     {% if pode_acessar(usuario, 'consultas', 'ver', estab_cookie) %}
