@@ -1117,6 +1117,14 @@ def dashboard_stats(
         )
     convenios = db.fetch_one("SELECT COUNT(*) AS total FROM convenios WHERE ativo = TRUE")
     procedimentos = db.fetch_one("SELECT COUNT(*) AS total FROM procedimentos WHERE ativo = TRUE")
+    prontuarios_count = db.fetch_one(
+        "SELECT COUNT(*) AS total FROM prontuarios WHERE estabelecimento_id = %s",
+        (estab_id,),
+    ) if estab_id else db.fetch_one("SELECT COUNT(*) AS total FROM prontuarios")
+    consultas_hoje = db.fetch_one(
+        f"SELECT COUNT(*) AS total FROM consultas WHERE DATE(data_hora) = CURRENT_DATE{estab_filter}",
+        tuple(estab_params),
+    )
 
     consultas_periodo = db.fetch_one(
         f"SELECT COUNT(*) AS total FROM consultas WHERE data_hora BETWEEN %s AND %s{estab_filter}",
@@ -1129,36 +1137,36 @@ def dashboard_stats(
     )
 
     orc_rascunho = db.fetch_one(
-        "SELECT COUNT(*) AS total FROM orcamentos WHERE status = 'rascunho' AND criado_em BETWEEN %s AND %s",
-        (ini, fim),
+        f"SELECT COUNT(*) AS total FROM orcamentos WHERE status = 'rascunho' AND criado_em BETWEEN %s AND %s{estab_filter}",
+        (ini, fim) + tuple(estab_params),
     )
     orc_enviados = db.fetch_one(
-        "SELECT COUNT(*) AS total FROM orcamentos WHERE status = 'enviado' AND criado_em BETWEEN %s AND %s",
-        (ini, fim),
+        f"SELECT COUNT(*) AS total FROM orcamentos WHERE status = 'enviado' AND criado_em BETWEEN %s AND %s{estab_filter}",
+        (ini, fim) + tuple(estab_params),
     )
     orc_aprovados = db.fetch_one(
-        "SELECT COUNT(*) AS total FROM orcamentos WHERE status = 'aprovado' AND criado_em BETWEEN %s AND %s",
-        (ini, fim),
+        f"SELECT COUNT(*) AS total FROM orcamentos WHERE status = 'aprovado' AND criado_em BETWEEN %s AND %s{estab_filter}",
+        (ini, fim) + tuple(estab_params),
     )
     orc_rejeitados = db.fetch_one(
-        "SELECT COUNT(*) AS total FROM orcamentos WHERE status = 'rejeitado' AND criado_em BETWEEN %s AND %s",
-        (ini, fim),
+        f"SELECT COUNT(*) AS total FROM orcamentos WHERE status = 'rejeitado' AND criado_em BETWEEN %s AND %s{estab_filter}",
+        (ini, fim) + tuple(estab_params),
     )
 
     faturamento = db.fetch_one(
-        """SELECT COALESCE(SUM(valor_total), 0) AS total
+        f"""SELECT COALESCE(SUM(valor_total), 0) AS total
            FROM orcamentos WHERE status = 'aprovado'
-           AND atualizado_em BETWEEN %s AND %s""",
-        (ini, fim),
+           AND atualizado_em BETWEEN %s AND %s{estab_filter}""",
+        (ini, fim) + tuple(estab_params),
     )
 
     faturamento_por_prof = db.fetch_all(
-        """SELECT u.nome AS profissional_nome, COUNT(o.id) AS qtd, COALESCE(SUM(o.valor_total), 0) AS valor
+        f"""SELECT u.nome AS profissional_nome, COUNT(o.id) AS qtd, COALESCE(SUM(o.valor_total), 0) AS valor
            FROM orcamentos o
            JOIN usuarios u ON u.id = o.profissional_usuario_id
-           WHERE o.status = 'aprovado' AND o.atualizado_em BETWEEN %s AND %s
+           WHERE o.status = 'aprovado' AND o.atualizado_em BETWEEN %s AND %s{estab_filter}
            GROUP BY o.profissional_usuario_id, u.nome ORDER BY valor DESC""",
-        (ini, fim),
+        (ini, fim) + tuple(estab_params),
     )
 
     return JSONResponse(content={
@@ -1167,7 +1175,9 @@ def dashboard_stats(
         "profissionais": profissionais["total"],
         "convenios": convenios["total"],
         "procedimentos": procedimentos["total"],
+        "prontuarios": prontuarios_count["total"] if prontuarios_count else 0,
         "consultas_total": consultas_periodo["total"],
+        "consultas_hoje": consultas_hoje["total"] if consultas_hoje else 0,
         "consultas_status": [{"status": r["status"], "total": r["total"]} for r in consultas_status],
         "orc_rascunho": orc_rascunho["total"],
         "orc_enviados": orc_enviados["total"],
@@ -2831,14 +2841,14 @@ def api_profissionais(
     estab_id = estabelecimento_id or resolver_estabelecimento(request, usuario)
     if estab_id:
         profissionais = db.fetch_all(
-            """SELECT u.id, u.nome, COALESCE(pe.cor, '#6c757d') as cor FROM usuarios u
+            """SELECT u.id, u.nome, pe.especialidade, COALESCE(pe.cor, '#6c757d') as cor FROM usuarios u
                JOIN profissional_estabelecimento pe ON pe.usuario_id = u.id
                WHERE pe.estabelecimento_id = %s AND u.ativo = TRUE ORDER BY u.nome""",
             (estab_id,),
         )
     elif usuario.get("is_super"):
         profissionais = db.fetch_all(
-            """SELECT u.id, u.nome, COALESCE(pe.cor, '#6c757d') as cor FROM usuarios u
+            """SELECT u.id, u.nome, pe.especialidade, COALESCE(pe.cor, '#6c757d') as cor FROM usuarios u
                LEFT JOIN profissional_estabelecimento pe ON pe.usuario_id = u.id
                WHERE u.tipo = 'profissional' AND u.ativo = TRUE ORDER BY u.nome"""
         )

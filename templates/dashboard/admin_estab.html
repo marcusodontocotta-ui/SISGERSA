@@ -174,8 +174,8 @@ function carregarStats() {
         document.getElementById('stat-consultas').textContent = d.consultas_total || 0;
         document.getElementById('stat-profissionais').textContent = d.profissionais || 0;
         document.getElementById('stat-faturamento').textContent = formatarMoeda(d.faturamento);
-        document.getElementById('stat-prontuarios').textContent = '-';
-        document.getElementById('stat-consultas-hoje').textContent = '-';
+        document.getElementById('stat-prontuarios').textContent = d.prontuarios || 0;
+        document.getElementById('stat-consultas-hoje').textContent = d.consultas_hoje || 0;
 
         var cs = d.consultas_status || [];
         var html = '';
@@ -194,7 +194,7 @@ function carregarStats() {
 
         var fp = d.faturamento_por_prof || [];
         var fhtml = '';
-        fp.forEach(function(f) { fhtml += '<div class="d-flex justify-content-between border-bottom py-1"><span>' + f.nome + '</span><strong>' + formatarMoeda(f.total) + '</strong></div>'; });
+        fp.forEach(function(f) { fhtml += '<div class="d-flex justify-content-between border-bottom py-1"><span>' + f.profissional_nome + '</span><strong>' + formatarMoeda(f.valor) + '</strong></div>'; });
         document.getElementById('faturamento-prof').innerHTML = fhtml || '<span class="text-muted">Nenhum dado</span>';
     })
     .catch(function() {
@@ -202,6 +202,8 @@ function carregarStats() {
         document.getElementById('stat-consultas').textContent = '0';
         document.getElementById('stat-profissionais').textContent = '0';
         document.getElementById('stat-faturamento').textContent = 'R$ 0,00';
+        document.getElementById('stat-prontuarios').textContent = '0';
+        document.getElementById('stat-consultas-hoje').textContent = '0';
     });
 
     fetch('/api/profissionais')
