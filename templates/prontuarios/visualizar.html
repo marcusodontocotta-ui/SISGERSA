@@ -109,9 +109,6 @@
             <div class="card-header d-flex justify-content-between align-items-center secao">
                 <h5 class="mb-0"><i class="bi bi-journal-text"></i> Evolucao Clinica</h5>
                 <div class="d-flex gap-2">
-                    <button class="btn btn-sm btn-outline-secondary" id="btnMostrarTodas" style="display:none;" onclick="mostrarTodasEvolucoes()">
-                        <i class="bi bi-list"></i> Mostrar Todas
-                    </button>
                     {% if usuario.tipo in ['admin', 'profissional'] %}
                     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovaEvolucao">
                         <i class="bi bi-plus"></i> Nova Evolucao
@@ -697,7 +694,6 @@ function filtrarEvolucao(consultaId) {
     });
     document.getElementById('evolucaoPlaceholder').style.display = 'none';
     document.getElementById('evolucaoConteudo').style.display = '';
-    document.getElementById('btnMostrarTodas').style.display = '';
     document.querySelectorAll('.btn-historico').forEach(function(btn) {
         btn.classList.toggle('active', btn.dataset.consultaId == consultaId);
         if (btn.dataset.consultaId == consultaId) {
@@ -705,19 +701,6 @@ function filtrarEvolucao(consultaId) {
         } else {
             btn.classList.add('list-group-item-action');
         }
-    });
-}
-
-function mostrarTodasEvolucoes() {
-    document.querySelectorAll('.evolucao-item').forEach(function(el) {
-        el.style.display = '';
-    });
-    document.getElementById('evolucaoPlaceholder').style.display = 'none';
-    document.getElementById('evolucaoConteudo').style.display = '';
-    document.getElementById('btnMostrarTodas').style.display = 'none';
-    document.querySelectorAll('.btn-historico').forEach(function(btn) {
-        btn.classList.remove('active');
-        btn.classList.add('list-group-item-action');
     });
 }
 </script>
