@@ -35,8 +35,18 @@ from utils.permissoes import (
     salvar_permissoes, limpar_permissoes, exigir_permissao,
 )
 from utils.planos import verificar_limite, LimiteAtingidoError, obter_plano_estabelecimento, contar_uso, bloquear_se_limite, _mes_atual_filter
+from utils.email import enviar_email, montar_confirmacao_agendamento
+from utils.scheduler import iniciar_scheduler, parar_scheduler
 
 app = FastAPI(title="SISGERSA", docs_url=None, redoc_url=None)
+
+@app.on_event("startup")
+def startup_event():
+    iniciar_scheduler()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    parar_scheduler()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -622,6 +632,37 @@ def stop_impersonate(request: Request):
     else:
         response.delete_cookie("estabelecimento_id")
     return response
+
+
+@app.get("/admin/testar-email")
+def testar_email(request: Request, usuario=Depends(exigir_login)):
+    if not usuario.get("is_super"):
+        raise HTTPException(status_code=403)
+
+    if not usuario.get("email"):
+        return JSONResponse({"erro": "Admin sem email cadastrado"}, status_code=400)
+
+    corpo = montar_confirmacao_agendamento(
+        paciente_nome=usuario["nome"],
+        profissional_nome="Dr. Teste",
+        data_formatada="01/01/2099",
+        hora_formatada="10:00",
+        duracao=30,
+        procedimento="Consulta de Teste",
+        estabelecimento_nome="SISGERSA - Teste",
+        estabelecimento_endereco="Rua de Teste, 123",
+    )
+
+    enviado = enviar_email(
+        destinatario=usuario["email"],
+        assunto="[SISGERSA] Teste de envio de email",
+        corpo_html=corpo,
+    )
+
+    if enviado:
+        return JSONResponse({"ok": True, "mensagem": f"Email de teste enviado para {usuario['email']}"})
+    else:
+        return JSONResponse({"ok": False, "mensagem": "Falha ao enviar. Verifique as configuracoes SMTP."}, status_code=500)
 
 
 @app.post("/estabelecimento/selecionar")
@@ -1744,6 +1785,33 @@ def criar_consulta(
                VALUES (%s, %s, %s, %s)""",
             (prontuario["id"], consulta_id_val, profissional_id, data_consulta),
         )
+
+    try:
+        dados_paciente = db.fetch_one("SELECT nome, email FROM usuarios WHERE id = %s", (paciente_id,))
+        dados_profissional = db.fetch_one("SELECT nome FROM usuarios WHERE id = %s", (profissional_id,))
+        dados_estab = db.fetch_one("SELECT nome, endereco FROM estabelecimentos WHERE id = %s", (estab_id,))
+        dados_proc = db.fetch_one("SELECT nome FROM procedimentos WHERE id = %s", (procedimento_id,)) if procedimento_id else None
+
+        if dados_paciente and dados_paciente.get("email"):
+            from datetime import datetime as _dt3
+            dt_consulta = _dt3.strptime(data_hora, "%Y-%m-%dT%H:%M") if "T" in data_hora else _dt3.strptime(data_hora, "%Y-%m-%d")
+            corpo = montar_confirmacao_agendamento(
+                paciente_nome=dados_paciente["nome"],
+                profissional_nome=dados_profissional["nome"] if dados_profissional else "-",
+                data_formatada=dt_consulta.strftime("%d/%m/%Y"),
+                hora_formatada=dt_consulta.strftime("%H:%M"),
+                duracao=duracao,
+                procedimento=dados_proc["nome"] if dados_proc else None,
+                estabelecimento_nome=dados_estab["nome"] if dados_estab else None,
+                estabelecimento_endereco=dados_estab["endereco"] if dados_estab else None,
+            )
+            enviar_email(
+                destinatario=dados_paciente["email"],
+                assunto=f"Consulta agendada - {dt_consulta.strftime('%d/%m/%Y')} as {dt_consulta.strftime('%H:%M')}",
+                corpo_html=corpo,
+            )
+    except Exception as e:
+        logger.warning(f"Erro ao enviar email de confirmacao: {e}")
 
     if origem == "agenda":
         from datetime import datetime as _dt2

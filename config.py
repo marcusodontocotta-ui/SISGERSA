@@ -20,6 +20,13 @@ class Settings:
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
 
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", 587))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "SISGERSA")
+    EMAIL_HABILITADO: bool = os.getenv("EMAIL_HABILITADO", "false").lower() == "true"
+
     def __init__(self):
         database_url = os.getenv("DATABASE_URL", "")
         if database_url:

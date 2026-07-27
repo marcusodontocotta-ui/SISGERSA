@@ -170,6 +170,7 @@ CREATE TABLE IF NOT EXISTS consultas (
     duracao_minutos INT DEFAULT 30,
     status ENUM('agendada', 'confirmada', 'em_andamento', 'concluida', 'cancelada', 'faltou') DEFAULT 'agendada',
     observacoes TEXT,
+    lembrete_enviado BOOLEAN DEFAULT FALSE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (paciente_usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -533,6 +534,7 @@ CREATE TABLE IF NOT EXISTS consultas (
     duracao_minutos INT DEFAULT 30,
     status VARCHAR(20) DEFAULT 'agendada' CHECK (status IN ('agendada', 'confirmada', 'em_andamento', 'concluida', 'cancelada', 'faltou')),
     observacoes TEXT,
+    lembrete_enviado BOOLEAN DEFAULT FALSE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (paciente_usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -731,6 +733,7 @@ ALTER TABLE estabelecimentos ADD COLUMN IF NOT EXISTS cupom_id INT REFERENCES cu
 ALTER TABLE estabelecimentos ADD COLUMN IF NOT EXISTS plano_id INT REFERENCES planos(id);
 ALTER TABLE estabelecimentos ADD COLUMN IF NOT EXISTS plano_expira_em DATE;
 ALTER TABLE profissional_estabelecimento ADD COLUMN IF NOT EXISTS cor VARCHAR(7) DEFAULT '#6c757d';
+ALTER TABLE consultas ADD COLUMN IF NOT EXISTS lembrete_enviado BOOLEAN DEFAULT FALSE;
 
 """
 
@@ -743,6 +746,7 @@ SCHEMA_ALTER_MYSQL = [
     "ALTER TABLE planos ADD COLUMN limite_orcamentos_mes INT DEFAULT 50",
     "ALTER TABLE planos ADD COLUMN limite_procedimentos INT DEFAULT 50",
     "ALTER TABLE profissional_estabelecimento ADD COLUMN cor VARCHAR(7) DEFAULT '#6c757d'",
+    "ALTER TABLE consultas ADD COLUMN lembrete_enviado BOOLEAN DEFAULT FALSE",
 ]
 
 
