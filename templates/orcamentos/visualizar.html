@@ -10,7 +10,12 @@
                 <span class="badge bg-{{ status_class.get(orcamento.status, 'secondary') }} ms-2">{{ orcamento.status|capitalize }}</span>
             </h4>
             <div class="d-flex gap-2">
-                <a href="/orcamentos" class="btn btn-outline-secondary btn-sm">
+                {% if orcamento.paciente_usuario_id %}
+                <a href="/pacientes/{{ orcamento.paciente_usuario_id }}" class="btn btn-outline-info btn-sm">
+                    <i class="bi bi-folder2-open"></i> Prontuario
+                </a>
+                {% endif %}
+                <a href="/orcamentos?paciente_id={{ orcamento.paciente_usuario_id }}" class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-arrow-left"></i> Lista
                 </a>
                 <a href="/orcamentos/{{ orcamento.id }}/imprimir" class="btn btn-outline-secondary btn-sm" target="_blank">

@@ -3387,6 +3387,20 @@ def listar_orcamentos(request: Request, usuario=Depends(exigir_login), paciente_
         else:
             orcamentos = []
 
+    for o in orcamentos:
+        itens = db.fetch_all(
+            "SELECT descricao, quantidade, valor_unitario, subtotal FROM orcamento_itens WHERE orcamento_id = %s ORDER BY id",
+            (o["id"],),
+        )
+        o["_itens_resumo"] = ", ".join(
+            f"{i['descricao']} ({i['quantidade']}x R$ {'%.2f'|format(i['valor_unitario']|float)})"
+            for i in itens[:4]
+        )
+        o["_total_pago"] = db.fetch_one(
+            "SELECT COALESCE(SUM(valor), 0) AS total FROM pagamentos WHERE orcamento_id = %s AND status = 'pago'",
+            (o["id"],),
+        )["total"]
+
     return templates.TemplateResponse(
         "orcamentos/lista.html",
         {"request": request, "usuario": usuario, "orcamentos": orcamentos,

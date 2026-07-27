@@ -97,6 +97,10 @@
             <small class="text-white-50" style="font-size:0.78rem; font-weight:500; text-transform:uppercase; letter-spacing:0.05em;">Anamnese</small>
         </div>
         <span class="opacity-25">|</span>
+        <a href="/orcamentos?paciente_id={{ prontuario.paciente_usuario_id }}" class="btn-voltar"><i class="bi bi-receipt"></i> Orcamentos</a>
+        <span class="opacity-25">|</span>
+        <a href="/financeiro?paciente_id={{ prontuario.paciente_usuario_id }}" class="btn-voltar"><i class="bi bi-cash-stack"></i> Historico</a>
+        <span class="opacity-25">|</span>
         <div class="text-white" style="font-size:1.05rem;"><strong>{{ prontuario.paciente_nome }}</strong></div>
         {% if usuario.tipo in ['admin', 'recepcionista'] %}
         <a href="/pacientes/{{ prontuario.paciente_usuario_id }}/editar" class="btn-voltar">
