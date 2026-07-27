@@ -934,6 +934,19 @@ def dashboard(request: Request, usuario=Depends(exigir_login)):
         uso_info = contar_uso(estab_id)
         estab_info = db.fetch_one("SELECT * FROM estabelecimentos WHERE id = %s", (estab_id,))
 
+    if usuario["tipo"] == "admin" and not usuario.get("is_super") and not estab_id:
+        estabs = db.fetch_all("SELECT id, nome, tipo, email FROM estabelecimentos WHERE ativo = TRUE ORDER BY nome")
+        if len(estabs) == 1:
+            response = RedirectResponse("/dashboard", status_code=302)
+            cookie_kwargs = dict(httponly=True, max_age=172800, samesite="lax")
+            if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+                cookie_kwargs["secure"] = True
+            response.set_cookie("estabelecimento_id", str(estabs[0]["id"]), **cookie_kwargs)
+            return response
+        return templates.TemplateResponse("auth/selecionar_estab.html", {
+            "request": request, "usuario": usuario, "estabelecimentos": estabs,
+        })
+
     template_name = f"dashboard/{usuario['tipo']}.html"
     if usuario["tipo"] == "admin" and not usuario.get("is_super"):
         template_name = "dashboard/admin_estab.html"

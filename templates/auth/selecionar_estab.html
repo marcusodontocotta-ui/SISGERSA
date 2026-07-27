@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Selecionar Estabelecimento - SISGERSA</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="/static/css/custom.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container">
+        <div class="row justify-content-center mt-5">
+            <div class="col-md-6 col-lg-5">
+                <div class="card shadow">
+                    <div class="card-body p-4">
+                        <div class="text-center mb-4">
+                            <i class="bi bi-building text-primary" style="font-size: 3rem;"></i>
+                            <h3 class="mt-2 fw-bold">SISGERSA</h3>
+                            <p class="text-muted">Selecione o estabelecimento que deseja acessar:</p>
+                        </div>
+
+                        {% for e in estabelecimentos %}
+                        <form method="POST" action="/estabelecimento/selecionar" class="mb-3">
+                            <input type="hidden" name="estabelecimento_id" value="{{ e.id }}">
+                            <button type="submit" class="btn btn-outline-primary w-100 text-start py-3 px-3 shadow-sm border-2">
+                                <div class="d-flex align-items-center">
+                                    <div class="me-3">
+                                        <i class="bi bi-building text-primary fs-3"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold fs-5">{{ e.nome }}</div>
+                                        <div>
+                                            <span class="badge bg-secondary">{{ e.tipo|capitalize }}</span>
+                                            {% if e.email %}
+                                            <small class="text-muted ms-2">{{ e.email }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="ms-auto">
+                                        <i class="bi bi-box-arrow-in-right text-primary fs-5"></i>
+                                    </div>
+                                </div>
+                            </button>
+                        </form>
+                        {% endfor %}
+
+                        {% if not estabelecimentos %}
+                        <div class="alert alert-warning text-center">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Nenhum estabelecimento encontrado. Entre em contato com o administrador.
+                        </div>
+                        {% endif %}
+
+                        <hr class="my-4">
+                        <p class="text-center text-muted mb-0">
+                            <a href="/login"><i class="bi bi-arrow-left"></i> Voltar ao login</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
