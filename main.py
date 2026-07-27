@@ -4159,26 +4159,3 @@ def fix_orphan_patients(request: Request, usuario=Depends(exigir_login)):
         criados.append({"nome": pac["nome"], "numero": numero})
 
     return JSONResponse({"mensagem": f"{len(criados)} prontuarios criados", "criados": criados})
-
-
-@app.get("/debug/orcamentos")
-def debug_orcamentos(request: Request, usuario=Depends(exigir_login)):
-    try:
-        estab_id = resolver_estabelecimento(request, usuario)
-        pacientes_filtro = obter_pacientes_para_filtro(usuario, estab_id)
-        orcamentos = []
-        resp = templates.TemplateResponse(
-            "orcamentos/lista.html",
-            {"request": request, "usuario": usuario, "orcamentos": orcamentos,
-             "pacientes_filtro": pacientes_filtro, "paciente_id": None,
-             "embedded": False},
-        )
-        return JSONResponse({
-            "ok": True,
-            "usuario_tipo": usuario.get("tipo"),
-            "pacientes_count": len(pacientes_filtro),
-            "response_status": resp.status_code,
-        })
-    except Exception as e:
-        import traceback
-        return JSONResponse({"error": str(e), "traceback": traceback.format_exc()})
