@@ -1483,7 +1483,7 @@ def criar_profissional(
         return RedirectResponse("/profissionais?erro=email_existente", status_code=302)
 
     if foto_url:
-        db.execute("UPDATE usuarios SET foto_url = %s WHERE id = %s", (foto_url, user_id))
+        db.execute("UPDATE profissionais SET foto_url = %s WHERE id = %s", (foto_url, user_id))
 
     if estabelecimento_id and estabelecimento_id.strip():
         db.execute(
@@ -1539,7 +1539,7 @@ def salvar_profissional(
         raise HTTPException(status_code=403)
 
     db.execute(
-        "UPDATE usuarios SET nome = %s, email = %s, telefone = %s, foto_url = %s WHERE id = %s",
+        "UPDATE profissionais SET nome = %s, email = %s, telefone = %s, foto_url = %s WHERE id = %s",
         (nome, email, telefone, foto_url, prof_id),
     )
 
@@ -1571,7 +1571,7 @@ def desativar_profissional(prof_id: int, usuario=Depends(exigir_login)):
     if usuario["tipo"] != "admin":
         raise HTTPException(status_code=403)
 
-    db.execute("UPDATE usuarios SET ativo = FALSE WHERE id = %s", (prof_id,))
+    db.execute("UPDATE profissionais SET ativo = FALSE WHERE id = %s", (prof_id,))
     return RedirectResponse("/profissionais", status_code=302)
 
 
@@ -1615,15 +1615,15 @@ def criar_paciente(
     except Exception:
         return RedirectResponse("/prontuarios?erro=email_duplicado", status_code=302)
     db.execute(
-        """UPDATE usuarios SET cpf = %s, data_nascimento = %s, endereco = %s,
-           logradouro = %s, numero = %s, complemento = %s, bairro = %s,
+        """UPDATE pacientes SET cpf = %s, data_nascimento = %s, logradouro = %s,
+           numero = %s, complemento = %s, bairro = %s,
            cidade = %s, estado = %s, cep = %s, tipo_pagamento = %s WHERE id = %s""",
-        (cpf or None, data_nascimento or None, endereco or None,
+        (cpf or None, data_nascimento or None,
          logradouro or None, numero or None, complemento or None, bairro or None,
          cidade or None, estado or None, cep or None, tipo_pagamento or 'particular', user_id),
     )
     if foto_url:
-        db.execute("UPDATE usuarios SET foto_url = %s WHERE id = %s", (foto_url, user_id))
+        db.execute("UPDATE pacientes SET foto_url = %s WHERE id = %s", (foto_url, user_id))
 
     if estab_id:
         vincular_paciente(user_id, int(estab_id))
@@ -1747,14 +1747,14 @@ def salvar_paciente(
         raise HTTPException(status_code=403)
 
     base_fields = """nome = %s, email = %s, telefone = %s, cpf = %s, data_nascimento = %s,
-                     endereco = %s, logradouro = %s, numero = %s, complemento = %s,
+                     logradouro = %s, numero = %s, complemento = %s,
                      bairro = %s, cidade = %s, estado = %s, cep = %s,
                      foto_url = %s, codigo_paciente = %s, numero_documentacao = %s,
                      indicacao = %s, estado_civil = %s, profissao = %s, nome_pai = %s, nome_mae = %s,
                      tipo_pagamento = %s"""
     base_params = (
         nome, email, telefone, cpf or None, data_nascimento or None,
-        endereco or None, logradouro or None, numero or None, complemento or None,
+        logradouro or None, numero or None, complemento or None,
         bairro or None, cidade or None, estado or None, cep or None,
         foto_url, codigo_paciente or None, numero_documentacao or None,
         indicacao or None, estado_civil or None, profissao or None, nome_pai or None, nome_mae or None,
@@ -1765,12 +1765,12 @@ def salvar_paciente(
         from utils.auth import hash_senha
         senha_hash = hash_senha(senha.strip())
         db.execute(
-            f"UPDATE usuarios SET {base_fields}, senha_hash = %s WHERE id = %s",
+            f"UPDATE pacientes SET {base_fields}, senha_hash = %s WHERE id = %s",
             (*base_params, senha_hash, pac_id),
         )
     else:
         db.execute(
-            f"UPDATE usuarios SET {base_fields} WHERE id = %s",
+            f"UPDATE pacientes SET {base_fields} WHERE id = %s",
             (*base_params, pac_id),
         )
     return RedirectResponse("/prontuarios", status_code=302)
@@ -2458,15 +2458,15 @@ def criar_prontuario(
         from utils.auth import hash_senha
         senha_hash = hash_senha(novo_paciente_senha.strip())
         novo_email = novo_paciente_email.strip().lower()
-        existente = db.fetch_one("SELECT id FROM usuarios WHERE email = %s AND tipo = 'paciente'", (novo_email,))
+        existente = db.fetch_one("SELECT id FROM pacientes WHERE email = %s", (novo_email,))
         if existente:
             paciente_id_int = existente["id"]
         else:
-            db.execute(
-                "INSERT INTO usuarios (nome, email, telefone, cpf, data_nascimento, senha_hash, tipo, tipo_pagamento, ativo) VALUES (%s, %s, %s, %s, %s, %s, 'paciente', %s, TRUE)",
+            cursor = db.execute(
+                "INSERT INTO pacientes (nome, email, telefone, cpf, data_nascimento, senha_hash, tipo_pagamento, ativo) VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE) RETURNING id",
                 (novo_paciente_nome.strip(), novo_email, novo_paciente_telefone or None, novo_paciente_cpf or None, novo_paciente_nascimento or None, senha_hash, novo_paciente_tipo_pagamento or 'particular'),
             )
-            paciente_id_int = db.fetch_one("SELECT id FROM usuarios WHERE email = %s AND tipo = 'paciente'", (novo_email,))["id"]
+            paciente_id_int = cursor.fetchone()[0]
             vincular_paciente(paciente_id_int, estab_id)
 
     if not paciente_id_int:

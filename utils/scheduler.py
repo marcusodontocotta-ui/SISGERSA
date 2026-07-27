@@ -26,8 +26,8 @@ def _buscar_consultas_para_lembrete():
                   proc.nome AS procedimento_nome,
                   e.nome AS estabelecimento_nome
            FROM consultas c
-           JOIN usuarios u ON u.id = c.paciente_usuario_id
-           JOIN usuarios p ON p.id = c.profissional_usuario_id
+           JOIN pacientes u ON u.id = c.paciente_usuario_id
+           JOIN profissionais p ON p.id = c.profissional_usuario_id
            LEFT JOIN procedimentos proc ON proc.id = c.procedimento_id
            LEFT JOIN estabelecimentos e ON e.id = c.estabelecimento_id
            WHERE c.status IN ('agendada', 'confirmada')
