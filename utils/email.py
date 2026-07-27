@@ -32,6 +32,7 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str) -> bool:
         headers={
             "Authorization": f"Bearer {settings.RESEND_API_KEY}",
             "Content-Type": "application/json",
+            "User-Agent": "SISGERSA/1.0",
         },
         method="POST",
     )
