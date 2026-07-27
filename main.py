@@ -665,6 +665,36 @@ def testar_email(request: Request, usuario=Depends(exigir_login)):
         return JSONResponse({"ok": False, "mensagem": "Falha ao enviar. Verifique as configuracoes SMTP."}, status_code=500)
 
 
+@app.get("/api/email-status")
+def api_email_status(request: Request, usuario=Depends(exigir_login)):
+    if not usuario.get("is_super"):
+        raise HTTPException(status_code=403)
+    try:
+        row = db.fetch_one("SELECT valor FROM config_sistema WHERE chave = 'email_habilitado'")
+        ativo = row["valor"] == "true" if row else True
+    except Exception:
+        ativo = True
+    return JSONResponse({"habilitado": ativo})
+
+
+@app.post("/admin/toggle-email")
+def toggle_email(request: Request, usuario=Depends(exigir_login)):
+    if not usuario.get("is_super"):
+        raise HTTPException(status_code=403)
+    try:
+        row = db.fetch_one("SELECT valor FROM config_sistema WHERE chave = 'email_habilitado'")
+        atual = row["valor"] if row else "true"
+        novo = "false" if atual == "true" else "true"
+        if row:
+            db.execute("UPDATE config_sistema SET valor = %s WHERE chave = 'email_habilitado'", (novo,))
+        else:
+            db.execute("INSERT INTO config_sistema (chave, valor) VALUES ('email_habilitado', %s)", (novo,))
+        return JSONResponse({"ok": True, "habilitado": novo == "true"})
+    except Exception as e:
+        logger.error(f"Erro ao toggle email: {e}")
+        return JSONResponse({"ok": False, "mensagem": str(e)}, status_code=500)
+
+
 @app.post("/estabelecimento/selecionar")
 def selecionar_estabelecimento(
     request: Request,

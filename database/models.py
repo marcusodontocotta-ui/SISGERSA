@@ -361,6 +361,15 @@ CREATE TABLE IF NOT EXISTS cupons (
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ============================================
+-- CONFIGURACAO DO SISTEMA
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS config_sistema (
+    chave VARCHAR(100) PRIMARY KEY,
+    valor VARCHAR(200) NOT NULL
+);
+
 """
 
 
@@ -734,6 +743,11 @@ ALTER TABLE estabelecimentos ADD COLUMN IF NOT EXISTS plano_id INT REFERENCES pl
 ALTER TABLE estabelecimentos ADD COLUMN IF NOT EXISTS plano_expira_em DATE;
 ALTER TABLE profissional_estabelecimento ADD COLUMN IF NOT EXISTS cor VARCHAR(7) DEFAULT '#6c757d';
 ALTER TABLE consultas ADD COLUMN IF NOT EXISTS lembrete_enviado BOOLEAN DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS config_sistema (
+    chave VARCHAR(100) PRIMARY KEY,
+    valor VARCHAR(200) NOT NULL
+);
 
 """
 

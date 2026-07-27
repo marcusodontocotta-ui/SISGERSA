@@ -7,9 +7,24 @@ from config import settings
 logger = logging.getLogger("email")
 
 
+def _email_habilitado_no_banco() -> bool:
+    try:
+        from database.connection import db
+        row = db.fetch_one("SELECT valor FROM config_sistema WHERE chave = 'email_habilitado'")
+        if row:
+            val = row["valor"] if isinstance(row, dict) else row.get("valor", "true")
+            return str(val).lower() == "true"
+    except Exception:
+        pass
+    return True
+
+
 def enviar_email(destinatario: str, assunto: str, corpo_html: str) -> bool:
     if not settings.EMAIL_HABILITADO:
-        logger.info("Email desabilitado. Envio ignorado.")
+        logger.info("Email desabilitado (variavel de ambiente). Envio ignorado.")
+        return False
+    if not _email_habilitado_no_banco():
+        logger.info("Email desabilitado (config_sistema). Envio ignorado.")
         return False
     if not settings.RESEND_API_KEY:
         logger.warning("RESEND_API_KEY nao configurada.")
