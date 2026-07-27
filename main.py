@@ -3326,88 +3326,97 @@ def remover_paciente_convenio(pac_id: int, vc_id: int, usuario=Depends(exigir_lo
 
 @app.get("/orcamentos", response_class=HTMLResponse)
 def listar_orcamentos(request: Request, usuario=Depends(exigir_login), paciente_id: str = Query(None), embedded: str = Query(None)):
-    estab_id = resolver_estabelecimento(request, usuario)
-    exigir_permissao(usuario, "orcamentos", "ver", estab_id)
-    pacientes_filtro = obter_pacientes_para_filtro(usuario, estab_id)
-    paciente_id_int = int(paciente_id) if paciente_id and paciente_id.isdigit() else None
+    try:
+        estab_id = resolver_estabelecimento(request, usuario)
+        exigir_permissao(usuario, "orcamentos", "ver", estab_id)
+        pacientes_filtro = obter_pacientes_para_filtro(usuario, estab_id)
+        paciente_id_int = int(paciente_id) if paciente_id and paciente_id.isdigit() else None
 
-    if usuario["tipo"] == "paciente":
-        orcamentos = db.fetch_all(
-            """SELECT o.*, u_pac.nome AS paciente_nome, u_prof.nome AS profissional_nome,
-                      u_pac.cpf AS paciente_cpf, u_pac.telefone AS paciente_telefone, u_pac.email AS paciente_email
-               FROM orcamentos o
-               JOIN usuarios u_pac ON u_pac.id = o.paciente_usuario_id
-               JOIN usuarios u_prof ON u_prof.id = o.profissional_usuario_id
-               WHERE o.paciente_usuario_id = %s
-               ORDER BY o.criado_em DESC""",
-            (usuario["id"],),
-        )
-    elif usuario["tipo"] == "profissional":
-        query = """SELECT o.*, u_pac.nome AS paciente_nome, u_prof.nome AS profissional_nome,
+        if usuario["tipo"] == "paciente":
+            orcamentos = db.fetch_all(
+                """SELECT o.*, u_pac.nome AS paciente_nome, u_prof.nome AS profissional_nome,
                           u_pac.cpf AS paciente_cpf, u_pac.telefone AS paciente_telefone, u_pac.email AS paciente_email
                    FROM orcamentos o
                    JOIN usuarios u_pac ON u_pac.id = o.paciente_usuario_id
                    JOIN usuarios u_prof ON u_prof.id = o.profissional_usuario_id
-                   WHERE o.profissional_usuario_id = %s"""
-        params = [usuario["id"]]
-        if estab_id:
-            query += " AND o.estabelecimento_id = %s"
-            params.append(estab_id)
-        if paciente_id_int:
-            query += " AND o.paciente_usuario_id = %s"
-            params.append(paciente_id_int)
-        query += " ORDER BY o.criado_em DESC"
-        orcamentos = db.fetch_all(query, tuple(params))
-    elif estab_id:
-        query = """SELECT o.*, u_pac.nome AS paciente_nome, u_prof.nome AS profissional_nome,
-                          u_pac.cpf AS paciente_cpf, u_pac.telefone AS paciente_telefone, u_pac.email AS paciente_email
-                   FROM orcamentos o
-                   JOIN usuarios u_pac ON u_pac.id = o.paciente_usuario_id
-                   JOIN usuarios u_prof ON u_prof.id = o.profissional_usuario_id
-                   WHERE o.estabelecimento_id = %s"""
-        params = [estab_id]
-        if paciente_id_int:
-            query += " AND o.paciente_usuario_id = %s"
-            params.append(paciente_id_int)
-        query += " ORDER BY o.criado_em DESC"
-        orcamentos = db.fetch_all(query, tuple(params))
-    else:
-        if usuario.get("is_super"):
+                   WHERE o.paciente_usuario_id = %s
+                   ORDER BY o.criado_em DESC""",
+                (usuario["id"],),
+            )
+        elif usuario["tipo"] == "profissional":
             query = """SELECT o.*, u_pac.nome AS paciente_nome, u_prof.nome AS profissional_nome,
                               u_pac.cpf AS paciente_cpf, u_pac.telefone AS paciente_telefone, u_pac.email AS paciente_email
                        FROM orcamentos o
                        JOIN usuarios u_pac ON u_pac.id = o.paciente_usuario_id
                        JOIN usuarios u_prof ON u_prof.id = o.profissional_usuario_id
-                       WHERE 1=1"""
-            params = []
+                       WHERE o.profissional_usuario_id = %s"""
+            params = [usuario["id"]]
+            if estab_id:
+                query += " AND o.estabelecimento_id = %s"
+                params.append(estab_id)
+            if paciente_id_int:
+                query += " AND o.paciente_usuario_id = %s"
+                params.append(paciente_id_int)
+            query += " ORDER BY o.criado_em DESC"
+            orcamentos = db.fetch_all(query, tuple(params))
+        elif estab_id:
+            query = """SELECT o.*, u_pac.nome AS paciente_nome, u_prof.nome AS profissional_nome,
+                              u_pac.cpf AS paciente_cpf, u_pac.telefone AS paciente_telefone, u_pac.email AS paciente_email
+                       FROM orcamentos o
+                       JOIN usuarios u_pac ON u_pac.id = o.paciente_usuario_id
+                       JOIN usuarios u_prof ON u_prof.id = o.profissional_usuario_id
+                       WHERE o.estabelecimento_id = %s"""
+            params = [estab_id]
             if paciente_id_int:
                 query += " AND o.paciente_usuario_id = %s"
                 params.append(paciente_id_int)
             query += " ORDER BY o.criado_em DESC"
             orcamentos = db.fetch_all(query, tuple(params))
         else:
-            orcamentos = []
+            if usuario.get("is_super"):
+                query = """SELECT o.*, u_pac.nome AS paciente_nome, u_prof.nome AS profissional_nome,
+                                  u_pac.cpf AS paciente_cpf, u_pac.telefone AS paciente_telefone, u_pac.email AS paciente_email
+                           FROM orcamentos o
+                           JOIN usuarios u_pac ON u_pac.id = o.paciente_usuario_id
+                           JOIN usuarios u_prof ON u_prof.id = o.profissional_usuario_id
+                           WHERE 1=1"""
+                params = []
+                if paciente_id_int:
+                    query += " AND o.paciente_usuario_id = %s"
+                    params.append(paciente_id_int)
+                query += " ORDER BY o.criado_em DESC"
+                orcamentos = db.fetch_all(query, tuple(params))
+            else:
+                orcamentos = []
 
-    for o in orcamentos:
-        itens = db.fetch_all(
-            "SELECT descricao, quantidade, valor_unitario, subtotal FROM orcamento_itens WHERE orcamento_id = %s ORDER BY id",
-            (o["id"],),
-        )
-        o["_itens_resumo"] = ", ".join(
-            f"{i['descricao']} ({i['quantidade']}x R$ {'%.2f'|format(i['valor_unitario']|float)})"
-            for i in itens[:4]
-        )
-        o["_total_pago"] = db.fetch_one(
-            "SELECT COALESCE(SUM(valor), 0) AS total FROM pagamentos WHERE orcamento_id = %s AND status = 'pago'",
-            (o["id"],),
-        )["total"]
+        for o in orcamentos:
+            itens = db.fetch_all(
+                "SELECT descricao, quantidade, valor_unitario, subtotal FROM orcamento_itens WHERE orcamento_id = %s ORDER BY id",
+                (o["id"],),
+            )
+            o["_itens_resumo"] = ", ".join(
+                f"{i['descricao']} ({i['quantidade']}x R$ {float(i['valor_unitario']):.2f})"
+                for i in itens[:4]
+            )
+            o["_total_pago"] = db.fetch_one(
+                "SELECT COALESCE(SUM(valor), 0) AS total FROM pagamentos WHERE orcamento_id = %s AND status = 'pago'",
+                (o["id"],),
+            )["total"]
 
-    return templates.TemplateResponse(
-        "orcamentos/lista.html",
-        {"request": request, "usuario": usuario, "orcamentos": orcamentos,
-         "pacientes_filtro": pacientes_filtro, "paciente_id": paciente_id_int,
-         "embedded": embedded == "1"},
-    )
+        return templates.TemplateResponse(
+            "orcamentos/lista.html",
+            {"request": request, "usuario": usuario, "orcamentos": orcamentos,
+             "pacientes_filtro": pacientes_filtro, "paciente_id": paciente_id_int,
+             "embedded": embedded == "1"},
+        )
+    except Exception as e:
+        import traceback
+        logger.error(f"Erro listar_orcamentos: {e}\n{traceback.format_exc()}")
+        return templates.TemplateResponse(
+            "orcamentos/lista.html",
+            {"request": request, "usuario": usuario, "orcamentos": [],
+             "pacientes_filtro": [], "paciente_id": None, "embedded": False},
+        )
 
 
 @app.get("/orcamentos/novo", response_class=HTMLResponse)
