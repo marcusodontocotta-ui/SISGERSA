@@ -1626,6 +1626,14 @@ def criar_paciente(
          logradouro or None, numero or None, complemento or None, bairro or None,
          cidade or None, estado or None, cep or None, tipo_pagamento or 'particular', user_id),
     )
+    has_address = logradouro or cep or cidade
+    if has_address:
+        db.execute(
+            """INSERT INTO enderecos (paciente_id, logradouro, numero, complemento, bairro, cidade, estado, cep, principal)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE)""",
+            (user_id, logradouro or None, numero or None, complemento or None, bairro or None,
+             cidade or None, estado or None, cep or None),
+        )
     if foto_url:
         db.execute("UPDATE pacientes SET foto_url = %s WHERE id = %s", (foto_url, user_id))
 
@@ -1776,6 +1784,24 @@ def salvar_paciente(
         db.execute(
             f"UPDATE pacientes SET {base_fields} WHERE id = %s",
             (*base_params, pac_id),
+        )
+    existing_end = db.fetch_one(
+        "SELECT id FROM enderecos WHERE paciente_id = %s AND principal = TRUE", (pac_id,)
+    )
+    if existing_end:
+        db.execute(
+            """UPDATE enderecos SET logradouro = %s, numero = %s, complemento = %s,
+               bairro = %s, cidade = %s, estado = %s, cep = %s, atualizado_em = CURRENT_TIMESTAMP
+               WHERE id = %s""",
+            (logradouro or None, numero or None, complemento or None,
+             bairro or None, cidade or None, estado or None, cep or None, existing_end["id"]),
+        )
+    elif logradouro or cep or cidade:
+        db.execute(
+            """INSERT INTO enderecos (paciente_id, logradouro, numero, complemento, bairro, cidade, estado, cep, principal)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE)""",
+            (pac_id, logradouro or None, numero or None, complemento or None,
+             bairro or None, cidade or None, estado or None, cep or None),
         )
     return RedirectResponse("/prontuarios", status_code=302)
 
