@@ -1727,6 +1727,13 @@ def ver_paciente(pac_id: int, request: Request, usuario=Depends(exigir_login), t
             "SELECT * FROM prontuarios WHERE paciente_usuario_id = %s AND estabelecimento_id = %s",
             (pac_id, estab_id),
         )
+    elif usuario.get("is_super"):
+        prontuario = db.fetch_one(
+            "SELECT * FROM prontuarios WHERE paciente_usuario_id = %s LIMIT 1",
+            (pac_id,),
+        )
+        if prontuario:
+            estab_id = str(prontuario["estabelecimento_id"])
 
     consultas_recentes = []
     if estab_id:
