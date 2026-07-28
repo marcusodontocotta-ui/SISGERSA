@@ -2,36 +2,130 @@
 {% block titulo %}Meu Painel{% endblock %}
 {% block conteudo %}
 
+<style>
+    .med-card { transition: all 0.15s; }
+    .med-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .sv-mini-card { border-left: 3px solid #0d6efd; }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h2><i class="bi bi-person-circle"></i> Olá, {{ usuario.nome }}</h2>
+        <h2><i class="bi bi-person-circle"></i> Ola, {{ usuario.nome }}</h2>
         <small class="text-muted">Meu Painel</small>
     </div>
     <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Online</span>
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card text-bg-primary">
             <div class="card-body text-center">
                 <h3>{{ minhas_consultas|length if minhas_consultas else 0 }}</h3>
-                <small>Minhas Consultas</small>
+                <small>Consultas</small>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card text-bg-info">
             <div class="card-body text-center">
                 <h3>{{ meus_prontuarios|length if meus_prontuarios else 0 }}</h3>
-                <small>Meus Prontuários</small>
+                <small>Prontuarios</small>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
+        <div class="card text-bg-success">
+            <div class="card-body text-center">
+                <h3>{{ meus_medicamentos|length if meus_medicamentos else 0 }}</h3>
+                <small>Medicamentos</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
         <div class="card text-bg-warning">
             <div class="card-body text-center">
-                <h3>{{ meus_orcamentos|length if meus_orcamentos else 0 }}</h3>
-                <small>Orçamentos</small>
+                <h3>{{ meus_sinais_vitais|length if meus_sinais_vitais else 0 }}</h3>
+                <small>Medicoes</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-capsule"></i> Meus Medicamentos</div>
+            <div class="card-body">
+                {% if meus_medicamentos %}
+                <div class="row g-2">
+                    {% for m in meus_medicamentos %}
+                    <div class="col-md-6">
+                        <div class="card med-card border">
+                            <div class="card-body py-2 px-3">
+                                <strong>{{ m.nome_med or m.nome_medicamento }}</strong>
+                                <div class="d-flex gap-2 small text-muted">
+                                    {% if m.dose %}<span><i class="bi bi-droplet"></i> {{ m.dose }}</span>{% endif %}
+                                    {% if m.frequencia %}<span><i class="bi bi-clock"></i> {{ m.frequencia }}</span>{% endif %}
+                                    {% if m.via %}<span><i class="bi bi-syringe"></i> {{ m.via }}</span>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-3 text-muted">
+                    <i class="bi bi-capsule fs-1"></i>
+                    <p class="mt-1">Nenhum medicamento cadastrado.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-activity"></i> Minhas Medicoes</span>
+                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovaMedicao"><i class="bi bi-plus"></i> Nova</button>
+            </div>
+            <div class="card-body">
+                {% if meus_sinais_vitais %}
+                <div class="row g-2">
+                    {% for sv in meus_sinais_vitais %}
+                    <div class="col-12">
+                        <div class="card sv-mini-card border">
+                            <div class="card-body py-1 px-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">{{ sv.aferido_em.strftime('%d/%m/%Y %H:%M') if sv.aferido_em else '-' }}</small>
+                                    <div class="d-flex gap-2 small">
+                                        {% if sv.pressao_sistolica and sv.pressao_diastolica %}
+                                        <span title="PA"><strong>{{ sv.pressao_sistolica }}/{{ sv.pressao_diastolica }}</strong> mmHg</span>
+                                        {% endif %}
+                                        {% if sv.frequencia_cardiaca %}
+                                        <span title="FC"><strong>{{ sv.frequencia_cardiaca }}</strong> bpm</span>
+                                        {% endif %}
+                                        {% if sv.saturacao_oxigenio %}
+                                        <span title="SpO2"><strong>{{ sv.saturacao_oxigenio }}%</strong></span>
+                                        {% endif %}
+                                        {% if sv.glicemia %}
+                                        <span title="Glicemia"><strong>{{ sv.glicemia }}</strong> mg/dL</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% if sv.observacoes %}
+                                <small class="text-muted d-block">{{ sv.observacoes }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-3 text-muted">
+                    <i class="bi bi-activity fs-1"></i>
+                    <p class="mt-1">Nenhuma medicao registrada. Clique em "Nova" para comecar.</p>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -66,7 +160,7 @@
     </div>
     <div class="col-md-6">
         <div class="card">
-            <div class="card-header"><i class="bi bi-folder-medical"></i> Meus Prontuários</div>
+            <div class="card-header"><i class="bi bi-folder-medical"></i> Meus Prontuarios</div>
             <div class="card-body">
                 {% if meus_prontuarios %}
                 <div class="list-group list-group-flush">
@@ -83,7 +177,7 @@
                 {% else %}
                 <div class="text-center py-4 text-muted">
                     <i class="bi bi-folder fs-1"></i>
-                    <p class="mt-2">Nenhum prontuário encontrado.</p>
+                    <p class="mt-2">Nenhum prontuario encontrado.</p>
                 </div>
                 {% endif %}
             </div>
@@ -93,7 +187,7 @@
 
 {% if meus_orcamentos %}
 <div class="card mb-4">
-    <div class="card-header"><i class="bi bi-file-earmark-text"></i> Meus Orçamentos Recentes</div>
+    <div class="card-header"><i class="bi bi-file-earmark-text"></i> Meus Orcamentos</div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-sm table-hover">
@@ -113,5 +207,56 @@
     </div>
 </div>
 {% endif %}
+
+<div class="modal fade" id="modalNovaMedicao" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/paciente/medicao">
+                <div class="modal-header"><h5 class="modal-title">Nova Medicao</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <p class="text-muted small">Registre aqui suas medicoes caseiras. Seus profissionais poderao acompanhar.</p>
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <label class="form-label">PA Sistolica</label>
+                            <input type="number" class="form-control" name="pressao_sistolica" placeholder="mmHg" min="0" max="300">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">PA Diastolica</label>
+                            <input type="number" class="form-control" name="pressao_diastolica" placeholder="mmHg" min="0" max="300">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">FC (bpm)</label>
+                            <input type="number" class="form-control" name="frequencia_cardiaca" placeholder="bpm" min="0" max="300">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">SpO2 (%)</label>
+                            <input type="number" class="form-control" name="saturacao_oxigenio" placeholder="%" min="0" max="100" step="0.1">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Temperatura (C)</label>
+                            <input type="number" class="form-control" name="temperatura" placeholder="C" min="30" max="45" step="0.1">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Glicemia (mg/dL)</label>
+                            <input type="number" class="form-control" name="glicemia" placeholder="mg/dL" min="0" max="1000">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Peso (kg)</label>
+                            <input type="number" class="form-control" name="peso" placeholder="kg" min="0" max="500" step="0.1">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Observacoes</label>
+                            <input type="text" class="form-control" name="observacoes" placeholder="Opcional">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Registrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 {% endblock %}

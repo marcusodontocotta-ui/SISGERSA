@@ -1102,6 +1102,20 @@ def dashboard(request: Request, usuario=Depends(exigir_login)):
                WHERE o.paciente_usuario_id = %s ORDER BY o.criado_em DESC LIMIT 5""",
             (usuario["id"],),
         )
+        ctx["meus_medicamentos"] = db.fetch_all(
+            """SELECT pm.*, m.nome AS nome_med
+               FROM paciente_medicamentos pm
+               LEFT JOIN medicamentos m ON m.id = pm.medicamento_id
+               WHERE pm.paciente_id = %s AND pm.ativo = TRUE
+               ORDER BY pm.criado_em DESC""",
+            (usuario["id"],),
+        )
+        ctx["meus_sinais_vitais"] = db.fetch_all(
+            """SELECT * FROM sinais_vitais
+               WHERE paciente_id = %s
+               ORDER BY aferido_em DESC LIMIT 10""",
+            (usuario["id"],),
+        )
 
     if usuario["tipo"] == "admin" and usuario.get("is_super"):
         ctx["total_estabelecimentos"] = db.fetch_one("SELECT COUNT(*) AS total FROM estabelecimentos WHERE ativo = TRUE")
@@ -1133,6 +1147,28 @@ def dashboard(request: Request, usuario=Depends(exigir_login)):
         )
 
     return templates.TemplateResponse(template_name, ctx)
+
+
+@app.post("/paciente/medicao")
+def paciente_nova_medicao(request: Request, usuario=Depends(exigir_login)):
+    if usuario["tipo"] != "paciente":
+        raise HTTPException(status_code=403)
+    form = dict(request.form())
+    db.execute(
+        """INSERT INTO sinais_vitais (paciente_id, pressao_sistolica, pressao_diastolica,
+           frequencia_cardiaca, saturacao_oxigenio, temperatura, glicemia, peso, observacoes)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+        (usuario["id"],
+         int(form["pressao_sistolica"]) if form.get("pressao_sistolica") else None,
+         int(form["pressao_diastolica"]) if form.get("pressao_diastolica") else None,
+         int(form["frequencia_cardiaca"]) if form.get("frequencia_cardiaca") else None,
+         float(form["saturacao_oxigenio"]) if form.get("saturacao_oxigenio") else None,
+         float(form["temperatura"]) if form.get("temperatura") else None,
+         float(form["glicemia"]) if form.get("glicemia") else None,
+         float(form["peso"]) if form.get("peso") else None,
+         form.get("observacoes")),
+    )
+    return RedirectResponse(url="/dashboard", status_code=302)
 
 
 @app.get("/api/dashboard-stats")
