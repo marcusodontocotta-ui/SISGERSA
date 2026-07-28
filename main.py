@@ -1893,7 +1893,7 @@ def buscar_medicamentos(q: str = ""):
     if len(q) < 2:
         return JSONResponse([])
     rows = db.fetch_all(
-        "SELECT id, nome, principio_ativo FROM medicamentos WHERE unaccent(nome) ILIKE unaccent(%s) OR unaccent(principio_ativo) ILIKE unaccent(%s) LIMIT 20",
+        "SELECT id, nome, principio_ativo FROM medicamentos WHERE nome ILIKE %s OR principio_ativo ILIKE %s LIMIT 20",
         (f"%{q}%", f"%{q}%"),
     )
     return JSONResponse([{"id": r["id"], "nome": r["nome"], "principio_ativo": r["principio_ativo"]} for r in rows])
