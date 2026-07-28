@@ -27,6 +27,7 @@ def dump_database():
 def _dump_postgresql(settings, dump_file: str) -> str:
     try:
         import psycopg
+        from psycopg.sql import SQL, Identifier
         conn = psycopg.connect(
             host=settings.DB_HOST,
             port=settings.DB_PORT,
@@ -53,7 +54,7 @@ def _dump_postgresql(settings, dump_file: str) -> str:
             for table in tables:
                 try:
                     cur = conn.cursor()
-                    cur.execute(f'SELECT * FROM "{table}"')
+                    cur.execute(SQL('SELECT * FROM {}').format(Identifier(table)))
                     rows = cur.fetchall()
                     cols = [desc[0] for desc in cur.description]
                     cur.close()

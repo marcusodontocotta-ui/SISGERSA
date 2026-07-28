@@ -1,3 +1,4 @@
+import time
 from database.connection import db
 
 MODULOS = {
@@ -75,18 +76,25 @@ DEFAULT_PERMISSIONS = {
 }
 
 _overrides_cache = {}
-
+_CACHE_TTL = 300
 
 def _limpar_cache(estab_id=None):
-    keys = [k for k in _overrides_cache if estab_id is None or k[1] == estab_id]
-    for k in keys:
+    now = time.time()
+    expired = [k for k, (_, ts) in _overrides_cache.items() if now - ts > _CACHE_TTL]
+    for k in expired:
         del _overrides_cache[k]
+    if estab_id is not None:
+        keys = [k for k in _overrides_cache if k[1] == estab_id]
+        for k in keys:
+            del _overrides_cache[k]
 
 
 def _buscar_overrides(usuario_id: int, estabelecimento_id: int) -> dict:
     key = (usuario_id, estabelecimento_id)
     if key in _overrides_cache:
-        return _overrides_cache[key]
+        cached, ts = _overrides_cache[key]
+        if time.time() - ts < _CACHE_TTL:
+            return cached
 
     rows = db.fetch_all(
         "SELECT modulo, pode_ver, pode_criar, pode_editar, pode_excluir FROM permissoes_usuario WHERE usuario_id = %s AND estabelecimento_id = %s",
@@ -101,7 +109,7 @@ def _buscar_overrides(usuario_id: int, estabelecimento_id: int) -> dict:
             "editar": bool(row["pode_editar"]) if row["pode_editar"] is not None else None,
             "excluir": bool(row["pode_excluir"]) if row["pode_excluir"] is not None else None,
         }
-    _overrides_cache[key] = overrides
+    _overrides_cache[key] = (overrides, time.time())
     return overrides
 
 

@@ -2,7 +2,7 @@
 {% block titulo %}Profissionais - SISGERSA{% endblock %}
 {% block conteudo %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-person-badge"></i> Profissionais</h2>
+    <h2><i class="bi bi-person-badge"></i> Profissionais <span class="badge bg-secondary fs-6">{{ profissionais|length }}</span></h2>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoProf">
         <i class="bi bi-person-plus"></i> Novo Profissional
     </button>
@@ -18,20 +18,27 @@
 <div class="row g-4">
     {% for p in profissionais %}
     <div class="col-md-4 col-lg-3">
-        <div class="card h-100 shadow-sm">
+        <div class="card h-100 shadow-sm {% if not p.ativo %}border-danger border-opacity-25{% endif %}">
             <div class="card-body text-center">
                 {% if p.foto_url %}
-                <img src="{{ p.foto_url }}" class="rounded-circle mb-2" style="width:80px;height:80px;object-fit:cover;border:3px solid #0d6efd;">
+                <img src="{{ p.foto_url }}" class="rounded-circle mb-2" style="width:80px;height:80px;object-fit:cover;border:3px solid {% if p.ativo %}#0d6efd{% else %}#dc3545{% endif %};">
                 {% else %}
-                <div class="rounded-circle bg-primary d-inline-flex align-items-center justify-content-center text-white mb-2" style="width:80px;height:80px;">
+                <div class="rounded-circle {% if p.ativo %}bg-primary{% else %}bg-secondary{% endif %} d-inline-flex align-items-center justify-content-center text-white mb-2" style="width:80px;height:80px;">
                     <i class="bi bi-person" style="font-size:2rem;"></i>
                 </div>
                 {% endif %}
                 <h6 class="card-title mb-1">{{ p.nome }}</h6>
                 <small class="text-muted">{{ p.email }}</small>
-                {% if p.especialidade %}
-                <div><span class="badge bg-info mt-1">{{ p.especialidade }}</span></div>
-                {% endif %}
+                <div>
+                    {% if p.ativo %}
+                    <span class="badge bg-success mt-1">Ativo</span>
+                    {% else %}
+                    <span class="badge bg-danger mt-1">Inativo</span>
+                    {% endif %}
+                    {% if p.especialidade %}
+                    <span class="badge bg-info mt-1">{{ p.especialidade }}</span>
+                    {% endif %}
+                </div>
                 {% if p.estabelecimento_nome %}
                 <div><small class="text-muted"><i class="bi bi-building"></i> {{ p.estabelecimento_nome }}</small></div>
                 {% endif %}
@@ -43,12 +50,20 @@
                 <a href="/profissionais/{{ p.id }}/editar" class="btn btn-sm btn-outline-primary">
                     <i class="bi bi-pencil"></i> Editar
                 </a>
+                {% if p.ativo %}
                 <form method="POST" action="/profissionais/{{ p.id }}/desativar"
                       onsubmit="return confirm('Desativar este profissional?')">
-                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                        <i class="bi bi-trash"></i>
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Desativar">
+                        <i class="bi bi-x-circle"></i>
                     </button>
                 </form>
+                {% else %}
+                <form method="POST" action="/profissionais/{{ p.id }}/reativar">
+                    <button type="submit" class="btn btn-sm btn-outline-success" title="Reativar">
+                        <i class="bi bi-check-circle"></i>
+                    </button>
+                </form>
+                {% endif %}
             </div>
         </div>
     </div>

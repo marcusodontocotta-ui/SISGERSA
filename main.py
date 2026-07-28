@@ -5,6 +5,7 @@ import secrets
 from collections import defaultdict
 import time
 import logging
+from contextlib import asynccontextmanager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("sisgersa")
@@ -22,6 +23,10 @@ from database.backup import dump_database, start_background_backup, stop_backgro
 from utils.auth import (
     usuario_por_email,
     usuarios_por_email,
+    usuarios_por_cpf,
+    usuario_por_cpf,
+    _is_cpf,
+    _normalizar_cpf,
     verificar_senha,
     criar_token,
     verificar_token,
@@ -38,15 +43,91 @@ from utils.planos import verificar_limite, LimiteAtingidoError, obter_plano_esta
 from utils.email import enviar_email, montar_confirmacao_agendamento
 from utils.scheduler import iniciar_scheduler, parar_scheduler
 
-app = FastAPI(title="SISGERSA", docs_url=None, redoc_url=None)
+@asynccontextmanager
+async def lifespan(app):
+    logger.info(f"Startup: ENVIRONMENT={settings.ENVIRONMENT}, DB_ENGINE={settings.DB_ENGINE}")
+    try:
+        db.get_connection()
+        logger.info("Startup: conexao DB OK")
+    except Exception as e:
+        logger.error(f"Startup: falha na conexao DB: {e}")
 
-@app.on_event("startup")
-def startup_event():
+    if settings.DB_ENGINE == "postgresql":
+        try:
+            from init_db import criar_banco, criar_admin_padrao, seed_planos, seed_cupons
+            criar_banco()
+            criar_admin_padrao()
+            seed_planos()
+            seed_cupons()
+            logger.info("Startup: banco inicializado com sucesso")
+        except Exception as e:
+            logger.error(f"Startup: erro ao inicializar banco: {e}", exc_info=True)
+    else:
+        try:
+            from init_db import seed_planos, seed_cupons
+            seed_planos()
+            seed_cupons()
+        except Exception as e:
+            logger.error(f"Startup: erro ao semear dados: {e}")
+
+    if settings.DB_ENGINE == "postgresql":
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(settings.DATABASE_URL)
+            host = parsed.hostname or settings.DB_HOST
+            port = parsed.port or 5432
+            init_connectivity_checker(host, port)
+            logger.info(f"Startup: Connectivity checker ON, Render={host}:{port}")
+        except Exception as e:
+            logger.error(f"Startup: erro connectivity: {e}")
+
+        try:
+            from database.cache import init_cache, download_to_cache
+            init_cache()
+            initial = force_check()
+            if initial:
+                logger.info("Startup: online, baixando cache...")
+                download_to_cache()
+            else:
+                logger.warning("Startup: offline, usando cache SQLite existente")
+        except Exception as e:
+            logger.error(f"Startup: erro cache inicial: {e}")
+
+        start_background_cache(interval=3600)
+
+    try:
+        dump_file = dump_database()
+        if dump_file:
+            cleanup_old_backups()
+            logger.info(f"Startup: backup local criado")
+        else:
+            logger.warning("Startup: backup nao criado")
+    except Exception as e:
+        logger.error(f"Startup: erro backup: {e}")
+
+    start_background_backup(interval=21600)
     iniciar_scheduler()
 
-@app.on_event("shutdown")
-def shutdown_event():
+    yield
+
     parar_scheduler()
+    stop_background_cache()
+    stop_background_backup()
+    db.close()
+
+
+app = FastAPI(title="SISGERSA", docs_url=None, redoc_url=None, lifespan=lifespan)
+
+
+def _proximo_numero_prontuario(estabelecimento_id: int) -> str:
+    row = db.fetch_one(
+        "SELECT MAX(CAST(SUBSTRING(numero_prontuario FROM 7) AS INTEGER)) AS max_num "
+        "FROM prontuarios WHERE estabelecimento_id = %s",
+        (estabelecimento_id,),
+    )
+    proximo = (row["max_num"] or 0) + 1 if row else 1
+    return f"PRONT-{proximo:05d}"
+
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -85,7 +166,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Content-Security-Policy"] = "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data:"
@@ -108,6 +189,19 @@ def is_rate_limited(ip: str) -> bool:
 
 def record_login_attempt(ip: str):
     login_attempts[ip].append(time.time())
+
+def _cleanup_rate_limits():
+    now = time.time()
+    empty_keys = [k for k, v in login_attempts.items() if not v or now - v[-1] > RATE_LIMIT_WINDOW * 2]
+    for k in empty_keys:
+        del login_attempts[k]
+    empty_keys_w = [k for k, v in write_requests.items() if not v or now - v[-1] > WRITE_RATE_WINDOW * 2]
+    for k in empty_keys_w:
+        del write_requests[k]
+    stale = [k for k in list(_pending_logins_ts.keys()) if now - _pending_logins_ts[k] > 600]
+    for k in stale:
+        _pending_logins.pop(k, None)
+        _pending_logins_ts.pop(k, None)
 
 
 write_requests = defaultdict(list)
@@ -228,76 +322,17 @@ def obter_pacientes_para_filtro(usuario, estab_id=None):
     return []
 
 
-@app.on_event("startup")
-def startup():
-    logger.info(f"Startup: ENVIRONMENT={settings.ENVIRONMENT}, DB_ENGINE={settings.DB_ENGINE}")
+@app.get("/health")
+def health_check():
     try:
-        db.get_connection()
-        logger.info("Startup: conexao DB OK")
-    except Exception as e:
-        logger.error(f"Startup: falha na conexao DB: {e}")
-
-    if settings.DB_ENGINE == "postgresql":
-        try:
-            from init_db import criar_banco, criar_admin_padrao, seed_planos, seed_cupons
-            criar_banco()
-            criar_admin_padrao()
-            seed_planos()
-            seed_cupons()
-            logger.info("Startup: banco inicializado com sucesso")
-        except Exception as e:
-            logger.error(f"Startup: erro ao inicializar banco: {e}", exc_info=True)
-    else:
-        try:
-            from init_db import seed_planos, seed_cupons
-            seed_planos()
-            seed_cupons()
-        except Exception as e:
-            logger.error(f"Startup: erro ao semear dados: {e}")
-
-    if settings.DB_ENGINE == "postgresql":
-        try:
-            from urllib.parse import urlparse
-            parsed = urlparse(settings.DATABASE_URL)
-            host = parsed.hostname or settings.DB_HOST
-            port = parsed.port or 5432
-            init_connectivity_checker(host, port)
-            logger.info(f"Startup: Connectivity checker ON, Render={host}:{port}")
-        except Exception as e:
-            logger.error(f"Startup: erro connectivity: {e}")
-
-        try:
-            from database.cache import init_cache, download_to_cache
-            init_cache()
-            initial = force_check()
-            if initial:
-                logger.info("Startup: online, baixando cache...")
-                download_to_cache()
-            else:
-                logger.warning("Startup: offline, usando cache SQLite existente")
-        except Exception as e:
-            logger.error(f"Startup: erro cache inicial: {e}")
-
-        start_background_cache(interval=3600)
-
-    try:
-        dump_file = dump_database()
-        if dump_file:
-            cleanup_old_backups()
-            logger.info(f"Startup: backup local criado")
-        else:
-            logger.warning("Startup: backup nao criado")
-    except Exception as e:
-        logger.error(f"Startup: erro backup: {e}")
-
-    start_background_backup(interval=21600)
-
-
-@app.on_event("shutdown")
-def shutdown():
-    stop_background_cache()
-    stop_background_backup()
-    db.close()
+        row = db.fetch_one("SELECT 1 AS ok")
+        db_ok = row is not None
+    except Exception:
+        db_ok = False
+    return JSONResponse({
+        "status": "ok" if db_ok else "degraded",
+        "database": "connected" if db_ok else "disconnected",
+    })
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -327,7 +362,10 @@ def login_submit(request: Request, email: str = Form(...), senha: str = Form(...
             {"request": request, "erro": "Muitas tentativas. Aguarde 5 minutos."},
         )
 
-    todos_usuarios = usuarios_por_email(email)
+    if _is_cpf(email):
+        todos_usuarios = usuarios_por_cpf(_normalizar_cpf(email))
+    else:
+        todos_usuarios = usuarios_por_email(email)
     if not todos_usuarios:
         record_login_attempt(client_ip)
         return templates.TemplateResponse(
@@ -356,7 +394,7 @@ def login_submit(request: Request, email: str = Form(...), senha: str = Form(...
     session_key = hashlib.sha256(f"{email}:{time.time()}:{client_ip}".encode()).hexdigest()[:32]
 
     _pending_logins[session_key] = [u["id"] for u in usuarios_validos]
-    _pending_logins.pop("__cleanup__", None)
+    _pending_logins_ts[session_key] = time.time()
 
     usuarios_info = []
     for u in usuarios_validos:
@@ -377,6 +415,7 @@ def login_submit(request: Request, email: str = Form(...), senha: str = Form(...
 
 
 _pending_logins = {}
+_pending_logins_ts = {}
 
 
 def _login_usuario(request: Request, usuario: dict):
@@ -411,6 +450,7 @@ def login_selecionar(request: Request, session_key: str = Form(...), usuario_id:
         )
 
     allowed_ids = _pending_logins.pop(session_key, [])
+    _pending_logins_ts.pop(session_key, None)
     if not allowed_ids or usuario_id not in allowed_ids:
         return templates.TemplateResponse(
             "auth/login.html",
@@ -1055,11 +1095,13 @@ def dashboard(request: Request, usuario=Depends(exigir_login)):
         ctx["total_usuarios"] = db.fetch_one("SELECT COUNT(*) AS total FROM usuarios WHERE ativo = TRUE")
         ctx["total_pacientes"] = db.fetch_one("SELECT COUNT(*) AS total FROM prontuarios")
         ctx["total_profissionais"] = db.fetch_one("SELECT COUNT(*) AS total FROM usuarios WHERE tipo = 'profissional' AND ativo = TRUE")
+        filtro_consultas, params_cf = _mes_atual_filter()
         ctx["total_consultas_mes"] = db.fetch_one(
-            f"SELECT COUNT(*) AS total FROM consultas WHERE {_mes_atual_filter()}"
+            f"SELECT COUNT(*) AS total FROM consultas WHERE {filtro_consultas}", params_cf
         )
+        filtro_receita, params_rf = _mes_atual_filter('')
         ctx["receita_mes"] = db.fetch_one(
-            f"SELECT COALESCE(SUM(valor), 0) AS total FROM pagamentos WHERE status = 'pago' AND {_mes_atual_filter('')}"
+            f"SELECT COALESCE(SUM(valor), 0) AS total FROM pagamentos WHERE status = 'pago' AND {filtro_receita}", params_rf
         )
         ctx["planos_distribuicao"] = db.fetch_all(
             """SELECT p.nome, COUNT(e.id) AS total FROM planos p
@@ -1441,8 +1483,8 @@ def listar_profissionais(request: Request, usuario=Depends(exigir_login)):
            FROM usuarios u
            LEFT JOIN profissional_estabelecimento pe ON pe.usuario_id = u.id
            LEFT JOIN estabelecimentos e ON e.id = pe.estabelecimento_id
-           WHERE u.tipo = 'profissional' AND u.ativo = TRUE
-           ORDER BY u.nome"""
+           WHERE u.tipo = 'profissional'
+           ORDER BY u.ativo DESC, u.nome"""
     )
 
     estabelecimentos = db.fetch_all(
@@ -1579,6 +1621,15 @@ def desativar_profissional(prof_id: int, usuario=Depends(exigir_login)):
     return RedirectResponse("/profissionais", status_code=302)
 
 
+@app.post("/profissionais/{prof_id}/reativar")
+def reativar_profissional(prof_id: int, usuario=Depends(exigir_login)):
+    if usuario["tipo"] != "admin":
+        raise HTTPException(status_code=403)
+
+    db.execute("UPDATE profissionais SET ativo = TRUE WHERE id = %s", (prof_id,))
+    return RedirectResponse("/profissionais", status_code=302)
+
+
 @app.post("/pacientes/criar")
 def criar_paciente(
     request: Request,
@@ -1639,11 +1690,7 @@ def criar_paciente(
 
     if estab_id:
         vincular_paciente(user_id, int(estab_id))
-        count = db.fetch_one(
-            "SELECT COUNT(*) AS total FROM prontuarios WHERE estabelecimento_id = %s",
-            (estab_id,),
-        )
-        numero = f"PRONT-{int(count['total']) + 1:05d}"
+        numero = _proximo_numero_prontuario(int(estab_id))
         db.execute(
             "INSERT INTO prontuarios (paciente_usuario_id, estabelecimento_id, numero_prontuario) VALUES (%s, %s, %s)",
             (user_id, int(estab_id), numero),
@@ -1652,11 +1699,7 @@ def criar_paciente(
         estabs = db.fetch_all("SELECT id FROM estabelecimentos WHERE ativo = TRUE")
         for e in estabs:
             vincular_paciente(user_id, int(e["id"]))
-            count = db.fetch_one(
-                "SELECT COUNT(*) AS total FROM prontuarios WHERE estabelecimento_id = %s",
-                (e["id"],),
-            )
-            numero = f"PRONT-{int(count['total']) + 1:05d}"
+            numero = _proximo_numero_prontuario(int(e["id"]))
             db.execute(
                 "INSERT INTO prontuarios (paciente_usuario_id, estabelecimento_id, numero_prontuario) VALUES (%s, %s, %s)",
                 (user_id, int(e["id"]), numero),
@@ -2521,11 +2564,7 @@ def criar_prontuario(
         )
 
     if not numero:
-        count = db.fetch_one(
-            "SELECT COUNT(*) AS total FROM prontuarios WHERE estabelecimento_id = %s",
-            (estab_id,),
-        )
-        numero = f"PRONT-{int(count['total']) + 1:05d}"
+        numero = _proximo_numero_prontuario(int(estab_id))
 
     db.execute(
         "INSERT INTO prontuarios (paciente_usuario_id, estabelecimento_id, numero_prontuario) VALUES (%s, %s, %s)",
@@ -4197,11 +4236,7 @@ def fix_orphan_patients(request: Request, usuario=Depends(exigir_login)):
     estab_id = estab["id"]
     criados = []
     for pac in orfaos:
-        count = db.fetch_one(
-            "SELECT COUNT(*) AS total FROM prontuarios WHERE estabelecimento_id = %s",
-            (estab_id,),
-        )
-        numero = f"PRONT-{int(count['total']) + 1:05d}"
+        numero = _proximo_numero_prontuario(estab_id)
         db.execute(
             "INSERT INTO paciente_estabelecimento (usuario_id, estabelecimento_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
             (pac["id"], estab_id),

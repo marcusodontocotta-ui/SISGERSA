@@ -63,6 +63,31 @@ def usuarios_por_email(email: str) -> list:
     )
 
 
+def _normalizar_cpf(texto: str) -> str:
+    return "".join(c for c in texto if c.isdigit())
+
+
+def _is_cpf(texto: str) -> bool:
+    cpf = _normalizar_cpf(texto)
+    return len(cpf) == 11 and cpf.isdigit()
+
+
+def usuarios_por_cpf(cpf: str) -> list:
+    cpf_limpo = _normalizar_cpf(cpf)
+    return db.fetch_all(
+        "SELECT * FROM usuarios WHERE REGEXP_REPLACE(cpf, '[^0-9]', '', 'g') = %s AND ativo = TRUE ORDER BY tipo, nome",
+        (cpf_limpo,),
+    )
+
+
+def usuario_por_cpf(cpf: str) -> dict | None:
+    cpf_limpo = _normalizar_cpf(cpf)
+    return db.fetch_one(
+        "SELECT * FROM usuarios WHERE REGEXP_REPLACE(cpf, '[^0-9]', '', 'g') = %s AND ativo = TRUE",
+        (cpf_limpo,),
+    )
+
+
 def criar_paciente(
     nome: str, email: str, senha: str, telefone: str = None,
     cpf: str = None, data_nascimento: str = None, tipo_pagamento: str = "particular",

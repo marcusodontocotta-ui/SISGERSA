@@ -1,6 +1,12 @@
+import os
+import sys
 import psycopg
 
-conn = psycopg.connect('postgresql://sisgersa:tOJ0rv1qWUQABYIWRMO0ew2c2AtfGZNU@dpg-d9hqikr7uimc73dt3e0g-a.oregon-postgres.render.com/sisgersa')
+DB_URL = os.getenv("DATABASE_URL")
+if not DB_URL:
+    print("ERROR: Set DATABASE_URL environment variable"); sys.exit(1)
+
+conn = psycopg.connect(DB_URL, sslmode="require")
 cur = conn.cursor()
 
 cols = [
@@ -13,13 +19,14 @@ cols = [
     ("usuarios", "nome_mae", "VARCHAR(200)"),
 ]
 
+from psycopg.sql import SQL, Identifier
+
 cur.execute("""SELECT column_name FROM information_schema.columns WHERE table_name='usuarios'""")
 existing = {r[0] for r in cur.fetchall()}
 
 for table, col, ctype in cols:
     if col not in existing:
-        sql = f"ALTER TABLE {table} ADD COLUMN {col} {ctype}"
-        cur.execute(sql)
+        cur.execute(SQL("ALTER TABLE {} ADD COLUMN {} {}").format(Identifier(table), Identifier(col), SQL(ctype)))
         print(f"Adicionado: {col}")
     else:
         print(f"Ja existe: {col}")

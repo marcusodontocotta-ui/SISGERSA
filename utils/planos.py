@@ -1,18 +1,24 @@
+from datetime import datetime
+from calendar import monthrange
 from config import settings
 from database.connection import db
 
 
-def _mes_atual_filter(alias: str = "") -> str:
+def _mes_atual_filter(alias: str = "") -> tuple:
+    now = datetime.now()
     prefix = f"{alias}." if alias else ""
+    first_day = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    last_day_num = monthrange(now.year, now.month)[1]
+    last_day = first_day.replace(day=last_day_num, hour=23, minute=59, second=59)
     if settings.DB_ENGINE == "postgresql":
-        return (
-            f"EXTRACT(MONTH FROM {prefix}criado_em) = EXTRACT(MONTH FROM CURRENT_DATE) "
-            f"AND EXTRACT(YEAR FROM {prefix}criado_em) = EXTRACT(YEAR FROM CURRENT_DATE)"
+        sql = (
+            f"{prefix}criado_em >= %s AND {prefix}criado_em <= %s"
         )
-    return (
-        f"MONTH({prefix}criado_em) = MONTH(CURRENT_DATE()) "
-        f"AND YEAR({prefix}criado_em) = YEAR(CURRENT_DATE())"
-    )
+    else:
+        sql = (
+            f"{prefix}criado_em >= %s AND {prefix}criado_em <= %s"
+        )
+    return sql, (first_day, last_day)
 
 
 def obter_plano_estabelecimento(estabelecimento_id: int) -> dict:
@@ -25,9 +31,10 @@ def obter_plano_estabelecimento(estabelecimento_id: int) -> dict:
 
 
 def contar_uso(estabelecimento_id: int) -> dict:
+    filtro_consultas, params_c = _mes_atual_filter()
     consultas_mes = db.fetch_one(
-        f"SELECT COUNT(*) as total FROM consultas WHERE estabelecimento_id = %s AND {_mes_atual_filter()}",
-        (estabelecimento_id,),
+        f"SELECT COUNT(*) as total FROM consultas WHERE estabelecimento_id = %s AND {filtro_consultas}",
+        (estabelecimento_id, *params_c),
     )
     profissionais = db.fetch_one(
         "SELECT COUNT(*) as total FROM profissional_estabelecimento WHERE estabelecimento_id = %s",
@@ -41,9 +48,10 @@ def contar_uso(estabelecimento_id: int) -> dict:
         "SELECT COUNT(*) as total FROM prontuarios WHERE estabelecimento_id = %s",
         (estabelecimento_id,),
     )
+    filtro_orc, params_o = _mes_atual_filter()
     orcamentos_mes = db.fetch_one(
-        f"SELECT COUNT(*) as total FROM orcamentos WHERE estabelecimento_id = %s AND {_mes_atual_filter()}",
-        (estabelecimento_id,),
+        f"SELECT COUNT(*) as total FROM orcamentos WHERE estabelecimento_id = %s AND {filtro_orc}",
+        (estabelecimento_id, *params_o),
     )
     procedimentos = db.fetch_one(
         "SELECT COUNT(*) as total FROM procedimentos",

@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import logging
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -7,6 +8,7 @@ logger = logging.getLogger("init_db")
 
 from database.connection import db
 from database.models import get_schema, get_alter_tables
+from database.schema_extra import SQL_SCHEMA_EXTRA
 from config import settings
 
 
@@ -114,7 +116,102 @@ def criar_banco():
     cursor.close()
     conn.close()
 
+    if engine == "postgresql":
+        criar_schema_extra()
+
     logger.info(f"criar_banco: {criadas} OK, {erros} erros")
+
+
+def criar_schema_extra():
+    if settings.DB_ENGINE != "postgresql":
+        return
+    try:
+        import psycopg
+        conn = psycopg.connect(
+            host=settings.DB_HOST, port=settings.DB_PORT,
+            user=settings.DB_USER, password=settings.DB_PASSWORD,
+            dbname=settings.DB_NAME, sslmode="prefer",
+        )
+        conn.autocommit = True
+        cursor = conn.cursor()
+
+        def _split_sql(sql):
+            statements = []
+            i = 0
+            while i < len(sql):
+                while i < len(sql) and sql[i] in ' \n\r\t':
+                    i += 1
+                if i >= len(sql):
+                    break
+                if sql[i:i+2] == '--':
+                    end = sql.find('\n', i)
+                    i = end + 1 if end != -1 else len(sql)
+                    continue
+                if sql[i] == '\n':
+                    i += 1
+                    continue
+
+                in_dollar = False
+                dollar_tag = None
+                in_string = False
+                string_char = None
+                start = i
+
+                while i < len(sql):
+                    ch = sql[i]
+
+                    if not in_dollar:
+                        if ch in ("'", '"') and not in_string:
+                            in_string = True
+                            string_char = ch
+                        elif in_string and ch == string_char:
+                            if i + 1 < len(sql) and sql[i+1] == string_char:
+                                i += 2
+                                continue
+                            in_string = False
+                            string_char = None
+
+                    if not in_string:
+                        if not in_dollar:
+                            m = re.match(r'^\$(\w*)\$', sql[i:])
+                            if m:
+                                in_dollar = True
+                                dollar_tag = m.group(1)
+                                i += len(m.group(0))
+                                continue
+                        else:
+                            end_tag = '$' + (dollar_tag or '') + '$'
+                            if sql[i:i+len(end_tag)] == end_tag:
+                                in_dollar = False
+                                dollar_tag = None
+                                i += len(end_tag)
+                                continue
+
+                    if ch == ';' and not in_dollar and not in_string:
+                        statements.append(sql[start:i+1])
+                        i += 1
+                        break
+
+                    i += 1
+                else:
+                    remaining = sql[start:].strip()
+                    if remaining:
+                        statements.append(remaining)
+                    break
+
+            return [s.strip() for s in statements if s.strip()]
+
+        statements = _split_sql(SQL_SCHEMA_EXTRA)
+        for stmt in statements:
+            try:
+                cursor.execute(stmt)
+            except Exception as e:
+                logger.warning(f"schema_extra: erro ({e}) em: {stmt[:80]}...")
+        cursor.close()
+        conn.close()
+        logger.info("criar_schema_extra: OK (views, functions, triggers, indexes)")
+    except Exception as e:
+        logger.warning(f"criar_schema_extra: {e}")
 
 
 def criar_admin_padrao():

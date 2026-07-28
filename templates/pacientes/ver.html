@@ -281,7 +281,14 @@
     <iframe src="/orcamentos?paciente_id={{ pac.id }}&embedded=1" class="tab-iframe" id="iframeOrcamentos"></iframe>
 
 {% elif tab == 'historico' %}
-    <iframe src="/financeiro?paciente_id={{ pac.id }}&embedded=1" class="tab-iframe" id="iframeHistorico"></iframe>
+    {% if prontuario %}
+    <iframe src="/prontuarios/{{ prontuario.id }}?embedded=1" class="tab-iframe" id="iframeHistorico"></iframe>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+        <i class="bi bi-journal-x fs-1"></i>
+        <p class="mt-2">Nenhum historico encontrado para este paciente neste estabelecimento.</p>
+    </div>
+    {% endif %}
 
 {% endif %}
 

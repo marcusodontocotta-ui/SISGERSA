@@ -1,7 +1,10 @@
 import os
+import sys
 import psycopg
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://sisgersa:tOJ0rv1qWUQABYIWRMO0ew2c2AtfGZNU@dpg-d9hqikr7uimc73dt3e0g-a.oregon-postgres.render.com/sisgersa")
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    print("ERROR: Set DATABASE_URL environment variable"); sys.exit(1)
 
 conn = psycopg.connect(DATABASE_URL, sslmode="require")
 cur = conn.cursor()

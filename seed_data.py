@@ -1,9 +1,17 @@
+import os
+import sys
 import pymysql
 import bcrypt
 from datetime import datetime, timedelta
 import random
+from urllib.parse import urlparse
 
-conn = pymysql.connect(host='localhost', user='root', password='root123', database='medical_db', charset='utf8mb4', cursorclass=pymysql.cursors.DictCursor)
+DB_URL = os.getenv("DATABASE_URL")
+if not DB_URL:
+    print("ERROR: Set DATABASE_URL environment variable"); sys.exit(1)
+
+parsed = urlparse(DB_URL)
+conn = pymysql.connect(host=parsed.hostname, user=parsed.username, password=parsed.password, database=parsed.path.lstrip("/"), charset='utf8mb4', cursorclass=pymysql.cursors.DictCursor)
 cur = conn.cursor()
 
 def hash_senha(s):
