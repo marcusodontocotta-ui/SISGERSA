@@ -1992,6 +1992,94 @@ def listar_sinais_vitais_json(pac_id: int):
     return JSONResponse([dict(r) for r in rows])
 
 
+# ─── Exames Laboratoriais ────────────────────────────────────────────────────
+
+@app.post("/pacientes/{pac_id}/exames/upload")
+async def upload_exame(pac_id: int, request: Request, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "editar")
+    import aiofiles, os, uuid
+    form = await request.form()
+    nome_exame = form.get("nome_exame", "").strip()
+    if not nome_exame:
+        return RedirectResponse(url=f"/pacientes/{pac_id}/anamnese?embedded=1&tab=exames&erro=Nome+do+exame+obrigatorio", status_code=302)
+
+    estab_id = resolver_estabelecimento(request, usuario)
+    prontuario = None
+    if estab_id:
+        prontuario = db.fetch_one("SELECT id FROM prontuarios WHERE paciente_usuario_id = %s AND estabelecimento_id = %s LIMIT 1", (pac_id, int(estab_id)))
+
+    arquivo_pdf = None
+    arquivo_nome = None
+    pdf_file = form.get("arquivo_pdf")
+    if pdf_file and pdf_file.filename:
+        ext = os.path.splitext(pdf_file.filename)[1].lower()
+        if ext != ".pdf":
+            return RedirectResponse(url=f"/pacientes/{pac_id}/anamnese?embedded=1&tab=exames&erro=Apenas+PDF+sao+aceitos", status_code=302)
+        import base64
+        content = await pdf_file.read()
+        if len(content) > 10 * 1024 * 1024:
+            return RedirectResponse(url=f"/pacientes/{pac_id}/anamnese?embedded=1&tab=exames&erro=Arquivo+muito+grande+(max+10MB)", status_code=302)
+        arquivo_pdf = base64.b64encode(content).decode("utf-8")
+        arquivo_nome = pdf_file.filename
+
+    db.execute(
+        """INSERT INTO exames_laboratoriais (paciente_id, prontuario_id, profissional_usuario_id,
+           nome_exame, data_solicitacao, data_resultado, resultado, valor_referencia,
+           laboratorio, observacoes, arquivo_pdf, arquivo_nome)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+        (pac_id, prontuario["id"] if prontuario else None, usuario["id"],
+         nome_exame,
+         form.get("data_solicitacao") or None,
+         form.get("data_resultado") or None,
+         form.get("resultado"),
+         form.get("valor_referencia"),
+         form.get("laboratorio"),
+         form.get("observacoes"),
+         arquivo_pdf, arquivo_nome),
+    )
+    return RedirectResponse(url=f"/pacientes/{pac_id}/anamnese?embedded=1&tab=exames", status_code=302)
+
+
+@app.get("/pacientes/{pac_id}/exames/json")
+def listar_exames_json(pac_id: int):
+    rows = db.fetch_all(
+        """SELECT id, nome_exame, data_solicitacao, data_resultado, resultado, valor_referencia,
+                  laboratorio, observacoes, arquivo_nome, criado_em
+           FROM exames_laboratoriais
+           WHERE paciente_id = %s
+           ORDER BY COALESCE(data_resultado, data_solicitacao, criado_em) DESC""",
+        (pac_id,),
+    )
+    exames = []
+    for r in rows:
+        d = dict(r)
+        d["tem_pdf"] = bool(r["arquivo_nome"])
+        exames.append(d)
+    return JSONResponse(exames)
+
+
+@app.get("/pacientes/{pac_id}/exames/{exame_id}/pdf")
+def visualizar_pdf(pac_id: int, exame_id: int):
+    from fastapi.responses import Response
+    row = db.fetch_one(
+        "SELECT arquivo_pdf, arquivo_nome FROM exames_laboratoriais WHERE id = %s AND paciente_id = %s",
+        (exame_id, pac_id),
+    )
+    if not row or not row["arquivo_pdf"]:
+        raise HTTPException(status_code=404)
+    import base64
+    content = base64.b64decode(row["arquivo_pdf"])
+    return Response(content=content, media_type="application/pdf", headers={
+        "Content-Disposition": f'inline; filename="{row["arquivo_nome"] or "exame.pdf"}"',
+    })
+
+
+@app.post("/pacientes/{pac_id}/exames/{exame_id}/remover")
+def remover_exame(pac_id: int, exame_id: int):
+    db.execute("DELETE FROM exames_laboratoriais WHERE id = %s AND paciente_id = %s", (exame_id, pac_id))
+    return RedirectResponse(url=f"/pacientes/{pac_id}/anamnese?embedded=1&tab=exames", status_code=302)
+
+
 @app.get("/pacientes/{pac_id}/editar", response_class=HTMLResponse)
 def editar_paciente(pac_id: int, request: Request, usuario=Depends(exigir_login)):
     exigir_permissao(usuario, "pacientes", "editar")

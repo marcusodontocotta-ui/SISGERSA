@@ -26,6 +26,7 @@
     <li class="nav-item"><a class="nav-link {% if tab_atual == 'sistemas' %}active{% endif %}" href="?tab=sistemas&embedded={{ embedded }}"><i class="bi bi-ui-checks"></i> Revisão Sistemas</a></li>
     <li class="nav-item"><a class="nav-link {% if tab_atual == 'medicamentos' %}active{% endif %}" href="?tab=medicamentos&embedded={{ embedded }}"><i class="bi bi-capsule"></i> Medicamentos</a></li>
     <li class="nav-item"><a class="nav-link {% if tab_atual == 'sinais' %}active{% endif %}" href="?tab=sinais&embedded={{ embedded }}"><i class="bi bi-activity"></i> Sinais Vitais</a></li>
+    <li class="nav-item"><a class="nav-link {% if tab_atual == 'exames' %}active{% endif %}" href="?tab=exames&embedded={{ embedded }}"><i class="bi bi-file-medical"></i> Exames</a></li>
 </ul>
 
 <div class="sub-content">
@@ -236,12 +237,27 @@
 <div class="text-center py-4 text-muted"><i class="bi bi-activity fs-2"></i><p class="mt-1">Nenhuma aferição registrada.</p></div>
 {% endif %}
 
+{% elif tab_atual == 'exames' %}
+
+{% set erro = request.query_params.get('erro') %}
+{% if erro %}
+<div class="alert alert-warning alert-dismissible fade show py-2">{{ erro }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endif %}
+
+<div class="mb-3">
+    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalNovoExame"><i class="bi bi-plus"></i> Novo Exame</button>
+</div>
+
+<div id="listaExames">
+    <div class="text-center py-4 text-muted"><i class="bi bi-hourglass-split fs-2"></i><p class="mt-1">Carregando...</p></div>
+</div>
+
 {% endif %}
 
 </form>
 </div>
 
-{% if tab_atual in ('medicamentos', 'sinais') %}
+{% if tab_atual in ('medicamentos', 'sinais', 'exames') %}
 {% if tab_atual == 'medicamentos' %}
 <div class="modal fade" id="modalNovoMedicamento" tabindex="-1">
     <div class="modal-dialog">
@@ -409,5 +425,92 @@ document.getElementById('formAnamnese').addEventListener('submit', function(e) {
     this.appendChild(input);
 });
 </script>
+{% if tab_atual == 'exames' %}
+<div class="modal fade" id="modalNovoExame" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="/pacientes/{{ pac.id }}/exames/upload" enctype="multipart/form-data">
+                <div class="modal-header"><h5 class="modal-title">Novo Exame Laboratorial</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="row g-2">
+                        <div class="col-8 mb-2">
+                            <label class="form-label">Nome do Exame *</label>
+                            <input type="text" class="form-control" name="nome_exame" required placeholder="ex: Hemograma, Glicemia, TSH...">
+                        </div>
+                        <div class="col-4 mb-2">
+                            <label class="form-label">Laboratorio</label>
+                            <input type="text" class="form-control" name="laboratorio" placeholder="ex: Hermes Pardini">
+                        </div>
+                        <div class="col-4 mb-2">
+                            <label class="form-label">Data Solicitacao</label>
+                            <input type="date" class="form-control" name="data_solicitacao">
+                        </div>
+                        <div class="col-4 mb-2">
+                            <label class="form-label">Data Resultado</label>
+                            <input type="date" class="form-control" name="data_resultado">
+                        </div>
+                        <div class="col-4 mb-2">
+                            <label class="form-label">PDF do Exame</label>
+                            <input type="file" class="form-control" name="arquivo_pdf" accept=".pdf">
+                        </div>
+                        <div class="col-6 mb-2">
+                            <label class="form-label">Resultado</label>
+                            <input type="text" class="form-control" name="resultado" placeholder="ex: 98 mg/dL">
+                        </div>
+                        <div class="col-6 mb-2">
+                            <label class="form-label">Valor de Referencia</label>
+                            <input type="text" class="form-control" name="valor_referencia" placeholder="ex: 70-110 mg/dL">
+                        </div>
+                        <div class="col-12 mb-2">
+                            <label class="form-label">Observacoes</label>
+                            <input type="text" class="form-control" name="observacoes">
+                        </div>
+                    </div>
+                    <input type="hidden" name="embedded" value="{{ embedded }}">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function carregarExames() {
+    fetch('/pacientes/{{ pac.id }}/exames/json')
+    .then(function(r){ return r.json(); })
+    .then(function(dados){
+        var el = document.getElementById('listaExames');
+        if (!dados || dados.length === 0) {
+            el.innerHTML = '<div class="text-center py-4 text-muted"><i class="bi bi-file-earmark-medical fs-2"></i><p class="mt-1">Nenhum exame registrado.</p></div>';
+            return;
+        }
+        var h = '<div class="table-responsive"><table class="table table-sm table-hover"><thead><tr><th>Exame</th><th>Data</th><th>Lab</th><th>Resultado</th><th>Ref.</th><th>PDF</th><th></th></tr></thead><tbody>';
+        dados.forEach(function(e){
+            h += '<tr><td><strong>' + e.nome_exame + '</strong></td>';
+            h += '<td><small>' + (e.data_resultado || e.data_solicitacao || '-') + '</small></td>';
+            h += '<td><small>' + (e.laboratorio || '-') + '</small></td>';
+            h += '<td>' + (e.resultado || '-') + '</td>';
+            h += '<td><small class="text-muted">' + (e.valor_referencia || '-') + '</small></td>';
+            if (e.tem_pdf) {
+                h += '<td><a href="/pacientes/{{ pac.id }}/exames/' + e.id + '/pdf" target="_blank" class="btn btn-sm btn-outline-primary py-0"><i class="bi bi-filetype-pdf"></i></a></td>';
+            } else {
+                h += '<td><span class="text-muted">-</span></td>';
+            }
+            h += '<td><form method="POST" action="/pacientes/{{ pac.id }}/exames/' + e.id + '/remover" style="display:inline" onsubmit="return confirm(\'Remover exame?\')"><button class="btn btn-sm btn-outline-danger py-0"><i class="bi bi-x"></i></button></form></td>';
+            h += '</tr>';
+        });
+        h += '</tbody></table></div>';
+        el.innerHTML = h;
+    })
+    .catch(function(){
+        document.getElementById('listaExames').innerHTML = '<div class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle fs-2"></i><p class="mt-1">Erro ao carregar exames.</p></div>';
+    });
+}
+carregarExames();
+</script>
+{% endif %}
 {% endif %}
 {% endblock %}
