@@ -107,11 +107,6 @@
                         <a class="nav-link" href="/prontuarios"><i class="bi bi-people"></i> Pacientes</a>
                     </li>
                     {% endif %}
-                    {% if pode_acessar(usuario, 'consultas', 'ver', estab_cookie) %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="/consultas"><i class="bi bi-calendar-check"></i> Historico</a>
-                    </li>
-                    {% endif %}
                     {% if pode_acessar(usuario, 'agenda', 'ver', estab_cookie) %}
                     <li class="nav-item">
                         <a class="nav-link" href="/agenda"><i class="bi bi-calendar-week"></i> Agenda</a>
