@@ -52,7 +52,13 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Cargo</label>
-                            <input type="text" class="form-control" name="cargo" value="{{ prof.cargo or '' }}">
+                            <select class="form-select" name="cargo">
+                                <option value="">Selecione...</option>
+                                {% set cargos = ['dentista','medico','enfermeiro','admin','recepcionista','auxiliar'] %}
+                                {% for c in cargos %}
+                                <option value="{{ c }}" {% if prof.cargo == c %}selected{% endif %}>{{ c|title }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Registro Profissional</label>

@@ -1396,7 +1396,8 @@ def editar_estabelecimento(estab_id: int, request: Request, usuario=Depends(exig
 
     return templates.TemplateResponse(
         "estabelecimentos/editar.html",
-        {"request": request, "usuario": usuario, "estab": estab},
+        {"request": request, "usuario": usuario, "estab": estab,
+         "profissionais": db.fetch_all("SELECT id, nome FROM profissionais WHERE ativo = TRUE ORDER BY nome")},
     )
 
 
@@ -1411,16 +1412,19 @@ def salvar_estabelecimento(
     email: str = Form(None),
     endereco: str = Form(None),
     logo_url: str = Form(None),
+    responsavel_usuario_id: str = Form(None),
     usuario=Depends(exigir_login),
 ):
     if usuario["tipo"] != "admin":
         raise HTTPException(status_code=403)
 
+    resp_id = int(responsavel_usuario_id) if responsavel_usuario_id and responsavel_usuario_id.strip() else None
     db.execute(
         """UPDATE estabelecimentos
-           SET nome = %s, tipo = %s, cnpj = %s, telefone = %s, email = %s, endereco = %s, logo_url = %s
+           SET nome = %s, tipo = %s, cnpj = %s, telefone = %s, email = %s, endereco = %s, logo_url = %s,
+               responsavel_usuario_id = %s
            WHERE id = %s""",
-        (nome, tipo, cnpj, telefone, email, endereco, logo_url, estab_id),
+        (nome, tipo, cnpj, telefone, email, endereco, logo_url, resp_id, estab_id),
     )
     return RedirectResponse("/estabelecimentos", status_code=302)
 
@@ -1539,8 +1543,8 @@ def salvar_profissional(
         raise HTTPException(status_code=403)
 
     db.execute(
-        "UPDATE profissionais SET nome = %s, email = %s, telefone = %s, foto_url = %s WHERE id = %s",
-        (nome, email, telefone, foto_url, prof_id),
+        "UPDATE profissionais SET nome = %s, email = %s, telefone = %s, foto_url = %s, cargo = %s WHERE id = %s",
+        (nome, email, telefone, foto_url, cargo or None, prof_id),
     )
 
     existing = db.fetch_one(
@@ -2988,14 +2992,20 @@ def criar_convenio(
     cnpj: str = Form(None),
     telefone: str = Form(None),
     email: str = Form(None),
+    plano_padrao: str = Form(None),
+    limite_consultas_mes: int = Form(0),
+    telefone_2: str = Form(None),
+    contato_nome: str = Form(None),
+    contato_email: str = Form(None),
     usuario=Depends(exigir_login),
 ):
     exigir_permissao(usuario, "convenios", "criar")
     if usuario["tipo"] not in ("admin", "recepcionista"):
         raise HTTPException(status_code=403)
     db.execute(
-        "INSERT INTO convenios (nome, cnpj, telefone, email) VALUES (%s, %s, %s, %s)",
-        (nome, cnpj, telefone, email),
+        """INSERT INTO convenios (nome, cnpj, telefone, email, plano_padrao, limite_consultas_mes, telefone_2, contato_nome, contato_email)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+        (nome, cnpj, telefone, email, plano_padrao, limite_consultas_mes, telefone_2, contato_nome, contato_email),
     )
     return RedirectResponse("/convenios", status_code=302)
 
@@ -3022,13 +3032,21 @@ def salvar_convenio(
     cnpj: str = Form(None),
     telefone: str = Form(None),
     email: str = Form(None),
+    plano_padrao: str = Form(None),
+    limite_consultas_mes: int = Form(0),
+    telefone_2: str = Form(None),
+    contato_nome: str = Form(None),
+    contato_email: str = Form(None),
     usuario=Depends(exigir_login),
 ):
     if usuario["tipo"] not in ("admin", "recepcionista"):
         raise HTTPException(status_code=403)
     db.execute(
-        "UPDATE convenios SET nome = %s, cnpj = %s, telefone = %s, email = %s WHERE id = %s",
-        (nome, cnpj, telefone, email, conv_id),
+        """UPDATE convenios SET nome = %s, cnpj = %s, telefone = %s, email = %s,
+           plano_padrao = %s, limite_consultas_mes = %s, telefone_2 = %s,
+           contato_nome = %s, contato_email = %s
+           WHERE id = %s""",
+        (nome, cnpj, telefone, email, plano_padrao, limite_consultas_mes, telefone_2, contato_nome, contato_email, conv_id),
     )
     return RedirectResponse("/convenios", status_code=302)
 
@@ -3067,6 +3085,9 @@ def criar_procedimento(
     nome: str = Form(...),
     descricao: str = Form(None),
     duracao_minutos: int = Form(30),
+    categoria: str = Form(None),
+    codigo_tuss: str = Form(None),
+    codigo_americano: str = Form(None),
     usuario=Depends(exigir_login),
 ):
     exigir_permissao(usuario, "procedimentos", "criar")
@@ -3074,8 +3095,9 @@ def criar_procedimento(
         raise HTTPException(status_code=403)
 
     db.execute(
-        "INSERT INTO procedimentos (nome, descricao, duracao_minutos) VALUES (%s, %s, %s)",
-        (nome, descricao, duracao_minutos),
+        """INSERT INTO procedimentos (nome, descricao, duracao_minutos, categoria, codigo_tuss, codigo_americano)
+           VALUES (%s, %s, %s, %s, %s, %s)""",
+        (nome, descricao, duracao_minutos, categoria or None, codigo_tuss or None, codigo_americano or None),
     )
     return RedirectResponse("/procedimentos", status_code=302)
 
@@ -3101,13 +3123,17 @@ def salvar_procedimento(
     nome: str = Form(...),
     descricao: str = Form(None),
     duracao_minutos: int = Form(30),
+    categoria: str = Form(None),
+    codigo_tuss: str = Form(None),
+    codigo_americano: str = Form(None),
     usuario=Depends(exigir_login),
 ):
     if usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
         raise HTTPException(status_code=403)
     db.execute(
-        "UPDATE procedimentos SET nome = %s, descricao = %s, duracao_minutos = %s WHERE id = %s",
-        (nome, descricao, duracao_minutos, proc_id),
+        """UPDATE procedimentos SET nome = %s, descricao = %s, duracao_minutos = %s,
+           categoria = %s, codigo_tuss = %s, codigo_americano = %s WHERE id = %s""",
+        (nome, descricao, duracao_minutos, categoria or None, codigo_tuss or None, codigo_americano or None, proc_id),
     )
     return RedirectResponse("/procedimentos", status_code=302)
 

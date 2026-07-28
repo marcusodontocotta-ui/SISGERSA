@@ -27,6 +27,30 @@
                         <label class="form-label">Email</label>
                         <input type="email" class="form-control" name="email" value="{{ convenio.email if convenio and convenio.email else '' }}">
                     </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Plano Padrao</label>
+                            <input type="text" class="form-control" name="plano_padrao" value="{{ convenio.plano_padrao if convenio and convenio.plano_padrao else '' }}" placeholder="Ex: Basico, Premium">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Limite Consultas/Mes</label>
+                            <input type="number" class="form-control" name="limite_consultas_mes" value="{{ convenio.limite_consultas_mes if convenio and convenio.limite_consultas_mes else 0 }}" min="0">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Telefone 2</label>
+                            <input type="text" class="form-control" name="telefone_2" value="{{ convenio.telefone_2 if convenio and convenio.telefone_2 else '' }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Contato Nome</label>
+                            <input type="text" class="form-control" name="contato_nome" value="{{ convenio.contato_nome if convenio and convenio.contato_nome else '' }}">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contato Email</label>
+                        <input type="email" class="form-control" name="contato_email" value="{{ convenio.contato_email if convenio and convenio.contato_email else '' }}">
+                    </div>
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-lg"></i> Salvar

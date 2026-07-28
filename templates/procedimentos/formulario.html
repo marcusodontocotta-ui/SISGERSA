@@ -22,6 +22,26 @@
                         <input type="number" class="form-control" name="duracao_minutos"
                                value="{{ procedimento.duracao_minutos if procedimento else 30 }}" min="5" max="480" required>
                     </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Categoria</label>
+                            <select class="form-select" name="categoria">
+                                <option value="">Selecione...</option>
+                                {% set cats = ['limpeza','restauracao','endodontia','periodontia','cirurgia','protese','ortodontia','implante','profilaxia','radiologia','cirurgia_buco_maxilo','odontopediatria','estetica','outro'] %}
+                                {% for c in cats %}
+                                <option value="{{ c }}" {% if procedimento and procedimento.categoria == c %}selected{% endif %}>{{ c|replace('_',' ')|title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Codigo TUSS</label>
+                            <input type="text" class="form-control" name="codigo_tuss" value="{{ procedimento.codigo_tuss if procedimento and procedimento.codigo_tuss else '' }}">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Codigo Americano</label>
+                            <input type="text" class="form-control" name="codigo_americano" value="{{ procedimento.codigo_americano if procedimento and procedimento.codigo_americano else '' }}">
+                        </div>
+                    </div>
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-lg"></i> Salvar
