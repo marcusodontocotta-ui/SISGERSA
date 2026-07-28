@@ -2443,71 +2443,81 @@ def criar_prontuario(
     novo_paciente_tipo_pagamento: str = Form(None),
     usuario=Depends(exigir_login),
 ):
-    exigir_permissao(usuario, "prontuarios", "criar")
+    import traceback as _tb
+    try:
+        exigir_permissao(usuario, "prontuarios", "criar")
+    except Exception as e:
+        return JSONResponse({"step": "exigir_permissao", "error": str(e), "tipo": usuario.get("tipo"), "traceback": _tb.format_exc()})
     if is_write_limited(request, usuario, "create"):
         raise HTTPException(status_code=429, detail="Muitas requisicoes. Aguarde 1 minuto.")
-    estab_id = resolver_estabelecimento(request, usuario, estabelecimento_id)
+    try:
+        estab_id = resolver_estabelecimento(request, usuario, estabelecimento_id)
+    except Exception as e:
+        return JSONResponse({"step": "resolver_estabelecimento", "error": str(e), "tipo": usuario.get("tipo"), "traceback": _tb.format_exc()})
     if not estab_id or usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
-        raise HTTPException(status_code=403)
-
-    paciente_id_int = int(paciente_id) if paciente_id and paciente_id.isdigit() else None
-
-    if criar_novo_paciente == "1":
-        if not novo_paciente_nome or not novo_paciente_email or not novo_paciente_senha:
-            return RedirectResponse("/prontuarios?erro=Preencha nome, email e senha do paciente", status_code=302)
-        from utils.auth import hash_senha
-        senha_hash = hash_senha(novo_paciente_senha.strip())
-        novo_email = novo_paciente_email.strip().lower()
-        existente = db.fetch_one("SELECT id FROM pacientes WHERE email = %s", (novo_email,))
-        if existente:
-            paciente_id_int = existente["id"]
-        else:
-            cursor = db.execute(
-                "INSERT INTO pacientes (nome, email, telefone, cpf, data_nascimento, senha_hash, tipo_pagamento, ativo) VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE) RETURNING id",
-                (novo_paciente_nome.strip(), novo_email, novo_paciente_telefone or None, novo_paciente_cpf or None, novo_paciente_nascimento or None, senha_hash, novo_paciente_tipo_pagamento or 'particular'),
-            )
-            row = cursor.fetchone()
-            paciente_id_int = row['id'] if isinstance(row, dict) else row[0]
-            vincular_paciente(paciente_id_int, estab_id)
-
-    if not paciente_id_int:
-        return RedirectResponse("/prontuarios?erro=Selecione ou cadastre um paciente", status_code=302)
+        return JSONResponse({"step": "tipo_check", "tipo": usuario.get("tipo"), "estab_id": estab_id, "error": "tipo nao permitido"})
 
     try:
-        bloquear_se_limite(estab_id, "prontuarios")
-    except LimiteAtingidoError as e:
-        return RedirectResponse(f"/prontuarios?erro_quota={e}", status_code=302)
+        paciente_id_int = int(paciente_id) if paciente_id and paciente_id.isdigit() else None
+
+        if criar_novo_paciente == "1":
+            if not novo_paciente_nome or not novo_paciente_email or not novo_paciente_senha:
+                return RedirectResponse("/prontuarios?erro=Preencha nome, email e senha do paciente", status_code=302)
+            from utils.auth import hash_senha
+            senha_hash = hash_senha(novo_paciente_senha.strip())
+            novo_email = novo_paciente_email.strip().lower()
+            existente = db.fetch_one("SELECT id FROM pacientes WHERE email = %s", (novo_email,))
+            if existente:
+                paciente_id_int = existente["id"]
+            else:
+                cursor = db.execute(
+                    "INSERT INTO pacientes (nome, email, telefone, cpf, data_nascimento, senha_hash, tipo_pagamento, ativo) VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE) RETURNING id",
+                    (novo_paciente_nome.strip(), novo_email, novo_paciente_telefone or None, novo_paciente_cpf or None, novo_paciente_nascimento or None, senha_hash, novo_paciente_tipo_pagamento or 'particular'),
+                )
+                row = cursor.fetchone()
+                paciente_id_int = row['id'] if isinstance(row, dict) else row[0]
+                vincular_paciente(paciente_id_int, estab_id)
+
+        if not paciente_id_int:
+            return RedirectResponse("/prontuarios?erro=Selecione ou cadastre um paciente", status_code=302)
+
+        try:
+            bloquear_se_limite(estab_id, "prontuarios")
+        except LimiteAtingidoError as e:
+            return RedirectResponse(f"/prontuarios?erro_quota={e}", status_code=302)
+        except Exception as e:
+            logger.warning(f"criar_prontuario: erro ao verificar quota: {e}")
+
+        existe_pront = db.fetch_one(
+            "SELECT id, numero_prontuario FROM prontuarios WHERE paciente_usuario_id = %s AND estabelecimento_id = %s",
+            (int(paciente_id_int), int(estab_id)),
+        )
+        if existe_pront:
+            return RedirectResponse(
+                f"/prontuarios?erro=Este paciente ja possui prontuario ({existe_pront['numero_prontuario']}) neste estabelecimento",
+                status_code=302,
+            )
+
+        if not numero:
+            count = db.fetch_one(
+                "SELECT COUNT(*) AS total FROM prontuarios WHERE estabelecimento_id = %s",
+                (estab_id,),
+            )
+            numero = f"PRONT-{int(count['total']) + 1:05d}"
+
+        db.execute(
+            "INSERT INTO prontuarios (paciente_usuario_id, estabelecimento_id, numero_prontuario) VALUES (%s, %s, %s)",
+            (int(paciente_id_int), int(estab_id), numero),
+        )
+        resp = RedirectResponse("/prontuarios", status_code=302)
+        cookie_kwargs = {"httponly": True, "samesite": "lax"}
+        is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+        if is_https:
+            cookie_kwargs["secure"] = True
+        resp.set_cookie("estabelecimento_id", str(estab_id), **cookie_kwargs)
+        return resp
     except Exception as e:
-        logger.warning(f"criar_prontuario: erro ao verificar quota: {e}")
-
-    existe_pront = db.fetch_one(
-        "SELECT id, numero_prontuario FROM prontuarios WHERE paciente_usuario_id = %s AND estabelecimento_id = %s",
-        (int(paciente_id_int), int(estab_id)),
-    )
-    if existe_pront:
-        return RedirectResponse(
-            f"/prontuarios?erro=Este paciente ja possui prontuario ({existe_pront['numero_prontuario']}) neste estabelecimento",
-            status_code=302,
-        )
-
-    if not numero:
-        count = db.fetch_one(
-            "SELECT COUNT(*) AS total FROM prontuarios WHERE estabelecimento_id = %s",
-            (estab_id,),
-        )
-        numero = f"PRONT-{int(count['total']) + 1:05d}"
-
-    db.execute(
-        "INSERT INTO prontuarios (paciente_usuario_id, estabelecimento_id, numero_prontuario) VALUES (%s, %s, %s)",
-        (int(paciente_id_int), int(estab_id), numero),
-    )
-    resp = RedirectResponse("/prontuarios", status_code=302)
-    cookie_kwargs = {"httponly": True, "samesite": "lax"}
-    is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
-    if is_https:
-        cookie_kwargs["secure"] = True
-    resp.set_cookie("estabelecimento_id", str(estab_id), **cookie_kwargs)
-    return resp
+        return JSONResponse({"step": "main_body", "error": str(e), "traceback": _tb.format_exc()})
 
 
 @app.post("/prontuarios/{prontuario_id}/evolucao")
@@ -4161,3 +4171,18 @@ def fix_orphan_patients(request: Request, usuario=Depends(exigir_login)):
         criados.append({"nome": pac["nome"], "numero": numero})
 
     return JSONResponse({"mensagem": f"{len(criados)} prontuarios criados", "criados": criados})
+
+
+@app.get("/debug/criar-pront")
+def debug_criar_pront(request: Request, usuario=Depends(exigir_login)):
+    import traceback
+    try:
+        estab_id = resolver_estabelecimento(request, usuario)
+        return JSONResponse({
+            "usuario_tipo": usuario.get("tipo"),
+            "usuario_id": usuario.get("id"),
+            "estab_id": estab_id,
+            "perm_ok": True,
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e), "traceback": traceback.format_exc()})
