@@ -155,6 +155,19 @@ def format_phone(value):
 templates.env.filters["format_phone"] = format_phone
 
 
+def from_json(value):
+    import json
+    if not value:
+        return {}
+    if isinstance(value, dict):
+        return value
+    try:
+        return json.loads(value) if isinstance(value, str) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+templates.env.filters["from_json"] = from_json
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     if exc.status_code == 302 and exc.headers and "Location" in exc.headers:
@@ -1758,6 +1771,225 @@ def ver_paciente(pac_id: int, request: Request, usuario=Depends(exigir_login), t
         "prontuario": prontuario, "consultas_recentes": consultas_recentes,
         "cpf_fmt": cpf_fmt, "tab": tab or "prontuario",
     })
+
+
+# ─── Anamnese ────────────────────────────────────────────────────────────────
+
+@app.get("/pacientes/{pac_id}/anamnese", response_class=HTMLResponse)
+def pagina_anamnese(pac_id: int, request: Request, usuario=Depends(exigir_login), embedded: str = Query(None)):
+    exigir_permissao(usuario, "prontuarios", "ver")
+    pac = db.fetch_one("SELECT id, nome, data_nascimento FROM usuarios WHERE id = %s AND tipo = 'paciente'", (pac_id,))
+    if not pac:
+        raise HTTPException(status_code=404)
+
+    estab_id = resolver_estabelecimento(request, usuario)
+    anamnese = db.fetch_one(
+        "SELECT * FROM anamnese WHERE paciente_id = %s ORDER BY criado_em DESC LIMIT 1",
+        (pac_id,),
+    )
+    if not anamnese and estab_id:
+        prontuario = db.fetch_one(
+            "SELECT id FROM prontuarios WHERE paciente_usuario_id = %s AND estabelecimento_id = %s LIMIT 1",
+            (pac_id, int(estab_id)),
+        )
+    else:
+        prontuario = None
+
+    medicamentos_paciente = db.fetch_all(
+        """SELECT pm.*, m.nome AS nome_medicamento_catalogo
+           FROM paciente_medicamentos pm
+           LEFT JOIN medicamentos m ON m.id = pm.medicamento_id
+           WHERE pm.paciente_id = %s AND pm.ativo = TRUE
+           ORDER BY pm.criado_em DESC""",
+        (pac_id,),
+    )
+
+    sinais_vitais = db.fetch_all(
+        """SELECT sv.*, u.nome AS profissional_nome
+           FROM sinais_vitais sv
+           LEFT JOIN usuarios u ON u.id = sv.profissional_usuario_id
+           WHERE sv.paciente_id = %s
+           ORDER BY sv.aferido_em DESC
+           LIMIT 20""",
+        (pac_id,),
+    )
+
+    return templates.TemplateResponse(
+        "pacientes/anamnese.html",
+        {
+            "request": request, "usuario": usuario, "pac": pac,
+            "anamnese": anamnese, "prontuario": prontuario,
+            "medicamentos": medicamentos_paciente,
+            "sinais_vitais": sinais_vitais,
+            "embedded": embedded == "1",
+        },
+    )
+
+
+@app.post("/pacientes/{pac_id}/anamnese/salvar")
+def salvar_anamnese(pac_id: int, request: Request, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "editar")
+    form = dict(request.form())
+    estab_id = resolver_estabelecimento(request, usuario)
+
+    prontuario = None
+    if estab_id:
+        prontuario = db.fetch_one("SELECT id FROM prontuarios WHERE paciente_usuario_id = %s AND estabelecimento_id = %s LIMIT 1", (pac_id, int(estab_id)))
+    if not prontuario:
+        prontuario = db.fetch_one("SELECT id FROM prontuarios WHERE paciente_usuario_id = %s LIMIT 1", (pac_id,))
+
+    existing = db.fetch_one("SELECT id FROM anamnese WHERE paciente_id = %s ORDER BY criado_em DESC LIMIT 1", (pac_id,))
+
+    fields = {
+        "queixa_principal": form.get("queixa_principal"),
+        "historico_doenca_atual": form.get("historico_doenca_atual"),
+        "impressao": form.get("impressao"),
+        "historico_medico": form.get("historico_medico"),
+        "historico_familiar": form.get("historico_familiar"),
+        "alergias": form.get("alergias"),
+        "habits": form.get("habits"),
+        "atividade_fisica": form.get("atividade_fisica"),
+        "tabagismo": form.get("tabagismo"),
+        "etilismo": form.get("etilismo"),
+        "refeicoes_dia": int(form["refeicoes_dia"]) if form.get("refeicoes_dia") else None,
+        "horas_sono": float(form["horas_sono"]) if form.get("horas_sono") else None,
+        "gestante": form.get("gestante") == "1" if form.get("gestante") else None,
+        "numero_gestacoes": int(form["numero_gestacoes"]) if form.get("numero_gestacoes") else None,
+        "observacoes": form.get("observacoes"),
+        "revisao_sistemas": form.get("revisao_sistemas", "{}"),
+    }
+
+    if existing:
+        fields["id"] = existing["id"]
+        db.execute(
+            """UPDATE anamnese SET queixa_principal=%(queixa_principal)s, historico_doenca_atual=%(historico_doenca_atual)s,
+               impressao=%(impressao)s, historico_medico=%(historico_medico)s, historico_familiar=%(historico_familiar)s,
+               alergias=%(alergias)s, habits=%(habits)s, atividade_fisica=%(atividade_fisica)s,
+               tabagismo=%(tabagismo)s, etilismo=%(etilismo)s, refeicoes_dia=%(refeicoes_dia)s,
+               horas_sono=%(horas_sono)s, gestante=%(gestante)s, numero_gestacoes=%(numero_gestacoes)s,
+               observacoes=%(observacoes)s, revisao_sistemas=%(revisao_sistemas)s::jsonb,
+               profissional_usuario_id=%(profissional)s, atualizado_em=NOW()
+               WHERE id=%(id)s""",
+            {**fields, "profissional": usuario["id"], "id": existing["id"]},
+        )
+    else:
+        db.execute(
+            """INSERT INTO anamnese (paciente_id, estabelecimento_id, prontuario_id, profissional_usuario_id,
+               queixa_principal, historico_doenca_atual, impressao, historico_medico, historico_familiar,
+               alergias, habits, atividade_fisica, tabagismo, etilismo, refeicoes_dia, horas_sono,
+               gestante, numero_gestacoes, observacoes, revisao_sistemas)
+               VALUES (%s,%s,%s,%s,%(queixa_principal)s,%(historico_doenca_atual)s,%(impressao)s,
+               %(historico_medico)s,%(historico_familiar)s,%(alergias)s,%(habits)s,%(atividade_fisica)s,
+               %(tabagismo)s,%(etilismo)s,%(refeicoes_dia)s,%(horas_sono)s,%(gestante)s,%(numero_gestacoes)s,
+               %(observacoes)s,%(revisao_sistemas)s::jsonb)""",
+            (pac_id, int(estab_id) if estab_id else None, prontuario["id"] if prontuario else None, usuario["id"], fields),
+        )
+
+    return RedirectResponse(url=f"/pacientes/{pac_id}/anamnese?embedded=1", status_code=302)
+
+
+@app.get("/medicamentos/buscar")
+def buscar_medicamentos(q: str = ""):
+    if len(q) < 2:
+        return JSONResponse([])
+    rows = db.fetch_all(
+        "SELECT id, nome, principio_ativo FROM medicamentos WHERE unaccent(nome) ILIKE unaccent(%s) OR unaccent(principio_ativo) ILIKE unaccent(%s) LIMIT 20",
+        (f"%{q}%", f"%{q}%"),
+    )
+    return JSONResponse([{"id": r["id"], "nome": r["nome"], "principio_ativo": r["principio_ativo"]} for r in rows])
+
+
+@app.post("/medicamentos/criar")
+def criar_medicamento(request: Request):
+    form = dict(request.form())
+    nome = form.get("nome", "").strip()
+    if not nome or len(nome) < 2:
+        return JSONResponse({"ok": False, "erro": "Nome muito curto"})
+    try:
+        cur = db.execute(
+            "INSERT INTO medicamentos (nome, principio_ativo) VALUES (%s, %s) ON CONFLICT (nome) DO UPDATE SET nome = EXCLUDED.nome RETURNING id",
+            (nome, form.get("principio_ativo", "").strip() or None),
+        )
+        if hasattr(cur, 'fetchone'):
+            row = cur.fetchone()
+            return JSONResponse({"ok": True, "id": row["id"], "nome": nome})
+        return JSONResponse({"ok": True, "nome": nome})
+    except Exception as e:
+        return JSONResponse({"ok": False, "erro": str(e)})
+
+
+@app.get("/pacientes/{pac_id}/medicamentos/json")
+def listar_medicamentos_json(pac_id: int):
+    rows = db.fetch_all(
+        """SELECT pm.id, COALESCE(m.nome, pm.nome_medicamento) AS nome,
+                  pm.dose, pm.frequencia, pm.via, pm.observacoes, pm.ativo
+           FROM paciente_medicamentos pm
+           LEFT JOIN medicamentos m ON m.id = pm.medicamento_id
+           WHERE pm.paciente_id = %s AND pm.ativo = TRUE
+           ORDER BY pm.criado_em DESC""",
+        (pac_id,),
+    )
+    return JSONResponse([dict(r) for r in rows])
+
+
+@app.post("/pacientes/{pac_id}/medicamentos")
+def adicionar_medicamento(pac_id: int, request: Request):
+    form = dict(request.form())
+    db.execute(
+        """INSERT INTO paciente_medicamentos (paciente_id, medicamento_id, nome_medicamento, dose, frequencia, via, observacoes)
+           VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+        (pac_id,
+         int(form["medicamento_id"]) if form.get("medicamento_id") else None,
+         form.get("nome_medicamento"),
+         form.get("dose"), form.get("frequencia"), form.get("via"),
+         form.get("observacoes")),
+    )
+    return RedirectResponse(url=f"/pacientes/{pac_id}/anamnese?embedded=1&tab=medicamentos", status_code=302)
+
+
+@app.post("/pacientes/{pac_id}/medicamentos/{med_id}/remover")
+def remover_medicamento(pac_id: int, med_id: int):
+    db.execute("DELETE FROM paciente_medicamentos WHERE id = %s AND paciente_id = %s", (med_id, pac_id))
+    return RedirectResponse(url=f"/pacientes/{pac_id}/anamnese?embedded=1&tab=medicamentos", status_code=302)
+
+
+@app.post("/pacientes/{pac_id}/sinais-vitais")
+def adicionar_sinais_vitais(pac_id: int, request: Request, usuario=Depends(exigir_login)):
+    form = dict(request.form())
+    estab_id = resolver_estabelecimento(request, usuario)
+    prontuario = None
+    if estab_id:
+        prontuario = db.fetch_one("SELECT id FROM prontuarios WHERE paciente_usuario_id = %s AND estabelecimento_id = %s LIMIT 1", (pac_id, int(estab_id)))
+    db.execute(
+        """INSERT INTO sinais_vitais (paciente_id, prontuario_id, profissional_usuario_id,
+           pressao_sistolica, pressao_diastolica, frequencia_cardiaca, frequencia_respiratoria,
+           saturacao_oxigenio, temperatura, glicemia, observacoes)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+        (pac_id, prontuario["id"] if prontuario else None, usuario["id"],
+         int(form["pressao_sistolica"]) if form.get("pressao_sistolica") else None,
+         int(form["pressao_diastolica"]) if form.get("pressao_diastolica") else None,
+         int(form["frequencia_cardiaca"]) if form.get("frequencia_cardiaca") else None,
+         int(form["frequencia_respiratoria"]) if form.get("frequencia_respiratoria") else None,
+         float(form["saturacao_oxigenio"]) if form.get("saturacao_oxigenio") else None,
+         float(form["temperatura"]) if form.get("temperatura") else None,
+         float(form["glicemia"]) if form.get("glicemia") else None,
+         form.get("observacoes")),
+    )
+    return RedirectResponse(url=f"/pacientes/{pac_id}/anamnese?embedded=1&tab=sinais", status_code=302)
+
+
+@app.get("/pacientes/{pac_id}/sinais-vitais/json")
+def listar_sinais_vitais_json(pac_id: int):
+    rows = db.fetch_all(
+        """SELECT sv.*, u.nome AS profissional_nome
+           FROM sinais_vitais sv
+           LEFT JOIN usuarios u ON u.id = sv.profissional_usuario_id
+           WHERE sv.paciente_id = %s
+           ORDER BY sv.aferido_em DESC
+           LIMIT 50""",
+        (pac_id,),
+    )
+    return JSONResponse([dict(r) for r in rows])
 
 
 @app.get("/pacientes/{pac_id}/editar", response_class=HTMLResponse)

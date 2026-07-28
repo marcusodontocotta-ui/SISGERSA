@@ -1,0 +1,413 @@
+{% if embedded %}{% extends "base_embedded.html" %}{% else %}{% extends "base.html" %}{% endif %}
+{% block titulo %}Anamnese - {{ pac.nome }}{% endblock %}
+{% block conteudo %}
+
+<style>
+    .sub-tabs { border-bottom: 2px solid #dee2e6; background: #f8f9fa; border-radius: 0.5rem 0.5rem 0 0; padding: 0.5rem 0.5rem 0 0.5rem; }
+    .sub-tabs .nav-link { color: #495057; font-size: 0.85rem; font-weight: 500; padding: 0.4rem 1rem; border: none; border-radius: 0.4rem 0.4rem 0 0; }
+    .sub-tabs .nav-link:hover { color: #1a5276; background: rgba(26,82,118,0.06); }
+    .sub-tabs .nav-link.active { color: #1a5276; font-weight: 600; background: #fff; border-bottom: 2px solid #1a5276; }
+    .sub-content { background: #fff; border-radius: 0 0 0.5rem 0.5rem; padding: 1rem; }
+    .sv-card { transition: all 0.15s; }
+    .sv-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .sv-value { font-size: 1.3rem; font-weight: 700; }
+    .sv-label { font-size: 0.7rem; text-transform: uppercase; color: #6c757d; }
+</style>
+
+{% set tab_atual = request.query_params.get('tab', 'queixa') %}
+
+<div class="d-flex align-items-center gap-2 mb-3">
+    <h5 class="mb-0"><i class="bi bi-journal-medical"></i> Anamnese - {{ pac.nome }}</h5>
+    <small class="text-muted">({{ pac.data_nascimento.strftime('%d/%m/%Y') if pac.data_nascimento else '—' }})</small>
+</div>
+
+<ul class="nav sub-tabs mb-0" id="subTabs">
+    <li class="nav-item"><a class="nav-link {% if tab_atual == 'queixa' %}active{% endif %}" href="?tab=queixa&embedded={{ embedded }}"><i class="bi bi-chat-dots"></i> Queixa / HDA</a></li>
+    <li class="nav-item"><a class="nav-link {% if tab_atual == 'sistemas' %}active{% endif %}" href="?tab=sistemas&embedded={{ embedded }}"><i class="bi bi-ui-checks"></i> Revisão Sistemas</a></li>
+    <li class="nav-item"><a class="nav-link {% if tab_atual == 'medicamentos' %}active{% endif %}" href="?tab=medicamentos&embedded={{ embedded }}"><i class="bi bi-capsule"></i> Medicamentos</a></li>
+    <li class="nav-item"><a class="nav-link {% if tab_atual == 'sinais' %}active{% endif %}" href="?tab=sinais&embedded={{ embedded }}"><i class="bi bi-activity"></i> Sinais Vitais</a></li>
+</ul>
+
+<div class="sub-content">
+
+<form method="POST" action="/pacientes/{{ pac.id }}/anamnese/salvar?embedded={{ embedded }}" id="formAnamnese">
+
+{% if tab_atual == 'queixa' %}
+
+<div class="row g-3">
+    <div class="col-12">
+        <label class="form-label fw-semibold">Queixa Principal</label>
+        <textarea class="form-control" name="queixa_principal" rows="3">{{ anamnese.queixa_principal or '' }}</textarea>
+    </div>
+    <div class="col-12">
+        <label class="form-label fw-semibold">História da Moléstia Atual (HDA)</label>
+        <textarea class="form-control" name="historico_doenca_atual" rows="4">{{ anamnese.historico_doenca_atual or '' }}</textarea>
+    </div>
+    <div class="col-12">
+        <label class="form-label fw-semibold">Impressão / Hipótese Diagnóstica</label>
+        <textarea class="form-control" name="impressao" rows="3">{{ anamnese.impressao or '' }}</textarea>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Histórico Médico Pregresso</label>
+        <textarea class="form-control" name="historico_medico" rows="3">{{ anamnese.historico_medico or '' }}</textarea>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Histórico Familiar</label>
+        <textarea class="form-control" name="historico_familiar" rows="3">{{ anamnese.historico_familiar or '' }}</textarea>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Alergias</label>
+        <textarea class="form-control" name="alergias" rows="2" placeholder="Se houver, liste as alergias">{{ anamnese.alergias or '' }}</textarea>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Hábitos / Observações</label>
+        <textarea class="form-control" name="habits" rows="2">{{ anamnese.habits or '' }}</textarea>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Atividade Física</label>
+        <input type="text" class="form-control" name="atividade_fisica" value="{{ anamnese.atividade_fisica or '' }}" placeholder="ex: 3x/semana">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Tabagismo</label>
+        <select class="form-select" name="tabagismo">
+            <option value="">—</option>
+            <option value="nao" {{ 'selected' if anamnese.tabagismo == 'nao' }}>Não</option>
+            <option value="ex" {{ 'selected' if anamnese.tabagismo == 'ex' }}>Ex-tabagista</option>
+            <option value="sim" {{ 'selected' if anamnese.tabagismo == 'sim' }}>Sim</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Etilismo</label>
+        <select class="form-select" name="etilismo">
+            <option value="">—</option>
+            <option value="nao" {{ 'selected' if anamnese.etilismo == 'nao' }}>Não</option>
+            <option value="social" {{ 'selected' if anamnese.etilismo == 'social' }}>Social</option>
+            <option value="sim" {{ 'selected' if anamnese.etilismo == 'sim' }}>Sim</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Refeições/dia</label>
+        <input type="number" class="form-control" name="refeicoes_dia" value="{{ anamnese.refeicoes_dia or '' }}" min="0" max="10">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Horas de Sono</label>
+        <input type="number" class="form-control" name="horas_sono" value="{{ anamnese.horas_sono or '' }}" min="0" max="24" step="0.5">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Gestante</label>
+        <select class="form-select" name="gestante">
+            <option value="">—</option>
+            <option value="1" {{ 'selected' if anamnese.gestante == True }}>Sim</option>
+            <option value="0" {{ 'selected' if anamnese.gestante == False }}>Não</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Nº Gestacoes</label>
+        <input type="number" class="form-control" name="numero_gestacoes" value="{{ anamnese.numero_gestacoes or '' }}" min="0">
+    </div>
+    <div class="col-12">
+        <label class="form-label">Observações Gerais</label>
+        <textarea class="form-control" name="observacoes" rows="2">{{ anamnese.observacoes or '' }}</textarea>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Salvar Anamnese</button>
+    </div>
+</div>
+
+{% elif tab_atual == 'sistemas' %}
+
+{% set sistemas = {
+    'neurologico': 'Neurológico',
+    'cardiovascular': 'Cardiovascular',
+    'respiratorio': 'Respiratório',
+    'gastrointestinal': 'Gastrointestinal',
+    'musculoesqueletico': 'Musculoesquelético',
+    'geniturinario': 'Geniturinário',
+    'dermatologico': 'Dermatológico',
+    'oftalmologico': 'Oftalmológico',
+    'otorrinolaringologico': 'Otorrinolaringológico',
+    'endocrinologico': 'Endócrino/Metabólico',
+    'hematologico': 'Hematológico',
+    'psiquiatrico': 'Psiquiátrico',
+} %}
+{% set rev = anamnese.revisao_sistemas|from_json if anamnese and anamnese.revisao_sistemas else {} %}
+
+<div class="row g-3">
+    <div class="col-12">
+        <p class="text-muted small">Marque os sistemas com alterações e descreva os achados.</p>
+    </div>
+    {% for key, label in sistemas.items() %}
+    {% set item = rev.get(key, {}) %}
+    <div class="col-md-4">
+        <div class="card sv-card border">
+            <div class="card-body py-2 px-3">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <input type="checkbox" name="rev_{{ key }}" value="1" {{ 'checked' if item.get('alterado') }} onchange="this.closest('.card').querySelector('.rev-obs').disabled=!this.checked">
+                    <label class="fw-semibold small mb-0">{{ label }}</label>
+                </div>
+                <input type="text" class="form-control form-control-sm rev-obs" name="rev_obs_{{ key }}" placeholder="Observacao" value="{{ item.get('observacao', '') }}" {{ 'disabled' if not item.get('alterado') }}>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Salvar Anamnese</button>
+    </div>
+</div>
+
+{% elif tab_atual == 'medicamentos' %}
+
+<div class="mb-3">
+    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalNovoMedicamento"><i class="bi bi-plus"></i> Adicionar Medicamento</button>
+</div>
+
+{% if medicamentos %}
+<div class="table-responsive">
+    <table class="table table-sm table-hover">
+        <thead>
+            <tr><th>Medicamento</th><th>Dose</th><th>Frequencia</th><th>Via</th><th>Obs</th><th></th></tr>
+        </thead>
+        <tbody>
+            {% for m in medicamentos %}
+            <tr>
+                <td>{{ m.nome_medicamento_catalogo or m.nome_medicamento }}</td>
+                <td>{{ m.dose or '-' }}</td>
+                <td>{{ m.frequencia or '-' }}</td>
+                <td>{{ m.via or '-' }}</td>
+                <td><small class="text-muted">{{ m.observacoes or '' }}</small></td>
+                <td>
+                    <form method="POST" action="/pacientes/{{ pac.id }}/medicamentos/{{ m.id }}/remover" style="display:inline">
+                        <input type="hidden" name="embedded" value="{{ embedded }}">
+                        <button class="btn btn-sm btn-outline-danger py-0"><i class="bi bi-x"></i></button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="text-center py-4 text-muted"><i class="bi bi-capsule fs-2"></i><p class="mt-1">Nenhum medicamento registrado.</p></div>
+{% endif %}
+
+{% elif tab_atual == 'sinais' %}
+
+<div class="mb-3">
+    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalSinaisVitais"><i class="bi bi-plus"></i> Nova Aferição</button>
+</div>
+
+{% if sinais_vitais %}
+<div class="row g-2 mb-3">
+    {% for sv in sinais_vitais %}
+    <div class="col-md-4 col-lg-3">
+        <div class="card sv-card border">
+            <div class="card-body p-2 text-center">
+                <div class="sv-label">{{ sv.aferido_em.strftime('%d/%m %H:%M') }}</div>
+                <div class="d-flex flex-wrap justify-content-center gap-2 mt-1">
+                    {% if sv.pressao_sistolica and sv.pressao_diastolica %}
+                    <span title="PA"><span class="fw-bold">{{ sv.pressao_sistolica }}/{{ sv.pressao_diastolica }}</span> <small class="text-muted">mmHg</small></span>
+                    {% endif %}
+                    {% if sv.frequencia_cardiaca %}
+                    <span title="FC"><span class="fw-bold">{{ sv.frequencia_cardiaca }}</span> <small class="text-muted">bpm</small></span>
+                    {% endif %}
+                    {% if sv.frequencia_respiratoria %}
+                    <span title="FR"><span class="fw-bold">{{ sv.frequencia_respiratoria }}</span> <small class="text-muted">rpm</small></span>
+                    {% endif %}
+                    {% if sv.saturacao_oxigenio %}
+                    <span title="SpO₂"><span class="fw-bold">{{ sv.saturacao_oxigenio }}%</span></span>
+                    {% endif %}
+                    {% if sv.temperatura %}
+                    <span title="Temp"><span class="fw-bold">{{ sv.temperatura }}°C</span></span>
+                    {% endif %}
+                    {% if sv.glicemia %}
+                    <span title="Glicemia"><span class="fw-bold">{{ sv.glicemia }}</span> <small class="text-muted">mg/dL</small></span>
+                    {% endif %}
+                </div>
+                {% if sv.observacoes %}
+                <small class="text-muted d-block mt-1">{{ sv.observacoes }}</small>
+                {% endif %}
+                <small class="text-muted d-block">{{ sv.profissional_nome or '' }}</small>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-4 text-muted"><i class="bi bi-activity fs-2"></i><p class="mt-1">Nenhuma aferição registrada.</p></div>
+{% endif %}
+
+{% endif %}
+
+</form>
+</div>
+
+{% if tab_atual in ('medicamentos', 'sinais') %}
+{% if tab_atual == 'medicamentos' %}
+<div class="modal fade" id="modalNovoMedicamento" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/pacientes/{{ pac.id }}/medicamentos">
+                <div class="modal-header"><h5 class="modal-title">Adicionar Medicamento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label">Medicamento</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="buscaMed" placeholder="Digite para buscar..." autocomplete="off">
+                            <input type="hidden" name="medicamento_id" id="medId">
+                            <input type="hidden" name="nome_medicamento" id="medNome">
+                            <button class="btn btn-outline-secondary" type="button" onclick="window.open('/admin/medicamentos/cadastrar','_blank')">+</button>
+                        </div>
+                        <div id="medSugestoes" class="list-group mt-1" style="max-height:200px;overflow-y:auto;display:none;position:absolute;z-index:1050;width:90%;"></div>
+                    </div>
+                    <div class="row">
+                        <div class="col-4 mb-2"><label class="form-label">Dose</label><input type="text" class="form-control form-control-sm" name="dose" placeholder="ex: 50mg"></div>
+                        <div class="col-4 mb-2"><label class="form-label">Frequência</label><input type="text" class="form-control form-control-sm" name="frequencia" placeholder="ex: 8/8h"></div>
+                        <div class="col-4 mb-2"><label class="form-label">Via</label><select class="form-select form-select-sm" name="via"><option value="">—</option><option>VO</option><option>EV</option><option>IM</option><option>SC</option><option>SL</option><option>Tópico</option><option>Inalatória</option></select></div>
+                    </div>
+                    <div><label class="form-label">Observações</label><input type="text" class="form-control form-control-sm" name="observacoes"></div>
+                    <input type="hidden" name="embedded" value="{{ embedded }}">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Adicionar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let buscaMed = document.getElementById('buscaMed');
+let medId = document.getElementById('medId');
+let medNome = document.getElementById('medNome');
+let sugestoes = document.getElementById('medSugestoes');
+let timeoutMed = null;
+
+buscaMed.addEventListener('input', function() {
+    clearTimeout(timeoutMed);
+    let q = this.value.trim();
+    if (q.length < 2) { sugestoes.style.display = 'none'; return; }
+    timeoutMed = setTimeout(function() {
+        fetch('/medicamentos/buscar?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.length === 0) {
+                sugestoes.innerHTML = '<button type="button" class="list-group-item list-group-item-action text-muted" onclick="addRapido(\'' + q + '\')"><i class="bi bi-plus-circle"></i> Cadastrar &quot;' + q + '&quot;</button>';
+                sugestoes.style.display = 'block';
+                return;
+            }
+            var h = '';
+            data.forEach(function(m) {
+                h += '<button type="button" class="list-group-item list-group-item-action py-1" onclick="selecionarMed(' + m.id + ',\'' + m.nome.replace(/'/g, "\\'") + '\')"><strong>' + m.nome + '</strong> <small class="text-muted">' + (m.principio_ativo || '') + '</small></button>';
+            });
+            h += '<button type="button" class="list-group-item list-group-item-action py-1 text-muted small" onclick="addRapido(\'' + q + '\')"><i class="bi bi-plus-circle"></i> Cadastrar &quot;' + q + '&quot;</button>';
+            sugestoes.innerHTML = h;
+            sugestoes.style.display = 'block';
+        });
+    }, 300);
+});
+
+function selecionarMed(id, nome) {
+    medId.value = id;
+    medNome.value = '';
+    buscaMed.value = nome;
+    sugestoes.style.display = 'none';
+}
+
+function addRapido(nome) {
+    var f = new FormData();
+    f.append('nome', nome);
+    fetch('/medicamentos/criar', {method:'POST', body:f})
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.ok) {
+            selecionarMed(d.id, d.nome);
+        } else {
+            alert('Erro: ' + d.erro);
+        }
+    });
+}
+
+document.addEventListener('click', function(e) {
+    if (!document.getElementById('modalNovoMedicamento').contains(e.target)) {
+        sugestoes.style.display = 'none';
+    }
+});
+</script>
+{% endif %}
+
+{% if tab_atual == 'sinais' %}
+<div class="modal fade" id="modalSinaisVitais" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/pacientes/{{ pac.id }}/sinais-vitais">
+                <div class="modal-header"><h5 class="modal-title">Nova Aferição de Sinais Vitais</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <label class="form-label">PA Sistólica</label>
+                            <input type="number" class="form-control" name="pressao_sistolica" placeholder="mmHg" min="0" max="300">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">PA Diastólica</label>
+                            <input type="number" class="form-control" name="pressao_diastolica" placeholder="mmHg" min="0" max="300">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">FC (bpm)</label>
+                            <input type="number" class="form-control" name="frequencia_cardiaca" placeholder="bpm" min="0" max="300">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">FR (rpm)</label>
+                            <input type="number" class="form-control" name="frequencia_respiratoria" placeholder="rpm" min="0" max="100">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">SpO₂ (%)</label>
+                            <input type="number" class="form-control" name="saturacao_oxigenio" placeholder="%" min="0" max="100" step="0.1">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Temperatura (°C)</label>
+                            <input type="number" class="form-control" name="temperatura" placeholder="°C" min="30" max="45" step="0.1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Glicemia (mg/dL)</label>
+                            <input type="number" class="form-control" name="glicemia" placeholder="mg/dL" min="0" max="1000" step="1">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Observações</label>
+                            <input type="text" class="form-control" name="observacoes" placeholder="Opcional">
+                        </div>
+                    </div>
+                    <input type="hidden" name="embedded" value="{{ embedded }}">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Registrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endif %}
+
+{% if tab_atual not in ('medicamentos', 'sinais') %}
+<script>
+document.getElementById('formAnamnese').addEventListener('submit', function(e) {
+    var rev = {};
+    document.querySelectorAll('[name^="rev_"]').forEach(function(el) {
+        if (el.name.startsWith('rev_obs_')) return;
+        var key = el.name.replace('rev_', '');
+        if (el.checked) {
+            var obsEl = document.querySelector('[name="rev_obs_' + key + '"]');
+            rev[key] = {alterado: true, observacao: obsEl ? obsEl.value : ''};
+        }
+    });
+    var input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'revisao_sistemas';
+    input.value = JSON.stringify(rev);
+    this.appendChild(input);
+});
+</script>
+{% endif %}
+{% endblock %}

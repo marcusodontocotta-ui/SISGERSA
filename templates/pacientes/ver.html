@@ -268,14 +268,7 @@
 </div>
 
 {% elif tab == 'anamnese' %}
-    {% if prontuario %}
-    <iframe src="/prontuarios/{{ prontuario.id }}?embedded=1" class="tab-iframe" id="iframeAnamnese"></iframe>
-    {% else %}
-    <div class="text-center py-5 text-muted">
-        <i class="bi bi-journal-x fs-1"></i>
-        <p class="mt-2">Nenhum prontuario encontrado para este paciente neste estabelecimento.</p>
-    </div>
-    {% endif %}
+    <iframe src="/pacientes/{{ pac.id }}/anamnese?embedded=1" class="tab-iframe" id="iframeAnamnese"></iframe>
 
 {% elif tab == 'orcamentos' %}
     <iframe src="/orcamentos?paciente_id={{ pac.id }}&embedded=1" class="tab-iframe" id="iframeOrcamentos"></iframe>
