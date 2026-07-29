@@ -215,6 +215,33 @@
             </div>
         </div>
 
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card border-primary">
+                    <div class="card-body text-center py-2">
+                        <small class="text-muted">Valor Total</small>
+                        <h4 class="text-primary mb-0">R$ {{ "%.2f"|format(orcamento.valor_total|float - orcamento.desconto|float)|replace('.',',') }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-success">
+                    <div class="card-body text-center py-2">
+                        <small class="text-muted">Total Pago</small>
+                        <h4 class="text-success mb-0">R$ {{ "%.2f"|format(total_pago)|replace('.',',') }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-{{ 'danger' if saldo > 0 else 'success' }}">
+                    <div class="card-body text-center py-2">
+                        <small class="text-muted">Saldo Restante</small>
+                        <h4 class="text-{{ 'danger' if saldo > 0 else 'success' }} mb-0">R$ {{ "%.2f"|format(saldo)|replace('.',',') }}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {% if orcamento.observacoes %}
         <div class="card mb-4">
             <div class="card-header"><h6 class="mb-0">Observacoes</h6></div>

@@ -4002,6 +4002,12 @@ def ver_orcamento(orc_id: int, request: Request, usuario=Depends(exigir_login), 
                 ev_ids,
             )
 
+    total_pago = db.fetch_one(
+        "SELECT COALESCE(SUM(valor), 0) AS total FROM pagamentos WHERE orcamento_id = %s AND status = 'pago'",
+        (orc_id,),
+    )
+    saldo = float(orcamento["valor_total"] or 0) - float(total_pago["total"])
+
     return templates.TemplateResponse(
         "orcamentos/visualizar.html",
         {
@@ -4010,6 +4016,8 @@ def ver_orcamento(orc_id: int, request: Request, usuario=Depends(exigir_login), 
             "procedimentos": procedimentos,
             "tratamentos_realizados": tratamentos_realizados,
             "embedded": embedded in ("1", "True", "true"),
+            "total_pago": float(total_pago["total"]),
+            "saldo": saldo,
         },
     )
 
