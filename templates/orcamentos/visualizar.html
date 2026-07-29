@@ -128,10 +128,10 @@
                     </thead>
                     {% set ns = namespace(subtotal=0, desconto_itens=0) %}
                     {% for item in itens %}
-                        {% set ns.subtotal = ns.subtotal + (item.valor_unitario * item.quantidade) %}
+                        {% set ns.subtotal = ns.subtotal + (item.valor_unitario|float * item.quantidade|float) %}
                         {% set ns.desconto_itens = ns.desconto_itens + (item.desconto|float) %}
                     {% endfor %}
-                    {% set total_final = ns.subtotal - ns.desconto_itens - (orcamento.desconto|float) %}
+                    {% set total_final = (ns.subtotal|float) - ns.desconto_itens - (orcamento.desconto|float) %}
                     <tbody>
                         {% for item in itens %}
                         {% set ns3 = namespace(item_realizado=false) %}
