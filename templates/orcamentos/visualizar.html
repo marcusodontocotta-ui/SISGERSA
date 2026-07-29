@@ -215,33 +215,6 @@
             </div>
         </div>
 
-        <div class="row g-3 mb-4">
-            <div class="col-md-4">
-                <div class="card border-primary">
-                    <div class="card-body text-center py-2">
-                        <small class="text-muted">Valor Total</small>
-                        <h4 class="text-primary mb-0">R$ {{ "%.2f"|format(orcamento.valor_total|float - orcamento.desconto|float)|replace('.',',') }}</h4>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card border-success">
-                    <div class="card-body text-center py-2">
-                        <small class="text-muted">Total Pago</small>
-                        <h4 class="text-success mb-0">R$ {{ "%.2f"|format(total_pago)|replace('.',',') }}</h4>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card border-{{ 'danger' if saldo > 0 else 'success' }}">
-                    <div class="card-body text-center py-2">
-                        <small class="text-muted">Saldo Restante</small>
-                        <h4 class="text-{{ 'danger' if saldo > 0 else 'success' }} mb-0">R$ {{ "%.2f"|format(saldo)|replace('.',',') }}</h4>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         {% if orcamento.observacoes %}
         <div class="card mb-4">
             <div class="card-header"><h6 class="mb-0">Observacoes</h6></div>
@@ -252,6 +225,26 @@
         <div class="card mb-4">
             <div class="card-header"><h6 class="mb-0">Gerenciar Status</h6></div>
             <div class="card-body">
+                <div class="row g-2 mb-3">
+                    <div class="col-4">
+                        <div class="border rounded p-2 text-center">
+                            <small class="text-muted">Valor Total</small>
+                            <div class="fw-bold text-primary">R$ {{ "%.2f"|format(orcamento.valor_total|float - orcamento.desconto|float)|replace('.',',') }}</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border rounded p-2 text-center">
+                            <small class="text-muted">Total Pago</small>
+                            <div class="fw-bold text-success">R$ {{ "%.2f"|format(total_pago)|replace('.',',') }}</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border rounded p-2 text-center">
+                            <small class="text-muted">Saldo Restante</small>
+                            <div class="fw-bold text-{{ 'danger' if saldo > 0 else 'success' }}">R$ {{ "%.2f"|format(saldo)|replace('.',',') }}</div>
+                        </div>
+                    </div>
+                </div>
                 <div class="d-flex gap-2 flex-wrap">
                     {% if orcamento.status in ['rascunho'] %}
                     <form method="POST" action="/orcamentos/{{ orcamento.id }}/status" class="d-inline">
