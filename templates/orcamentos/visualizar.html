@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% if embedded %}{% extends "base_embedded.html" %}{% else %}{% extends "base.html" %}{% endif %}
 {% block titulo %}Orcamento #{{ orcamento.id }}{% endblock %}
 {% block conteudo %}
 {% set status_class = {'rascunho':'secondary', 'enviado':'primary', 'aprovado':'success', 'rejeitado':'danger', 'expirado':'warning', 'pago':'success', 'pago_parcial':'info'} %}
@@ -11,11 +11,11 @@
             </h4>
             <div class="d-flex gap-2">
                 {% if orcamento.paciente_usuario_id %}
-                <a href="/pacientes/{{ orcamento.paciente_usuario_id }}" class="btn btn-outline-info btn-sm">
+                <a href="/pacientes/{{ orcamento.paciente_usuario_id }}" class="btn btn-outline-info btn-sm" {{ 'target="_parent"' if embedded else '' }}>
                     <i class="bi bi-folder2-open"></i> Prontuario
                 </a>
                 {% endif %}
-                <a href="/orcamentos?paciente_id={{ orcamento.paciente_usuario_id }}" class="btn btn-outline-secondary btn-sm">
+                <a href="/orcamentos?paciente_id={{ orcamento.paciente_usuario_id }}" class="btn btn-outline-secondary btn-sm" {{ 'target="_parent"' if embedded else '' }}>
                     <i class="bi bi-arrow-left"></i> Lista
                 </a>
                 <a href="/orcamentos/{{ orcamento.id }}/imprimir" class="btn btn-outline-secondary btn-sm" target="_blank">

@@ -28,7 +28,7 @@
             {% for o in orcamentos %}
             {% set valor_total = o.valor_total|float %}
             {% set total_pago = o._total_pago|float %}
-            <tr style="cursor:pointer;" onclick="window.location='/orcamentos/{{ o.id }}'">
+            <tr style="cursor:pointer;" onclick="window.location='/orcamentos/{{ o.id }}{% if embedded %}?embedded=1{% endif %}'">
                 <td>{{ o.id }}</td>
                 <td>{{ o.criado_em.strftime('%d/%m/%Y') if o.criado_em else '-' }}</td>
                 <td>{{ o.profissional_nome }}</td>

@@ -3950,7 +3950,7 @@ def criar_orcamento(
 
 
 @app.get("/orcamentos/{orc_id}", response_class=HTMLResponse)
-def ver_orcamento(orc_id: int, request: Request, usuario=Depends(exigir_login)):
+def ver_orcamento(orc_id: int, request: Request, usuario=Depends(exigir_login), embedded: str = Query(None)):
     exigir_permissao(usuario, "orcamentos", "ver")
     orcamento = db.fetch_one(
         """SELECT o.*, u_pac.nome AS paciente_nome, u_pac.email AS paciente_email,
@@ -4009,6 +4009,7 @@ def ver_orcamento(orc_id: int, request: Request, usuario=Depends(exigir_login)):
             "orcamento": orcamento, "itens": itens,
             "procedimentos": procedimentos,
             "tratamentos_realizados": tratamentos_realizados,
+            "embedded": embedded in ("1", "True", "true"),
         },
     )
 
