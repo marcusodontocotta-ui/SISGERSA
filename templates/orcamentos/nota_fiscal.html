@@ -73,8 +73,8 @@
         </table>
 
         <div class="total-row d-flex justify-content-between">
-            <span>TOTAL:</span>
-            <span>R$ {{ "%.2f"|format(orcamento.valor_total)|replace('.',',') }}</span>
+            <span>TOTAL{% if valor_nota != orcamento.valor_total|float - orcamento.desconto|float %} (valor parcial){% endif %}:</span>
+            <span>R$ {{ "%.2f"|format(valor_nota)|replace('.',',') }}</span>
         </div>
 
         {% if pagamentos %}

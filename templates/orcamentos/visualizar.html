@@ -277,9 +277,19 @@
                         <i class="bi bi-credit-card"></i> {% if orcamento.status == 'pago' %}Ver Pagamentos{% else %}Registrar Pagamento{% endif %}
                     </a>
                     {% if orcamento.status in ['pago', 'pago_parcial'] %}
-                    <a href="/orcamentos/{{ orcamento.id }}/nota-fiscal" class="btn btn-outline-dark btn-sm" target="_blank">
-                        <i class="bi bi-receipt"></i> Nota Fiscal
-                    </a>
+                    <div class="dropdown d-inline">
+                        <button class="btn btn-outline-dark btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="bi bi-receipt"></i> Nota Fiscal
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/orcamentos/{{ orcamento.id }}/nota-fiscal" target="_blank">
+                                <i class="bi bi-file-text"></i> Valor Total</a></li>
+                            {% if total_pago > 0 and total_pago < (orcamento.valor_total|float - orcamento.desconto|float) %}
+                            <li><a class="dropdown-item" href="/orcamentos/{{ orcamento.id }}/nota-fiscal?valor={{ total_pago }}" target="_blank">
+                                <i class="bi bi-credit-card"></i> Valor Pago (R$ {{ "%.2f"|format(total_pago)|replace('.',',') }})</a></li>
+                            {% endif %}
+                        </ul>
+                    </div>
                     {% endif %}
                 </div>
             </div>

@@ -4300,7 +4300,7 @@ def cancelar_pagamento(orc_id: int, pag_id: int, request: Request, usuario=Depen
 
 
 @app.get("/orcamentos/{orc_id}/nota-fiscal", response_class=HTMLResponse)
-def nota_fiscal(orc_id: int, request: Request, usuario=Depends(exigir_login)):
+def nota_fiscal(orc_id: int, request: Request, usuario=Depends(exigir_login), valor: float = Query(None)):
     orcamento = db.fetch_one(
         """SELECT o.*, u_pac.nome AS paciente_nome, u_pac.email AS paciente_email, u_pac.telefone AS paciente_telefone,
                   u_prof.nome AS profissional_nome, e.nome AS estabelecimento_nome,
@@ -4333,10 +4333,11 @@ def nota_fiscal(orc_id: int, request: Request, usuario=Depends(exigir_login)):
     )
 
     total_pago = sum(float(p["valor"]) for p in pagamentos)
+    valor_nota = valor if valor is not None and valor > 0 else float(orcamento["valor_total"] or 0) - float(orcamento["desconto"] or 0)
 
     return templates.TemplateResponse(
         "orcamentos/nota_fiscal.html",
-        {"request": request, "usuario": usuario, "orcamento": orcamento, "itens": itens, "pagamentos": pagamentos, "total_pago": total_pago},
+        {"request": request, "usuario": usuario, "orcamento": orcamento, "itens": itens, "pagamentos": pagamentos, "total_pago": total_pago, "valor_nota": valor_nota},
     )
 
 
