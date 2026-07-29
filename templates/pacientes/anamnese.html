@@ -16,10 +16,6 @@
 
 {% set tab_atual = request.query_params.get('tab', 'queixa') %}
 
-<div class="d-flex align-items-center gap-2 mb-2">
-    <h5 class="mb-0"><i class="bi bi-journal-medical"></i> Anamnese</h5>
-</div>
-
 <ul class="nav sub-tabs mb-0" id="subTabs">
     <li class="nav-item"><a class="nav-link {% if tab_atual == 'queixa' %}active{% endif %}" href="?tab=queixa&embedded=1"><i class="bi bi-chat-dots"></i> Queixa / HDA</a></li>
     <li class="nav-item"><a class="nav-link {% if tab_atual == 'sistemas' %}active{% endif %}" href="?tab=sistemas&embedded=1"><i class="bi bi-ui-checks"></i> Revisão Sistemas</a></li>
