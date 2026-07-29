@@ -18,7 +18,7 @@
                             <select class="form-select" name="paciente_id" id="selectPaciente" required>
                                 <option value="">Selecione...</option>
                                 {% for p in pacientes %}
-                                <option value="{{ p.id }}">{{ p.nome }}</option>
+                                <option value="{{ p.id }}" {{ 'selected' if paciente_selecionado == p.id else '' }}>{{ p.nome }}</option>
                                 {% endfor %}
                             </select>
                         </div>

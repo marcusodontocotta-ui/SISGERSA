@@ -3875,7 +3875,7 @@ def listar_orcamentos(request: Request, usuario=Depends(exigir_login), paciente_
 
 
 @app.get("/orcamentos/novo", response_class=HTMLResponse)
-def novo_orcamento(request: Request, usuario=Depends(exigir_login)):
+def novo_orcamento(request: Request, usuario=Depends(exigir_login), paciente_id: str = Query(None)):
     estab_id = resolver_estabelecimento(request, usuario)
     if usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
         raise HTTPException(status_code=403)
@@ -3883,6 +3883,7 @@ def novo_orcamento(request: Request, usuario=Depends(exigir_login)):
     pacientes = []
     profissionais = []
     convenios = db.fetch_all("SELECT id, nome FROM convenios WHERE ativo = TRUE ORDER BY nome")
+    paciente_selecionado = int(paciente_id) if paciente_id and paciente_id.isdigit() else None
 
     if estab_id:
         pacientes = db.fetch_all(
@@ -3904,6 +3905,7 @@ def novo_orcamento(request: Request, usuario=Depends(exigir_login)):
             "request": request, "usuario": usuario, "orcamento": None,
             "pacientes": pacientes, "profissionais": profissionais,
             "convenios": convenios, "estabelecimento_id": estab_id,
+            "paciente_selecionado": paciente_selecionado,
         },
     )
 
