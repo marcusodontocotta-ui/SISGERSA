@@ -294,6 +294,47 @@
     </div>
 </div>
 
+{% if pagamentos %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-credit-card"></i> Pagamentos Realizados</h6>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Data</th>
+                    <th>Valor</th>
+                    <th>Metodo</th>
+                    <th>Parcelas</th>
+                    <th>Obs</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in pagamentos %}
+                <tr>
+                    <td>{{ p.data_pagamento.strftime('%d/%m/%Y') if p.data_pagamento else '-' }}</td>
+                    <td class="fw-bold">R$ {{ "%.2f"|format(p.valor)|replace('.',',') }}</td>
+                    <td>
+                        {% if p.metodo == 'dinheiro' %}<i class="bi bi-cash"></i> Dinheiro
+                        {% elif p.metodo == 'pix' %}<i class="bi bi-qr-code"></i> PIX
+                        {% elif p.metodo == 'cartao_credito' %}<i class="bi bi-credit-card"></i> Credito
+                        {% elif p.metodo == 'cartao_debito' %}<i class="bi bi-credit-card"></i> Debito
+                        {% elif p.metodo == 'transferencia' %}<i class="bi bi-bank"></i> Transferencia
+                        {% elif p.metodo == 'cheque' %}<i class="bi bi-journal-text"></i> Cheque
+                        {% else %}{{ p.metodo }}
+                        {% endif %}
+                    </td>
+                    <td>{{ p.parcelas }}x de R$ {{ "%.2f"|format(p.valor_parcela)|replace('.',',') }}</td>
+                    <td><small>{{ p.observacao or '-' }}</small></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 {% if orcamento.status == 'aprovado' and itens %}
 <div class="modal fade" id="modalConverter" tabindex="-1">
     <div class="modal-dialog">

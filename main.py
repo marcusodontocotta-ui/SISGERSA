@@ -4002,6 +4002,10 @@ def ver_orcamento(orc_id: int, request: Request, usuario=Depends(exigir_login), 
                 ev_ids,
             )
 
+    pagamentos = db.fetch_all(
+        "SELECT * FROM pagamentos WHERE orcamento_id = %s ORDER BY criado_em DESC",
+        (orc_id,),
+    )
     total_pago = db.fetch_one(
         "SELECT COALESCE(SUM(valor), 0) AS total FROM pagamentos WHERE orcamento_id = %s AND status = 'pago'",
         (orc_id,),
@@ -4018,6 +4022,7 @@ def ver_orcamento(orc_id: int, request: Request, usuario=Depends(exigir_login), 
             "embedded": embedded in ("1", "True", "true"),
             "total_pago": float(total_pago["total"]),
             "saldo": saldo,
+            "pagamentos": pagamentos,
         },
     )
 
