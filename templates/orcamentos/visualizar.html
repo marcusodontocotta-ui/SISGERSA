@@ -280,11 +280,9 @@
                         <i class="bi bi-calendar-plus"></i> Converter em Consulta
                     </button>
                     {% endif %}
-                    {% if orcamento.status in ['aprovado', 'pago_parcial'] %}
                     <a href="/orcamentos/{{ orcamento.id }}/pagar" class="btn btn-info btn-sm">
-                        <i class="bi bi-credit-card"></i> Registrar Pagamento
+                        <i class="bi bi-credit-card"></i> {% if orcamento.status == 'pago' %}Ver Pagamentos{% else %}Registrar Pagamento{% endif %}
                     </a>
-                    {% endif %}
                     {% if orcamento.status in ['pago', 'pago_parcial'] %}
                     <a href="/orcamentos/{{ orcamento.id }}/nota-fiscal" class="btn btn-outline-dark btn-sm" target="_blank">
                         <i class="bi bi-receipt"></i> Nota Fiscal
