@@ -16,22 +16,21 @@
 
 {% set tab_atual = request.query_params.get('tab', 'queixa') %}
 
-<div class="d-flex align-items-center gap-2 mb-3">
-    <h5 class="mb-0"><i class="bi bi-journal-medical"></i> Anamnese - {{ pac.nome }}</h5>
-    <small class="text-muted">({{ pac.data_nascimento.strftime('%d/%m/%Y') if pac.data_nascimento else '—' }})</small>
+<div class="d-flex align-items-center gap-2 mb-2">
+    <h5 class="mb-0"><i class="bi bi-journal-medical"></i> Anamnese</h5>
 </div>
 
 <ul class="nav sub-tabs mb-0" id="subTabs">
-    <li class="nav-item"><a class="nav-link {% if tab_atual == 'queixa' %}active{% endif %}" href="?tab=queixa&embedded={{ embedded }}"><i class="bi bi-chat-dots"></i> Queixa / HDA</a></li>
-    <li class="nav-item"><a class="nav-link {% if tab_atual == 'sistemas' %}active{% endif %}" href="?tab=sistemas&embedded={{ embedded }}"><i class="bi bi-ui-checks"></i> Revisão Sistemas</a></li>
-    <li class="nav-item"><a class="nav-link {% if tab_atual == 'medicamentos' %}active{% endif %}" href="?tab=medicamentos&embedded={{ embedded }}"><i class="bi bi-capsule"></i> Medicamentos</a></li>
-    <li class="nav-item"><a class="nav-link {% if tab_atual == 'sinais' %}active{% endif %}" href="?tab=sinais&embedded={{ embedded }}"><i class="bi bi-activity"></i> Sinais Vitais</a></li>
-    <li class="nav-item"><a class="nav-link {% if tab_atual == 'exames' %}active{% endif %}" href="?tab=exames&embedded={{ embedded }}"><i class="bi bi-file-medical"></i> Exames</a></li>
+    <li class="nav-item"><a class="nav-link {% if tab_atual == 'queixa' %}active{% endif %}" href="?tab=queixa&embedded=1"><i class="bi bi-chat-dots"></i> Queixa / HDA</a></li>
+    <li class="nav-item"><a class="nav-link {% if tab_atual == 'sistemas' %}active{% endif %}" href="?tab=sistemas&embedded=1"><i class="bi bi-ui-checks"></i> Revisão Sistemas</a></li>
+    <li class="nav-item"><a class="nav-link {% if tab_atual == 'medicamentos' %}active{% endif %}" href="?tab=medicamentos&embedded=1"><i class="bi bi-capsule"></i> Medicamentos</a></li>
+    <li class="nav-item"><a class="nav-link {% if tab_atual == 'sinais' %}active{% endif %}" href="?tab=sinais&embedded=1"><i class="bi bi-activity"></i> Sinais Vitais</a></li>
+    <li class="nav-item"><a class="nav-link {% if tab_atual == 'exames' %}active{% endif %}" href="?tab=exames&embedded=1"><i class="bi bi-file-medical"></i> Exames</a></li>
 </ul>
 
 <div class="sub-content">
 
-<form method="POST" action="/pacientes/{{ pac.id }}/anamnese/salvar?embedded={{ embedded }}" id="formAnamnese">
+<form method="POST" action="/pacientes/{{ pac.id }}/anamnese/salvar?embedded=1" id="formAnamnese">
 
 {% if tab_atual == 'queixa' %}
 

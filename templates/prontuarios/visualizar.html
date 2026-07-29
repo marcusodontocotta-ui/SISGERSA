@@ -88,6 +88,7 @@
 </style>
 {% endblock %}
 {% block conteudo %}
+{% if not embedded %}
 <div class="prontuario-banner mb-4">
     <div class="d-flex align-items-center gap-3 flex-wrap mb-2">
         <a href="/pacientes/{{ prontuario.paciente_usuario_id }}?tab=anamnese" class="btn-voltar" onclick="if(window.parent!==window){window.parent.location.href=this.href;return false;}"><i class="bi bi-arrow-left"></i> Voltar</a>
@@ -100,6 +101,7 @@
         <div class="text-white" style="font-size:1.05rem;"><strong>{{ prontuario.paciente_nome }}</strong></div>
     </div>
 </div>
+{% endif %}
 
 <div class="row">
     <div class="col-md-6">

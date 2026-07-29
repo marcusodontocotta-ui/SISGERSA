@@ -1857,7 +1857,7 @@ def pagina_anamnese(pac_id: int, request: Request, usuario=Depends(exigir_login)
             "anamnese": anamnese, "prontuario": prontuario,
             "medicamentos": medicamentos_paciente,
             "sinais_vitais": sinais_vitais,
-            "embedded": embedded == "1",
+            "embedded": embedded in ("1", "True", "true"),
         },
     )
 
@@ -2858,7 +2858,7 @@ def ver_prontuario(prontuario_id: int, request: Request, usuario=Depends(exigir_
             "procedimentos": procedimentos,
             "orcamento_disponivel_id": orcamento_disponivel_id,
             "odontograma": odontograma,
-            "embedded": embedded == "1",
+            "embedded": embedded in ("1", "True", "true"),
         },
     )
 
@@ -3860,9 +3860,9 @@ def listar_orcamentos(request: Request, usuario=Depends(exigir_login), paciente_
 
         return templates.TemplateResponse(
             "orcamentos/lista.html",
-            {"request": request, "usuario": usuario, "orcamentos": orcamentos,
+             {"request": request, "usuario": usuario, "orcamentos": orcamentos,
              "pacientes_filtro": pacientes_filtro, "paciente_id": paciente_id_int,
-             "embedded": embedded == "1"},
+             "embedded": embedded in ("1", "True", "true")},
         )
     except Exception as e:
         import traceback
@@ -4399,7 +4399,7 @@ def relatorio_financeiro(request: Request, usuario=Depends(exigir_login), pacien
         {"request": request, "usuario": usuario, "periodo": periodo,
          "pagamentos": pagamentos, "resumo": resumo, "por_metodo": por_metodo, "por_profissional": por_profissional,
          "pacientes_filtro": pacientes_filtro, "paciente_id": paciente_id_int,
-         "embedded": embedded == "1"},
+         "embedded": embedded in ("1", "True", "true")},
     )
 
 
