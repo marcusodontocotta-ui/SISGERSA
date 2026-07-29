@@ -4065,6 +4065,15 @@ def remover_item_orcamento(orc_id: int, item_id: int, usuario=Depends(exigir_log
     return RedirectResponse(f"/orcamentos/{orc_id}", status_code=302)
 
 
+@app.post("/orcamentos/{orc_id}/desconto")
+def atualizar_desconto_orcamento(orc_id: int, desconto: float = Form(0), usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "orcamentos", "editar")
+    if usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
+        raise HTTPException(status_code=403)
+    db.execute("UPDATE orcamentos SET desconto = %s WHERE id = %s", (desconto, orc_id))
+    return RedirectResponse(f"/orcamentos/{orc_id}", status_code=302)
+
+
 @app.post("/orcamentos/{orc_id}/status")
 def atualizar_status_orcamento(
     orc_id: int,
