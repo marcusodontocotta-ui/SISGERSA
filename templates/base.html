@@ -414,5 +414,86 @@
             }
         })();
         </script>
+        {% if usuario is defined and usuario %}
+        <div class="modal fade" id="modalInatividade" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-clock-history text-warning"></i> Aviso de inatividade</h5>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-1">Sua sessão será encerrada por inatividade em <strong>1 minuto</strong>.</p>
+                        <p class="text-muted small mb-0">Se você ainda está aqui, clique em "Continuar conectado".</p>
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <button class="btn btn-primary px-4" id="btnContinuarSessao">Continuar conectado</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+        (function() {
+            var LIMITE = 20 * 60 * 1000;
+            var ALERTA = 19 * 60 * 1000;
+            var BATIDA = 60 * 1000;
+            var lastActivity = Date.now();
+            var warningShown = false;
+            var modal = null;
+            var lastBeat = 0;
+            var throttle = false;
+
+            function marcarAtividade() {
+                lastActivity = Date.now();
+                try { localStorage.setItem('sisgersa_last_activity', String(lastActivity)); } catch (e) {}
+                warningShown = false;
+                if (modal) { modal.hide(); modal = null; }
+                heartbeat();
+            }
+
+            function heartbeat() {
+                var agora = Date.now();
+                if (agora - lastBeat < BATIDA) return;
+                lastBeat = agora;
+                fetch('/api/heartbeat', {credentials: 'same-origin', cache: 'no-store'})
+                    .then(function(r) { if (r.status === 401) window.location.href = '/logout?motivo=inatividade'; })
+                    .catch(function() {});
+            }
+
+            ['click', 'keydown', 'mousemove', 'scroll', 'touchstart', 'wheel'].forEach(function(ev) {
+                window.addEventListener(ev, function() {
+                    if (throttle) return;
+                    throttle = true;
+                    marcarAtividade();
+                    setTimeout(function() { throttle = false; }, 1000);
+                });
+            });
+
+            window.addEventListener('storage', function(e) {
+                if (e.key === 'sisgersa_last_activity' && e.newValue) {
+                    lastActivity = Math.max(lastActivity, parseInt(e.newValue, 10) || 0);
+                }
+            });
+
+            var btn = document.getElementById('btnContinuarSessao');
+            if (btn) btn.addEventListener('click', marcarAtividade);
+
+            setInterval(function() {
+                var decorrido = Date.now() - lastActivity;
+                if (decorrido >= LIMITE) {
+                    window.location.href = '/logout?motivo=inatividade';
+                    return;
+                }
+                if (decorrido >= ALERTA && !warningShown) {
+                    warningShown = true;
+                    var el = document.getElementById('modalInatividade');
+                    if (el) {
+                        modal = new bootstrap.Modal(el);
+                        modal.show();
+                    }
+                }
+            }, 5000);
+        })();
+        </script>
+        {% endif %}
     </body>
 </html>

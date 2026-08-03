@@ -27,7 +27,14 @@
                         </div>
                         {% endif %}
 
-                        <form method="POST" action="/login">
+                        {% if motivo == 'inatividade' %}
+                        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                            <i class="bi bi-clock-history"></i> Sessão encerrada por inatividade. Faça login novamente.
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        {% endif %}
+
+                        <form method="POST" action="/login" autocomplete="off">
                             <div class="mb-3">
                                 <label for="email" class="form-label">Email ou CPF</label>
                                 <div class="input-group">
@@ -39,7 +46,7 @@
                                 <label for="senha" class="form-label">Senha</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="bi bi-lock"></i></span>
-                                    <input type="password" class="form-control" id="senha" name="senha" required>
+                                    <input type="password" class="form-control" id="senha" name="senha" autocomplete="new-password" required>
                                     <button class="btn btn-outline-secondary" type="button" id="toggleSenha">
                                         <i class="bi bi-eye" id="iconSenha"></i>
                                     </button>
@@ -61,6 +68,10 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    window.addEventListener('DOMContentLoaded', function() {
+        var input = document.getElementById('senha');
+        if (input) input.value = '';
+    });
     document.getElementById('toggleSenha')?.addEventListener('click', function() {
         var input = document.getElementById('senha');
         var icon = document.getElementById('iconSenha');

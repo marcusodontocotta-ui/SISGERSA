@@ -255,6 +255,10 @@ def is_write_limited(request: Request, usuario: dict, action: str = "create") ->
     return False
 
 
+IDLE_TIMEOUT_SECONDS = 20 * 60
+_ultima_atividade: dict = {}
+
+
 def obter_usuario_atual(request: Request):
     token = request.cookies.get("token")
     if not token:
@@ -262,6 +266,12 @@ def obter_usuario_atual(request: Request):
     payload = verificar_token(token)
     if not payload:
         return None
+    agora = time.time()
+    ultima = _ultima_atividade.get(payload["sub"])
+    if ultima is not None and agora - ultima > IDLE_TIMEOUT_SECONDS:
+        _ultima_atividade.pop(payload["sub"], None)
+        return None
+    _ultima_atividade[payload["sub"]] = agora
     usuario = db.fetch_one("SELECT * FROM usuarios WHERE id = %s AND ativo = TRUE", (payload["sub"],))
     return usuario
 
@@ -377,8 +387,11 @@ def index(request: Request):
 
 
 @app.get("/login", response_class=HTMLResponse)
-def login_page(request: Request):
-    return templates.TemplateResponse("auth/login.html", {"request": request, "erro": None})
+def login_page(request: Request, motivo: str = None):
+    return templates.TemplateResponse(
+        "auth/login.html",
+        {"request": request, "erro": None, "motivo": motivo},
+    )
 
 
 @app.post("/login")
@@ -708,13 +721,27 @@ def registrar_submit(
 
 
 @app.get("/logout")
-def logout():
-    response = RedirectResponse("/login", status_code=302)
+def logout(request: Request, motivo: str = None):
+    token = request.cookies.get("token")
+    payload = verificar_token(token) if token else None
+    if payload:
+        _ultima_atividade.pop(payload["sub"], None)
+    destino = "/login"
+    if motivo:
+        destino += f"?motivo={motivo}"
+    response = RedirectResponse(destino, status_code=302)
     response.delete_cookie("token")
     response.delete_cookie("estabelecimento_id")
     response.delete_cookie("impersonate_token")
     response.delete_cookie("impersonate_estab")
     return response
+
+
+@app.get("/api/heartbeat")
+def api_heartbeat(request: Request):
+    if not obter_usuario_atual(request):
+        return JSONResponse(status_code=401, content={"ok": False})
+    return {"ok": True, "ts": time.time()}
 
 
 @app.get("/admin/impersonate/{user_id}")
