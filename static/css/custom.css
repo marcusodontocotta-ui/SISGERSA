@@ -13,6 +13,12 @@ html, body {
     overflow-x: hidden;
 }
 
+/* Navbar: nunca esconder itens da direita (quebra para 2a linha quando nao couber) */
+.navbar .navbar-collapse,
+.navbar .navbar-nav {
+    flex-wrap: wrap !important;
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: var(--bg-page);

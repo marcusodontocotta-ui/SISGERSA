@@ -427,7 +427,7 @@ def login_submit(request: Request, email: str = Form(...), senha: str = Form(...
     if len(usuarios_validos) == 1:
         return _login_usuario(request, usuarios_validos[0])
 
-    cookie_kwargs = dict(httponly=True, max_age=172800, samesite="lax")
+    cookie_kwargs = dict(httponly=True, samesite="lax")
     is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
     if is_https:
         cookie_kwargs["secure"] = True
@@ -508,7 +508,7 @@ def _login_usuario(request: Request, usuario: dict):
     if usuario["tipo"] in ("admin", "profissional", "recepcionista"):
         estabelecimentos = obter_estabelecimentos_usuario(usuario["id"])
 
-    cookie_kwargs = dict(httponly=True, max_age=172800, samesite="lax")
+    cookie_kwargs = dict(httponly=True, samesite="lax")
     is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
     if is_https:
         cookie_kwargs["secure"] = True
@@ -707,7 +707,7 @@ def registrar_submit(
 
     token = criar_token(admin_id, "admin", False)
 
-    cookie_kwargs = dict(httponly=True, max_age=172800, samesite="lax")
+    cookie_kwargs = dict(httponly=True, samesite="lax")
     is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
     if is_https:
         cookie_kwargs["secure"] = True
@@ -777,7 +777,7 @@ def impersonate_user(
 
     token = criar_token(target["id"], target["tipo"], target.get("is_super", False))
 
-    cookie_kwargs = dict(httponly=True, max_age=172800, samesite="lax")
+    cookie_kwargs = dict(httponly=True, samesite="lax")
     is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
     if is_https:
         cookie_kwargs["secure"] = True
@@ -803,7 +803,7 @@ def stop_impersonate(request: Request):
     if not original_token:
         return RedirectResponse("/login", status_code=302)
 
-    cookie_kwargs = dict(httponly=True, max_age=172800, samesite="lax")
+    cookie_kwargs = dict(httponly=True, samesite="lax")
     is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
     if is_https:
         cookie_kwargs["secure"] = True
@@ -890,7 +890,7 @@ def selecionar_estabelecimento(
         raise HTTPException(status_code=403)
 
     redirect = request.headers.get("referer", "/dashboard")
-    cookie_kwargs = dict(httponly=True, max_age=172800, samesite="lax")
+    cookie_kwargs = dict(httponly=True, samesite="lax")
     is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
     if is_https:
         cookie_kwargs["secure"] = True
@@ -1125,7 +1125,7 @@ def dashboard(request: Request, usuario=Depends(exigir_login)):
         estabs = db.fetch_all("SELECT id, nome, tipo, email FROM estabelecimentos WHERE ativo = TRUE ORDER BY nome")
         if len(estabs) == 1:
             response = RedirectResponse("/dashboard", status_code=302)
-            cookie_kwargs = dict(httponly=True, max_age=172800, samesite="lax")
+            cookie_kwargs = dict(httponly=True, samesite="lax")
             if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
                 cookie_kwargs["secure"] = True
             response.set_cookie("estabelecimento_id", str(estabs[0]["id"]), **cookie_kwargs)
