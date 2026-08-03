@@ -36,6 +36,17 @@
 
                         {% if not sucesso %}
                         <form method="POST" action="/registrar" id="formRegistrar">
+                            <div class="alert alert-info text-center py-2 mb-3">
+                                <i class="bi bi-credit-card"></i>
+                                <strong>Plano selecionado:</strong>
+                                {{ plano_info.nome if plano_info else 'Grátis' }}
+                                {% if plano_info and plano_info.valor_mensal > 0 %}
+                                - R$ {{ "%.0f"|format(plano_info.valor_mensal) }}/mês
+                                {% else %}
+                                - Grátis
+                                {% endif %}
+                                <input type="hidden" name="plano_slug" value="{{ plano_info.slug if plano_info else 'gratis' }}">
+                            </div>
                             <h6 class="text-muted mb-3"><i class="bi bi-building"></i> Dados da Clínica</h6>
 
                             <div class="mb-3">

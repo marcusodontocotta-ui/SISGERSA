@@ -28,6 +28,7 @@ from utils.auth import (
     _is_cpf,
     _normalizar_cpf,
     verificar_senha,
+    hash_senha,
     criar_token,
     verificar_token,
     obter_estabelecimentos_usuario,
@@ -119,14 +120,29 @@ async def lifespan(app):
 app = FastAPI(title="SISGERSA", docs_url=None, redoc_url=None, lifespan=lifespan)
 
 
+@app.middleware("http")
+async def no_cache_html(request: Request, call_next):
+    response = await call_next(request)
+    content_type = response.headers.get("content-type", "")
+    if "text/html" in content_type:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 def _proximo_numero_prontuario(estabelecimento_id: int) -> str:
-    row = db.fetch_one(
-        "SELECT MAX(CAST(SUBSTRING(numero_prontuario FROM 7) AS INTEGER)) AS max_num "
-        "FROM prontuarios WHERE estabelecimento_id = %s",
+    linhas = db.fetch_all(
+        "SELECT numero_prontuario FROM prontuarios WHERE estabelecimento_id = %s",
         (estabelecimento_id,),
     )
-    proximo = (row["max_num"] or 0) + 1 if row else 1
-    return f"PRONT-{proximo:05d}"
+    maior = 0
+    for r in linhas or []:
+        valor = str(r.get("numero_prontuario") or "")
+        for token in valor.split("-"):
+            if token.isdigit():
+                maior = max(maior, int(token))
+    return f"PRONT-{maior + 1:05d}"
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -427,6 +443,47 @@ def login_submit(request: Request, email: str = Form(...), senha: str = Form(...
     )
 
 
+@app.get("/minha-conta/alterar-senha")
+def alterar_senha_page(request: Request, usuario: dict = Depends(exigir_login)):
+    return templates.TemplateResponse(
+        "auth/alterar_senha.html",
+        {"request": request, "usuario": usuario, "erro": None, "sucesso": None},
+    )
+
+
+@app.post("/minha-conta/alterar-senha")
+def alterar_senha_submit(
+    request: Request,
+    usuario: dict = Depends(exigir_login),
+    senha_atual: str = Form(...),
+    nova_senha: str = Form(...),
+    nova_senha2: str = Form(...),
+):
+    if not verificar_senha(senha_atual, usuario["senha_hash"]):
+        return templates.TemplateResponse(
+            "auth/alterar_senha.html",
+            {"request": request, "usuario": usuario, "erro": "Senha atual incorreta.", "sucesso": None},
+        )
+    if len(nova_senha) < 6:
+        return templates.TemplateResponse(
+            "auth/alterar_senha.html",
+            {"request": request, "usuario": usuario, "erro": "A nova senha deve ter pelo menos 6 caracteres.", "sucesso": None},
+        )
+    if nova_senha != nova_senha2:
+        return templates.TemplateResponse(
+            "auth/alterar_senha.html",
+            {"request": request, "usuario": usuario, "erro": "A confirmação da nova senha não confere.", "sucesso": None},
+        )
+    db.execute(
+        "UPDATE usuarios SET senha_hash = %s WHERE id = %s",
+        (hash_senha(nova_senha), usuario["id"]),
+    )
+    return templates.TemplateResponse(
+        "auth/alterar_senha.html",
+        {"request": request, "usuario": usuario, "erro": None, "sucesso": "Senha alterada com sucesso."},
+    )
+
+
 _pending_logins = {}
 _pending_logins_ts = {}
 
@@ -481,11 +538,18 @@ def login_selecionar(request: Request, session_key: str = Form(...), usuario_id:
 
 
 @app.get("/registrar", response_class=HTMLResponse)
-def registrar_page(request: Request):
+def registrar_page(request: Request, plano: str = Query("gratis")):
     usuario = obter_usuario_atual(request)
     if usuario:
         return RedirectResponse("/dashboard", status_code=302)
-    return templates.TemplateResponse("auth/registrar.html", {"request": request})
+    from database.connection import db
+    planos_validos = {"gratis", "basico", "profissional", "enterprise"}
+    if plano not in planos_validos:
+        plano = "gratis"
+    plano_info = db.fetch_one("SELECT id, nome, slug, valor_mensal FROM planos WHERE slug = %s AND ativo = TRUE", (plano,))
+    if not plano_info:
+        plano_info = db.fetch_one("SELECT id, nome, slug, valor_mensal FROM planos WHERE slug = 'gratis' AND ativo = TRUE")
+    return templates.TemplateResponse("auth/registrar.html", {"request": request, "plano_info": plano_info})
 
 
 @app.get("/api/cupom/validar")
@@ -501,7 +565,7 @@ def api_validar_cupom(codigo: str):
     if not cupom:
         return {"valido": False, "mensagem": "Cupom não encontrado ou inativo"}
 
-    if cupom["max_usos"] > 0 and cupom["usos_atual"] >= cupom["max_usos"]:
+    if cupom["max_usos"] is not None and cupom["max_usos"] > 0 and cupom["usos_atual"] >= cupom["max_usos"]:
         return {"valido": False, "mensagem": "Cupom atingiu o limite de uso"}
 
     desconto = cupom["desconto_percentual"]
@@ -527,38 +591,59 @@ def registrar_submit(
     senha: str = Form(...),
     senha2: str = Form(...),
     cupom: str = Form(None),
+    plano_slug: str = Form("gratis"),
 ):
+    from database.connection import db
+    cupom_id = None
+    planos_validos = {"gratis", "basico", "profissional", "enterprise"}
+    if plano_slug not in planos_validos:
+        plano_slug = "gratis"
+    data_expiracao_trial = None
+    validade_dias = 30
+
+    def _plano_info():
+        return db.fetch_one("SELECT id, nome, slug, valor_mensal FROM planos WHERE slug = %s", (plano_slug,))
+
     if senha != senha2:
         return templates.TemplateResponse("auth/registrar.html", {
-            "request": request, "erro": "As senhas não coincidem"
+            "request": request, "erro": "As senhas não coincidem",
+            "plano_info": _plano_info(),
         })
 
     if len(senha) < 6:
         return templates.TemplateResponse("auth/registrar.html", {
-            "request": request, "erro": "A senha deve ter no mínimo 6 caracteres"
+            "request": request, "erro": "A senha deve ter no mínimo 6 caracteres",
+            "plano_info": _plano_info(),
         })
 
-    from database.connection import db
     existente = db.fetch_one("SELECT id FROM usuarios WHERE email = %s", (email,))
     if existente:
         return templates.TemplateResponse("auth/registrar.html", {
-            "request": request, "erro": "Já existe uma conta com este email"
+            "request": request, "erro": "Já existe uma conta com este email",
+            "plano_info": _plano_info(),
         })
-
-    cupom_id = None
-    plano_slug = "gratis"
     if cupom and cupom.strip():
         cupom_row = db.fetch_one(
             "SELECT * FROM cupons WHERE codigo = %s AND ativo = TRUE",
             (cupom.strip().upper(),),
         )
         if cupom_row:
-            if cupom_row["max_usos"] > 0 and cupom_row["usos_atual"] >= cupom_row["max_usos"]:
+            if cupom_row["max_usos"] is not None and cupom_row["max_usos"] > 0 and cupom_row["usos_atual"] >= cupom_row["max_usos"]:
                 return templates.TemplateResponse("auth/registrar.html", {
-                    "request": request, "erro": "Cupom atingiu o limite de uso"
+                    "request": request, "erro": "Cupom atingiu o limite de uso",
+                    "plano_info": _plano_info(),
                 })
             cupom_id = cupom_row["id"]
             plano_slug = cupom_row["plano_destino"]
+            if cupom_row["desconto_percentual"] >= 100:
+                validade_dias = cupom_row.get("validade_dias") or 30
+                from datetime import timedelta
+                data_expiracao_trial = (datetime.now() + timedelta(days=validade_dias)).strftime("%Y-%m-%d")
+        else:
+            return templates.TemplateResponse("auth/registrar.html", {
+                "request": request, "erro": "Cupom inválido",
+                "plano_info": db.fetch_one("SELECT id, nome, slug, valor_mensal FROM planos WHERE slug = %s", (plano_slug,)),
+            })
 
     plano_row = db.fetch_one("SELECT id FROM planos WHERE slug = %s", (plano_slug,))
     plano_id = plano_row["id"] if plano_row else None
@@ -566,15 +651,15 @@ def registrar_submit(
     try:
         if settings.DB_ENGINE == "postgresql":
             db.execute(
-                """INSERT INTO estabelecimentos (nome, tipo, cnpj, telefone, email, endereco, plano_id, cupom_id)
-                   VALUES (%s, %s, NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), %s, %s)""",
-                (nome_estabelecimento, tipo, cnpj or "", telefone or "", email_estab or "", endereco or "", plano_id, cupom_id),
+                """INSERT INTO estabelecimentos (nome, tipo, cnpj, telefone, email, endereco, plano_id, cupom_id, plano_expira_em)
+                   VALUES (%s, %s, NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), %s, %s, %s)""",
+                (nome_estabelecimento, tipo, cnpj or "", telefone or "", email_estab or "", endereco or "", plano_id, cupom_id, data_expiracao_trial),
             )
         else:
             db.execute(
-                """INSERT INTO estabelecimentos (nome, tipo, cnpj, telefone, email, endereco, plano_id, cupom_id)
-                   VALUES (%s, %s, NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), %s, %s)""",
-                (nome_estabelecimento, tipo, cnpj or "", telefone or "", email_estab or "", endereco or "", plano_id, cupom_id),
+                """INSERT INTO estabelecimentos (nome, tipo, cnpj, telefone, email, endereco, plano_id, cupom_id, plano_expira_em)
+                   VALUES (%s, %s, NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), %s, %s, %s)""",
+                (nome_estabelecimento, tipo, cnpj or "", telefone or "", email_estab or "", endereco or "", plano_id, cupom_id, data_expiracao_trial),
             )
 
         estab = db.fetch_one("SELECT id FROM estabelecimentos ORDER BY id DESC LIMIT 1")
@@ -585,7 +670,8 @@ def registrar_submit(
     except Exception as e:
         logger.error(f"registrar: erro ao criar estabelecimento: {e}")
         return templates.TemplateResponse("auth/registrar.html", {
-            "request": request, "erro": f"Erro ao criar estabelecimento: {e}"
+            "request": request, "erro": f"Erro ao criar estabelecimento: {e}",
+            "plano_info": _plano_info(),
         })
 
     try:
@@ -602,7 +688,8 @@ def registrar_submit(
     except Exception as e:
         logger.error(f"registrar: erro ao criar admin: {e}")
         return templates.TemplateResponse("auth/registrar.html", {
-            "request": request, "erro": f"Erro ao criar usuário: {e}"
+            "request": request, "erro": f"Erro ao criar usuário: {e}",
+            "plano_info": _plano_info(),
         })
 
     token = criar_token(admin_id, "admin", False)
@@ -772,7 +859,7 @@ def selecionar_estabelecimento(
     estabelecimento_id: str = Form(""),
     usuario=Depends(exigir_login),
 ):
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     redirect = request.headers.get("referer", "/dashboard")
@@ -848,7 +935,7 @@ def paginar_permissoes(
     usuario_id: str = Query(None),
     usuario=Depends(exigir_login),
 ):
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     estab_id = estabelecimento_id or request.cookies.get("estabelecimento_id")
@@ -891,7 +978,7 @@ def salvar_permissoes_rota(
     estabelecimento_id: int = Form(...),
     usuario=Depends(exigir_login),
 ):
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     if not usuario.get("is_super"):
@@ -915,7 +1002,7 @@ def salvar_permissoes_rota(
 @app.get("/admin/configuracoes-recepcionista", response_class=HTMLResponse)
 def configuracoes_recepcionista_page(request: Request, usuario=Depends(exigir_login), usuario_id: str = ""):
     estab_id = resolver_estabelecimento(request, usuario)
-    if not estab_id or usuario["tipo"] != "admin":
+    if (not estab_id or usuario["tipo"] != "admin") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     recepcionistas = db.fetch_all(
@@ -953,7 +1040,7 @@ def salvar_config_recepcionista(
     usuario=Depends(exigir_login),
 ):
     estab_id = resolver_estabelecimento(request, usuario)
-    if not estab_id or usuario["tipo"] != "admin":
+    if (not estab_id or usuario["tipo"] != "admin") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     permissoes = {}
@@ -973,7 +1060,7 @@ def api_usuarios_por_estab(
     estabelecimento_id: int = Query(...),
     usuario=Depends(exigir_login),
 ):
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     if not usuario.get("is_super"):
@@ -1024,10 +1111,24 @@ def dashboard(request: Request, usuario=Depends(exigir_login)):
     if usuario["tipo"] == "admin" and not usuario.get("is_super"):
         template_name = "dashboard/admin_estab.html"
 
+    cortesia_ate = None
+    plano_status = None
+    if estab_info and estab_info.get("plano_expira_em"):
+        exp = estab_info["plano_expira_em"]
+        cortesia_ate = exp.strftime("%d/%m/%Y")
+        if exp < datetime.now().date():
+            plano_status = "expirado"
+        elif (exp - datetime.now().date()).days <= 5:
+            plano_status = "proximo_expirar"
+    elif plano_info and plano_info.get("valor_mensal", 0) > 0:
+        dt_base = estab_info.get("criado_em") or datetime.now()
+        cortesia_ate = (dt_base + timedelta(days=30)).strftime("%d/%m/%Y")
+
     ctx = {
         "request": request, "usuario": usuario, "now": datetime.now(),
         "plano_info": plano_info, "uso_info": uso_info,
         "estab_id": estab_id, "estab_info": estab_info,
+        "cortesia_ate": cortesia_ate, "plano_status": plano_status,
     }
 
     if usuario["tipo"] == "profissional" and estab_id:
@@ -1150,10 +1251,10 @@ def dashboard(request: Request, usuario=Depends(exigir_login)):
 
 
 @app.post("/paciente/medicao")
-def paciente_nova_medicao(request: Request, usuario=Depends(exigir_login)):
+async def paciente_nova_medicao(request: Request, usuario=Depends(exigir_login)):
     if usuario["tipo"] != "paciente":
         raise HTTPException(status_code=403)
-    form = dict(request.form())
+    form = dict(await request.form())
     db.execute(
         """INSERT INTO sinais_vitais (paciente_id, pressao_sistolica, pressao_diastolica,
            frequencia_cardiaca, saturacao_oxigenio, temperatura, glicemia, peso, observacoes)
@@ -1179,7 +1280,7 @@ def dashboard_stats(
     data_fim: str = Query(None),
     usuario=Depends(exigir_login),
 ):
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     hoje = datetime.now()
@@ -1304,7 +1405,7 @@ def dashboard_stats(
 
 @app.get("/api/estabelecimentos")
 def api_estabelecimentos(usuario=Depends(exigir_login)):
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
     estabs = db.fetch_all(
         "SELECT id, nome FROM estabelecimentos WHERE ativo = TRUE ORDER BY nome"
@@ -1337,11 +1438,8 @@ def sistema_status():
     db_latency_ms = -1
     try:
         t0 = time.time()
-        conn = db.get_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT 1")
-            db_ok = True
-            db_latency_ms = round((time.time() - t0) * 1000, 1)
+        db_ok = db.ping()
+        db_latency_ms = round((time.time() - t0) * 1000, 1)
     except Exception:
         db_ok = False
 
@@ -1430,7 +1528,7 @@ def listar_pacientes_redirect():
 @app.get("/estabelecimentos", response_class=HTMLResponse)
 def listar_estabelecimentos(request: Request, usuario=Depends(exigir_login)):
     exigir_permissao(usuario, "estabelecimentos", "ver")
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     estabelecimentos = db.fetch_all(
@@ -1455,7 +1553,7 @@ def criar_estabelecimento(
     usuario=Depends(exigir_login),
 ):
     exigir_permissao(usuario, "estabelecimentos", "criar")
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     db.execute(
@@ -1468,7 +1566,7 @@ def criar_estabelecimento(
 
 @app.post("/estabelecimentos/{estab_id}/desativar")
 def desativar_estabelecimento(estab_id: int, usuario=Depends(exigir_login)):
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     db.execute("UPDATE estabelecimentos SET ativo = FALSE WHERE id = %s", (estab_id,))
@@ -1478,7 +1576,7 @@ def desativar_estabelecimento(estab_id: int, usuario=Depends(exigir_login)):
 @app.get("/estabelecimentos/{estab_id}/editar", response_class=HTMLResponse)
 def editar_estabelecimento(estab_id: int, request: Request, usuario=Depends(exigir_login)):
     exigir_permissao(usuario, "estabelecimentos", "editar")
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     estab = db.fetch_one("SELECT * FROM estabelecimentos WHERE id = %s", (estab_id,))
@@ -1488,7 +1586,7 @@ def editar_estabelecimento(estab_id: int, request: Request, usuario=Depends(exig
     return templates.TemplateResponse(
         "estabelecimentos/editar.html",
         {"request": request, "usuario": usuario, "estab": estab,
-         "profissionais": db.fetch_all("SELECT id, nome FROM profissionais WHERE ativo = TRUE ORDER BY nome")},
+         "profissionais": db.fetch_all("SELECT id, nome FROM usuarios WHERE tipo IN ('admin','profissional') AND ativo = TRUE ORDER BY nome")},
     )
 
 
@@ -1506,7 +1604,7 @@ def salvar_estabelecimento(
     responsavel_usuario_id: str = Form(None),
     usuario=Depends(exigir_login),
 ):
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     resp_id = int(responsavel_usuario_id) if responsavel_usuario_id and responsavel_usuario_id.strip() else None
@@ -1523,18 +1621,34 @@ def salvar_estabelecimento(
 @app.get("/profissionais", response_class=HTMLResponse)
 def listar_profissionais(request: Request, usuario=Depends(exigir_login)):
     exigir_permissao(usuario, "profissionais", "ver")
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
-    profissionais = db.fetch_all(
-        """SELECT u.*, pe.especialidade, pe.cargo, pe.estabelecimento_id,
-                  e.nome AS estabelecimento_nome
-           FROM usuarios u
-           LEFT JOIN profissional_estabelecimento pe ON pe.usuario_id = u.id
-           LEFT JOIN estabelecimentos e ON e.id = pe.estabelecimento_id
-           WHERE u.tipo = 'profissional'
-           ORDER BY u.ativo DESC, u.nome"""
-    )
+    estab_id = resolver_estabelecimento(request, usuario)
+
+    if usuario.get("is_super") and not estab_id:
+        profissionais = db.fetch_all(
+            """SELECT u.*, pe.especialidade, pe.cargo, pe.estabelecimento_id,
+                      e.nome AS estabelecimento_nome
+               FROM usuarios u
+               LEFT JOIN profissional_estabelecimento pe ON pe.usuario_id = u.id
+               LEFT JOIN estabelecimentos e ON e.id = pe.estabelecimento_id
+               WHERE u.tipo IN ('admin', 'profissional')
+               ORDER BY u.ativo DESC, u.nome"""
+        )
+    elif estab_id:
+        profissionais = db.fetch_all(
+            """SELECT u.*, pe.especialidade, pe.cargo, pe.estabelecimento_id,
+                      e.nome AS estabelecimento_nome
+               FROM usuarios u
+               JOIN profissional_estabelecimento pe ON pe.usuario_id = u.id
+               LEFT JOIN estabelecimentos e ON e.id = pe.estabelecimento_id
+               WHERE pe.estabelecimento_id = %s AND u.tipo IN ('admin', 'profissional')
+               ORDER BY u.ativo DESC, u.nome""",
+            (estab_id,),
+        )
+    else:
+        profissionais = []
 
     estabelecimentos = db.fetch_all(
         "SELECT id, nome FROM estabelecimentos WHERE ativo = TRUE ORDER BY nome"
@@ -1562,7 +1676,7 @@ def criar_profissional(
     usuario=Depends(exigir_login),
 ):
     exigir_permissao(usuario, "profissionais", "criar")
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     estab_id = resolver_estabelecimento(request, usuario, estabelecimento_id)
@@ -1578,7 +1692,7 @@ def criar_profissional(
         return RedirectResponse("/profissionais?erro=email_existente", status_code=302)
 
     if foto_url:
-        db.execute("UPDATE profissionais SET foto_url = %s WHERE id = %s", (foto_url, user_id))
+        db.execute("UPDATE usuarios SET foto_url = %s WHERE id = %s", (foto_url, user_id))
 
     if estabelecimento_id and estabelecimento_id.strip():
         db.execute(
@@ -1592,7 +1706,7 @@ def criar_profissional(
 @app.get("/profissionais/{prof_id}/editar", response_class=HTMLResponse)
 def editar_profissional(prof_id: int, request: Request, usuario=Depends(exigir_login)):
     exigir_permissao(usuario, "profissionais", "editar")
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     prof = db.fetch_one(
@@ -1630,12 +1744,12 @@ def salvar_profissional(
     cor: str = Form("#6c757d"),
     usuario=Depends(exigir_login),
 ):
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     db.execute(
-        "UPDATE profissionais SET nome = %s, email = %s, telefone = %s, foto_url = %s, cargo = %s WHERE id = %s",
-        (nome, email, telefone, foto_url, cargo or None, prof_id),
+        "UPDATE usuarios SET nome = %s, email = %s, telefone = %s, foto_url = %s WHERE id = %s",
+        (nome, email, telefone, foto_url, prof_id),
     )
 
     existing = db.fetch_one(
@@ -1663,19 +1777,19 @@ def salvar_profissional(
 
 @app.post("/profissionais/{prof_id}/desativar")
 def desativar_profissional(prof_id: int, usuario=Depends(exigir_login)):
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
-    db.execute("UPDATE profissionais SET ativo = FALSE WHERE id = %s", (prof_id,))
+    db.execute("UPDATE usuarios SET ativo = FALSE WHERE id = %s", (prof_id,))
     return RedirectResponse("/profissionais", status_code=302)
 
 
 @app.post("/profissionais/{prof_id}/reativar")
 def reativar_profissional(prof_id: int, usuario=Depends(exigir_login)):
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
-    db.execute("UPDATE profissionais SET ativo = TRUE WHERE id = %s", (prof_id,))
+    db.execute("UPDATE usuarios SET ativo = TRUE WHERE id = %s", (prof_id,))
     return RedirectResponse("/profissionais", status_code=302)
 
 
@@ -1704,7 +1818,7 @@ def criar_paciente(
     exigir_permissao(usuario, "pacientes", "criar")
     if is_write_limited(request, usuario, "create"):
         raise HTTPException(status_code=429, detail="Muitas requisicoes. Aguarde 1 minuto.")
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     estab_id = resolver_estabelecimento(request, usuario, estabelecimento_id)
@@ -1718,24 +1832,14 @@ def criar_paciente(
         user_id = criar_usuario(nome, email, senha, "paciente", telefone)
     except Exception:
         return RedirectResponse("/prontuarios?erro=email_duplicado", status_code=302)
+    partes_endereco = [p for p in (logradouro, numero, complemento, bairro, cidade, cep) if p and p.strip()]
+    endereco_completo = ", ".join(partes_endereco) if partes_endereco else (endereco or None)
     db.execute(
-        """UPDATE pacientes SET cpf = %s, data_nascimento = %s, logradouro = %s,
-           numero = %s, complemento = %s, bairro = %s,
-           cidade = %s, estado = %s, cep = %s, tipo_pagamento = %s WHERE id = %s""",
-        (cpf or None, data_nascimento or None,
-         logradouro or None, numero or None, complemento or None, bairro or None,
-         cidade or None, estado or None, cep or None, tipo_pagamento or 'particular', user_id),
+        "UPDATE usuarios SET cpf = %s, data_nascimento = %s, endereco = %s WHERE id = %s",
+        (cpf or None, data_nascimento or None, endereco_completo, user_id),
     )
-    has_address = logradouro or cep or cidade
-    if has_address:
-        db.execute(
-            """INSERT INTO enderecos (paciente_id, logradouro, numero, complemento, bairro, cidade, estado, cep, principal)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE)""",
-            (user_id, logradouro or None, numero or None, complemento or None, bairro or None,
-             cidade or None, estado or None, cep or None),
-        )
     if foto_url:
-        db.execute("UPDATE pacientes SET foto_url = %s WHERE id = %s", (foto_url, user_id))
+        db.execute("UPDATE usuarios SET foto_url = %s WHERE id = %s", (foto_url, user_id))
 
     if estab_id:
         vincular_paciente(user_id, int(estab_id))
@@ -1863,9 +1967,9 @@ def pagina_anamnese(pac_id: int, request: Request, usuario=Depends(exigir_login)
 
 
 @app.post("/pacientes/{pac_id}/anamnese/salvar")
-def salvar_anamnese(pac_id: int, request: Request, usuario=Depends(exigir_login)):
+async def salvar_anamnese(pac_id: int, request: Request, usuario=Depends(exigir_login)):
     exigir_permissao(usuario, "prontuarios", "editar")
-    form = dict(request.form())
+    form = dict(await request.form())
     estab_id = resolver_estabelecimento(request, usuario)
 
     prontuario = None
@@ -1903,7 +2007,7 @@ def salvar_anamnese(pac_id: int, request: Request, usuario=Depends(exigir_login)
                alergias=%(alergias)s, habits=%(habits)s, atividade_fisica=%(atividade_fisica)s,
                tabagismo=%(tabagismo)s, etilismo=%(etilismo)s, refeicoes_dia=%(refeicoes_dia)s,
                horas_sono=%(horas_sono)s, gestante=%(gestante)s, numero_gestacoes=%(numero_gestacoes)s,
-               observacoes=%(observacoes)s, revisao_sistemas=%(revisao_sistemas)s::jsonb,
+               observacoes=%(observacoes)s, revisao_sistemas=%(revisao_sistemas)s,
                profissional_usuario_id=%(profissional)s, atualizado_em=NOW()
                WHERE id=%(id)s""",
             {**fields, "profissional": usuario["id"], "id": existing["id"]},
@@ -1914,48 +2018,90 @@ def salvar_anamnese(pac_id: int, request: Request, usuario=Depends(exigir_login)
                queixa_principal, historico_doenca_atual, impressao, historico_medico, historico_familiar,
                alergias, habits, atividade_fisica, tabagismo, etilismo, refeicoes_dia, horas_sono,
                gestante, numero_gestacoes, observacoes, revisao_sistemas)
-               VALUES (%s,%s,%s,%s,%(queixa_principal)s,%(historico_doenca_atual)s,%(impressao)s,
+               VALUES (%(paciente)s,%(estabelecimento)s,%(prontuario)s,%(profissional)s,
+               %(queixa_principal)s,%(historico_doenca_atual)s,%(impressao)s,
                %(historico_medico)s,%(historico_familiar)s,%(alergias)s,%(habits)s,%(atividade_fisica)s,
                %(tabagismo)s,%(etilismo)s,%(refeicoes_dia)s,%(horas_sono)s,%(gestante)s,%(numero_gestacoes)s,
-               %(observacoes)s,%(revisao_sistemas)s::jsonb)""",
-            (pac_id, int(estab_id) if estab_id else None, prontuario["id"] if prontuario else None, usuario["id"], fields),
+               %(observacoes)s,%(revisao_sistemas)s)""",
+            {**fields,
+             "paciente": pac_id,
+             "estabelecimento": int(estab_id) if estab_id else None,
+             "prontuario": prontuario["id"] if prontuario else None,
+             "profissional": usuario["id"]},
         )
 
     return RedirectResponse(url=f"/pacientes/{pac_id}/anamnese?embedded=1", status_code=302)
 
 
+@app.get("/admin/medicamentos/cadastrar", response_class=HTMLResponse)
+def pagina_cadastrar_medicamento(request: Request, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "editar")
+    return templates.TemplateResponse(
+        "admin/cadastrar_medicamento.html",
+        {
+            "request": request,
+            "usuario": usuario,
+            "erro": request.query_params.get("erro"),
+            "salvo": request.query_params.get("salvo"),
+        },
+    )
+
+
+@app.post("/admin/medicamentos/cadastrar")
+async def cadastrar_medicamento(request: Request, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "editar")
+    form = dict(await request.form())
+    nome = form.get("nome", "").strip()
+    if not nome or len(nome) < 2:
+        return RedirectResponse("/admin/medicamentos/cadastrar?erro=nome_curto", status_code=302)
+    try:
+        existente = db.fetch_one("SELECT id FROM medicamentos WHERE nome = %s", (nome,))
+        if existente:
+            return RedirectResponse("/admin/medicamentos/cadastrar?erro=duplicado", status_code=302)
+        db.execute(
+            "INSERT INTO medicamentos (nome, principio_ativo) VALUES (%s, %s)",
+            (nome, form.get("principio_ativo", "").strip() or None),
+        )
+    except Exception:
+        return RedirectResponse("/admin/medicamentos/cadastrar?erro=erro", status_code=302)
+    return RedirectResponse("/admin/medicamentos/cadastrar?salvo=1", status_code=302)
+
+
 @app.get("/medicamentos/buscar")
-def buscar_medicamentos(q: str = ""):
+def buscar_medicamentos(q: str = "", usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "ver")
     if len(q) < 2:
         return JSONResponse([])
     rows = db.fetch_all(
-        "SELECT id, nome, principio_ativo FROM medicamentos WHERE nome ILIKE %s OR principio_ativo ILIKE %s LIMIT 20",
+        "SELECT id, nome, principio_ativo FROM medicamentos WHERE nome LIKE %s OR principio_ativo LIKE %s LIMIT 20",
         (f"%{q}%", f"%{q}%"),
     )
     return JSONResponse([{"id": r["id"], "nome": r["nome"], "principio_ativo": r["principio_ativo"]} for r in rows])
 
 
 @app.post("/medicamentos/criar")
-def criar_medicamento(request: Request):
-    form = dict(request.form())
+async def criar_medicamento(request: Request, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "editar")
+    form = dict(await request.form())
     nome = form.get("nome", "").strip()
     if not nome or len(nome) < 2:
         return JSONResponse({"ok": False, "erro": "Nome muito curto"})
     try:
-        cur = db.execute(
-            "INSERT INTO medicamentos (nome, principio_ativo) VALUES (%s, %s) ON CONFLICT (nome) DO UPDATE SET nome = EXCLUDED.nome RETURNING id",
+        existente = db.fetch_one("SELECT id FROM medicamentos WHERE nome = %s", (nome,))
+        if existente:
+            return JSONResponse({"ok": True, "id": existente["id"], "nome": nome})
+        cursor = db.execute(
+            "INSERT INTO medicamentos (nome, principio_ativo) VALUES (%s, %s)",
             (nome, form.get("principio_ativo", "").strip() or None),
         )
-        if hasattr(cur, 'fetchone'):
-            row = cur.fetchone()
-            return JSONResponse({"ok": True, "id": row["id"], "nome": nome})
-        return JSONResponse({"ok": True, "nome": nome})
+        return JSONResponse({"ok": True, "id": cursor.lastrowid, "nome": nome})
     except Exception as e:
         return JSONResponse({"ok": False, "erro": str(e)})
 
 
 @app.get("/pacientes/{pac_id}/medicamentos/json")
-def listar_medicamentos_json(pac_id: int):
+def listar_medicamentos_json(pac_id: int, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "ver")
     rows = db.fetch_all(
         """SELECT pm.id, COALESCE(m.nome, pm.nome_medicamento) AS nome,
                   pm.dose, pm.frequencia, pm.via, pm.observacoes, pm.ativo
@@ -1969,8 +2115,9 @@ def listar_medicamentos_json(pac_id: int):
 
 
 @app.post("/pacientes/{pac_id}/medicamentos")
-def adicionar_medicamento(pac_id: int, request: Request):
-    form = dict(request.form())
+async def adicionar_medicamento(pac_id: int, request: Request, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "editar")
+    form = dict(await request.form())
     db.execute(
         """INSERT INTO paciente_medicamentos (paciente_id, medicamento_id, nome_medicamento, dose, frequencia, via, observacoes)
            VALUES (%s, %s, %s, %s, %s, %s, %s)""",
@@ -1984,14 +2131,16 @@ def adicionar_medicamento(pac_id: int, request: Request):
 
 
 @app.post("/pacientes/{pac_id}/medicamentos/{med_id}/remover")
-def remover_medicamento(pac_id: int, med_id: int):
+def remover_medicamento(pac_id: int, med_id: int, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "editar")
     db.execute("DELETE FROM paciente_medicamentos WHERE id = %s AND paciente_id = %s", (med_id, pac_id))
     return RedirectResponse(url=f"/pacientes/{pac_id}/anamnese?embedded=1&tab=medicamentos", status_code=302)
 
 
 @app.post("/pacientes/{pac_id}/sinais-vitais")
-def adicionar_sinais_vitais(pac_id: int, request: Request, usuario=Depends(exigir_login)):
-    form = dict(request.form())
+async def adicionar_sinais_vitais(pac_id: int, request: Request, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "editar")
+    form = dict(await request.form())
     estab_id = resolver_estabelecimento(request, usuario)
     prontuario = None
     if estab_id:
@@ -2015,7 +2164,8 @@ def adicionar_sinais_vitais(pac_id: int, request: Request, usuario=Depends(exigi
 
 
 @app.get("/pacientes/{pac_id}/sinais-vitais/json")
-def listar_sinais_vitais_json(pac_id: int):
+def listar_sinais_vitais_json(pac_id: int, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "ver")
     rows = db.fetch_all(
         """SELECT sv.*, u.nome AS profissional_nome
            FROM sinais_vitais sv
@@ -2025,7 +2175,15 @@ def listar_sinais_vitais_json(pac_id: int):
            LIMIT 50""",
         (pac_id,),
     )
-    return JSONResponse([dict(r) for r in rows])
+    resultado = []
+    for r in rows:
+        d = dict(r)
+        if d.get("aferido_em"):
+            d["aferido_em"] = d["aferido_em"].strftime("%Y-%m-%dT%H:%M:%S")
+        if d.get("criado_em"):
+            d["criado_em"] = d["criado_em"].strftime("%Y-%m-%dT%H:%M:%S")
+        resultado.append(d)
+    return JSONResponse(resultado)
 
 
 # ─── Exames Laboratoriais ────────────────────────────────────────────────────
@@ -2033,7 +2191,6 @@ def listar_sinais_vitais_json(pac_id: int):
 @app.post("/pacientes/{pac_id}/exames/upload")
 async def upload_exame(pac_id: int, request: Request, usuario=Depends(exigir_login)):
     exigir_permissao(usuario, "prontuarios", "editar")
-    import aiofiles, os, uuid
     form = await request.form()
     nome_exame = form.get("nome_exame", "").strip()
     if not nome_exame:
@@ -2077,7 +2234,8 @@ async def upload_exame(pac_id: int, request: Request, usuario=Depends(exigir_log
 
 
 @app.get("/pacientes/{pac_id}/exames/json")
-def listar_exames_json(pac_id: int):
+def listar_exames_json(pac_id: int, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "ver")
     rows = db.fetch_all(
         """SELECT id, nome_exame, data_solicitacao, data_resultado, resultado, valor_referencia,
                   laboratorio, observacoes, arquivo_nome, criado_em
@@ -2090,12 +2248,17 @@ def listar_exames_json(pac_id: int):
     for r in rows:
         d = dict(r)
         d["tem_pdf"] = bool(r["arquivo_nome"])
+        for chave in ("data_solicitacao", "data_resultado", "criado_em"):
+            valor = d.get(chave)
+            if valor is not None and hasattr(valor, "strftime"):
+                d[chave] = valor.strftime("%Y-%m-%d")
         exames.append(d)
     return JSONResponse(exames)
 
 
 @app.get("/pacientes/{pac_id}/exames/{exame_id}/pdf")
-def visualizar_pdf(pac_id: int, exame_id: int):
+def visualizar_pdf(pac_id: int, exame_id: int, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "ver")
     from fastapi.responses import Response
     row = db.fetch_one(
         "SELECT arquivo_pdf, arquivo_nome FROM exames_laboratoriais WHERE id = %s AND paciente_id = %s",
@@ -2111,7 +2274,8 @@ def visualizar_pdf(pac_id: int, exame_id: int):
 
 
 @app.post("/pacientes/{pac_id}/exames/{exame_id}/remover")
-def remover_exame(pac_id: int, exame_id: int):
+def remover_exame(pac_id: int, exame_id: int, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "editar")
     db.execute("DELETE FROM exames_laboratoriais WHERE id = %s AND paciente_id = %s", (exame_id, pac_id))
     return RedirectResponse(url=f"/pacientes/{pac_id}/anamnese?embedded=1&tab=exames", status_code=302)
 
@@ -2119,7 +2283,7 @@ def remover_exame(pac_id: int, exame_id: int):
 @app.get("/pacientes/{pac_id}/editar", response_class=HTMLResponse)
 def editar_paciente(pac_id: int, request: Request, usuario=Depends(exigir_login)):
     exigir_permissao(usuario, "pacientes", "editar")
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     pac = db.fetch_one("SELECT * FROM usuarios WHERE id = %s AND tipo = 'paciente'", (pac_id,))
@@ -2161,53 +2325,32 @@ def salvar_paciente(
     tipo_pagamento: str = Form(None),
     usuario=Depends(exigir_login),
 ):
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
+    partes_end = [p for p in (logradouro, numero, complemento, bairro, cidade, cep) if p and p.strip()]
+    endereco_final = ", ".join(partes_end) if partes_end else (endereco or None)
+
     base_fields = """nome = %s, email = %s, telefone = %s, cpf = %s, data_nascimento = %s,
-                     logradouro = %s, numero = %s, complemento = %s,
-                     bairro = %s, cidade = %s, estado = %s, cep = %s,
-                     foto_url = %s, codigo_paciente = %s, numero_documentacao = %s,
-                     indicacao = %s, estado_civil = %s, profissao = %s, nome_pai = %s, nome_mae = %s,
-                     tipo_pagamento = %s"""
+                     endereco = %s, foto_url = %s, codigo_paciente = %s, numero_documentacao = %s,
+                     indicacao = %s, estado_civil = %s, profissao = %s, nome_pai = %s, nome_mae = %s"""
     base_params = (
         nome, email, telefone, cpf or None, data_nascimento or None,
-        logradouro or None, numero or None, complemento or None,
-        bairro or None, cidade or None, estado or None, cep or None,
-        foto_url, codigo_paciente or None, numero_documentacao or None,
+        endereco_final, foto_url, codigo_paciente or None, numero_documentacao or None,
         indicacao or None, estado_civil or None, profissao or None, nome_pai or None, nome_mae or None,
-        tipo_pagamento or 'particular',
     )
 
     if senha and senha.strip():
         from utils.auth import hash_senha
         senha_hash = hash_senha(senha.strip())
         db.execute(
-            f"UPDATE pacientes SET {base_fields}, senha_hash = %s WHERE id = %s",
+            f"UPDATE usuarios SET {base_fields}, senha_hash = %s WHERE id = %s",
             (*base_params, senha_hash, pac_id),
         )
     else:
         db.execute(
-            f"UPDATE pacientes SET {base_fields} WHERE id = %s",
+            f"UPDATE usuarios SET {base_fields} WHERE id = %s",
             (*base_params, pac_id),
-        )
-    existing_end = db.fetch_one(
-        "SELECT id FROM enderecos WHERE paciente_id = %s AND principal = TRUE", (pac_id,)
-    )
-    if existing_end:
-        db.execute(
-            """UPDATE enderecos SET logradouro = %s, numero = %s, complemento = %s,
-               bairro = %s, cidade = %s, estado = %s, cep = %s, atualizado_em = CURRENT_TIMESTAMP
-               WHERE id = %s""",
-            (logradouro or None, numero or None, complemento or None,
-             bairro or None, cidade or None, estado or None, cep or None, existing_end["id"]),
-        )
-    elif logradouro or cep or cidade:
-        db.execute(
-            """INSERT INTO enderecos (paciente_id, logradouro, numero, complemento, bairro, cidade, estado, cep, principal)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE)""",
-            (pac_id, logradouro or None, numero or None, complemento or None,
-             bairro or None, cidade or None, estado or None, cep or None),
         )
     return RedirectResponse("/prontuarios", status_code=302)
 
@@ -2431,7 +2574,7 @@ def editar_consulta_form(consulta_id: int, request: Request, usuario=Depends(exi
     if not consulta:
         raise HTTPException(status_code=404)
 
-    if usuario["tipo"] == "profissional" and consulta["profissional_usuario_id"] != usuario["id"]:
+    if usuario["tipo"] == "profissional" and not usuario.get("is_super") and consulta["profissional_usuario_id"] != usuario["id"]:
         raise HTTPException(status_code=403)
 
     procedimentos = db.fetch_all(
@@ -2465,7 +2608,7 @@ def salvar_edicao_consulta(
     if not consulta:
         raise HTTPException(status_code=404)
 
-    if usuario["tipo"] == "profissional" and consulta["profissional_usuario_id"] != usuario["id"]:
+    if usuario["tipo"] == "profissional" and not usuario.get("is_super") and consulta["profissional_usuario_id"] != usuario["id"]:
         raise HTTPException(status_code=403)
 
     procedimento_id_val = int(procedimento_id) if procedimento_id and procedimento_id.strip() else None
@@ -2511,7 +2654,7 @@ def atualizar_status_consulta(
     if not consulta:
         raise HTTPException(status_code=404)
 
-    if usuario["tipo"] == "profissional" and consulta["profissional_usuario_id"] != usuario["id"]:
+    if usuario["tipo"] == "profissional" and not usuario.get("is_super") and consulta["profissional_usuario_id"] != usuario["id"]:
         raise HTTPException(status_code=403)
 
     valid_statuses = {"agendada", "confirmada", "em_andamento", "concluida", "cancelada", "faltou"}
@@ -2558,7 +2701,7 @@ def atender_consulta(consulta_id: int, request: Request, usuario=Depends(exigir_
     if not consulta:
         raise HTTPException(status_code=404)
 
-    if usuario["tipo"] == "profissional" and consulta["profissional_usuario_id"] != usuario["id"]:
+    if usuario["tipo"] == "profissional" and not usuario.get("is_super") and consulta["profissional_usuario_id"] != usuario["id"]:
         raise HTTPException(status_code=403)
 
     evolucao_data = None
@@ -2594,7 +2737,7 @@ def salvar_atendimento(
     if not consulta:
         raise HTTPException(status_code=404)
 
-    if usuario["tipo"] == "profissional" and consulta["profissional_usuario_id"] != usuario["id"]:
+    if usuario["tipo"] == "profissional" and not usuario.get("is_super") and consulta["profissional_usuario_id"] != usuario["id"]:
         raise HTTPException(status_code=403)
 
     if consulta.get("status") in ("cancelada",):
@@ -2737,7 +2880,7 @@ def ver_prontuario(prontuario_id: int, request: Request, usuario=Depends(exigir_
 
     evolucoes = db.fetch_all(
         """SELECT e.*, u.nome AS profissional_nome,
-                  COALESCE(c.data_hora::date, e.data) AS data_exibicao
+                  COALESCE(CAST(c.data_hora AS DATE), e.data) AS data_exibicao
            FROM evolucoes e
            JOIN usuarios u ON u.id = e.profissional_usuario_id
            LEFT JOIN consultas c ON c.id = e.consulta_id
@@ -2891,19 +3034,24 @@ def criar_prontuario(
     if criar_novo_paciente == "1":
         if not novo_paciente_nome or not novo_paciente_email or not novo_paciente_senha:
             return RedirectResponse("/prontuarios?erro=Preencha nome, email e senha do paciente", status_code=302)
-        from utils.auth import hash_senha
-        senha_hash = hash_senha(novo_paciente_senha.strip())
         novo_email = novo_paciente_email.strip().lower()
-        existente = db.fetch_one("SELECT id FROM pacientes WHERE email = %s", (novo_email,))
+        existente = db.fetch_one("SELECT id FROM usuarios WHERE email = %s", (novo_email,))
         if existente:
             paciente_id_int = existente["id"]
         else:
-            cursor = db.execute(
-                "INSERT INTO pacientes (nome, email, telefone, cpf, data_nascimento, senha_hash, tipo_pagamento, ativo) VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE) RETURNING id",
-                (novo_paciente_nome.strip(), novo_email, novo_paciente_telefone or None, novo_paciente_cpf or None, novo_paciente_nascimento or None, senha_hash, novo_paciente_tipo_pagamento or 'particular'),
+            from utils.auth import criar_usuario
+            paciente_id_int = criar_usuario(
+                nome=novo_paciente_nome.strip(),
+                email=novo_email,
+                senha=novo_paciente_senha.strip(),
+                tipo="paciente",
+                telefone=novo_paciente_telefone or None,
             )
-            row = cursor.fetchone()
-            paciente_id_int = row['id'] if isinstance(row, dict) else row[0]
+            if novo_paciente_cpf or novo_paciente_nascimento:
+                db.execute(
+                    "UPDATE usuarios SET cpf = %s, data_nascimento = %s WHERE id = %s",
+                    (novo_paciente_cpf or None, novo_paciente_nascimento or None, paciente_id_int),
+                )
             vincular_paciente(paciente_id_int, estab_id)
 
     if not paciente_id_int:
@@ -3405,7 +3553,7 @@ def listar_convenios(request: Request, usuario=Depends(exigir_login)):
 
 @app.get("/convenios/novo", response_class=HTMLResponse)
 def novo_convenio(request: Request, usuario=Depends(exigir_login)):
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
     return templates.TemplateResponse(
         "convenios/formulario.html",
@@ -3428,7 +3576,7 @@ def criar_convenio(
     usuario=Depends(exigir_login),
 ):
     exigir_permissao(usuario, "convenios", "criar")
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
     db.execute(
         """INSERT INTO convenios (nome, cnpj, telefone, email, plano_padrao, limite_consultas_mes, telefone_2, contato_nome, contato_email)
@@ -3441,7 +3589,7 @@ def criar_convenio(
 @app.get("/convenios/{conv_id}/editar", response_class=HTMLResponse)
 def editar_convenio(conv_id: int, request: Request, usuario=Depends(exigir_login)):
     exigir_permissao(usuario, "convenios", "editar")
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
     convenio = db.fetch_one("SELECT * FROM convenios WHERE id = %s", (conv_id,))
     if not convenio:
@@ -3467,7 +3615,7 @@ def salvar_convenio(
     contato_email: str = Form(None),
     usuario=Depends(exigir_login),
 ):
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
     db.execute(
         """UPDATE convenios SET nome = %s, cnpj = %s, telefone = %s, email = %s,
@@ -3481,7 +3629,7 @@ def salvar_convenio(
 
 @app.post("/convenios/{conv_id}/desativar")
 def desativar_convenio(conv_id: int, usuario=Depends(exigir_login)):
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
     db.execute("UPDATE convenios SET ativo = FALSE WHERE id = %s", (conv_id,))
     return RedirectResponse("/convenios", status_code=302)
@@ -3577,7 +3725,7 @@ def desativar_procedimento(proc_id: int, usuario=Depends(exigir_login)):
 @app.get("/procedimentos/{proc_id}/valores", response_class=HTMLResponse)
 def valores_procedimento(proc_id: int, request: Request, usuario=Depends(exigir_login)):
     exigir_permissao(usuario, "procedimentos", "editar")
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     estab_id = resolver_estabelecimento(request, usuario)
@@ -3614,7 +3762,7 @@ async def salvar_valores_procedimento(
     request: Request,
     usuario=Depends(exigir_login),
 ):
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     estab_id = resolver_estabelecimento(request, usuario)
@@ -3725,7 +3873,7 @@ def api_convenios_paciente(
 @app.get("/pacientes/{pac_id}/convenio", response_class=HTMLResponse)
 def paciente_convenio_page(pac_id: int, request: Request, usuario=Depends(exigir_login)):
     exigir_permissao(usuario, "convenios", "ver")
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     pac = db.fetch_one("SELECT * FROM usuarios WHERE id = %s AND tipo = 'paciente'", (pac_id,))
@@ -3758,7 +3906,7 @@ def salvar_paciente_convenio(
     usuario=Depends(exigir_login),
 ):
     convenio_id = int(convenio_id) if convenio_id and convenio_id.strip() else None
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     if convenio_id:
@@ -3773,7 +3921,7 @@ def salvar_paciente_convenio(
 
 @app.post("/pacientes/{pac_id}/convenio/{vc_id}/remover")
 def remover_paciente_convenio(pac_id: int, vc_id: int, usuario=Depends(exigir_login)):
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
     db.execute("DELETE FROM paciente_convenio WHERE id = %s", (vc_id,))
     return RedirectResponse(f"/pacientes/{pac_id}/convenio", status_code=302)
@@ -3939,13 +4087,10 @@ def criar_orcamento(
     cursor = db.execute(
         """INSERT INTO orcamentos
            (paciente_usuario_id, profissional_usuario_id, estabelecimento_id, convenio_id, data_validade, observacoes)
-           VALUES (%s, %s, %s, %s, %s, %s)
-           RETURNING id""",
+           VALUES (%s, %s, %s, %s, %s, %s)""",
         (paciente_id, profissional_id, estab_id, conv_id, dv, observacoes),
     )
-
-    row = cursor.fetchone()
-    new_id = row['id'] if isinstance(row, dict) else row[0]
+    new_id = cursor.lastrowid
     return RedirectResponse(f"/orcamentos/{new_id}", status_code=302)
 
 
@@ -4023,6 +4168,15 @@ def ver_orcamento(orc_id: int, request: Request, usuario=Depends(exigir_login), 
             "total_pago": float(total_pago["total"]),
             "saldo": saldo,
             "pagamentos": pagamentos,
+            "status_class": {
+                "rascunho": "secondary",
+                "enviado": "primary",
+                "aprovado": "success",
+                "rejeitado": "danger",
+                "pago": "success",
+                "pago_parcial": "warning",
+                "cancelado": "danger",
+            },
         },
     )
 
@@ -4101,7 +4255,7 @@ def atualizar_status_orcamento(
     if usuario["tipo"] not in ("admin", "recepcionista", "profissional"):
         raise HTTPException(status_code=403)
 
-    if usuario["tipo"] == "profissional":
+    if usuario["tipo"] == "profissional" and not usuario.get("is_super"):
         orc = db.fetch_one("SELECT * FROM orcamentos WHERE id = %s", (orc_id,))
         if not orc or orc["profissional_usuario_id"] != usuario["id"]:
             raise HTTPException(status_code=403)
@@ -4125,7 +4279,7 @@ def converter_orcamento_em_consulta(
     if not orcamento:
         raise HTTPException(status_code=404)
 
-    if usuario["tipo"] == "profissional" and orcamento["profissional_usuario_id"] != usuario["id"]:
+    if usuario["tipo"] == "profissional" and not usuario.get("is_super") and orcamento["profissional_usuario_id"] != usuario["id"]:
         raise HTTPException(status_code=403)
 
     try:
@@ -4195,7 +4349,7 @@ def imprimir_orcamento(orc_id: int, request: Request, usuario=Depends(exigir_log
 
 @app.get("/orcamentos/{orc_id}/pagar", response_class=HTMLResponse)
 def pagar_orcamento(orc_id: int, request: Request, usuario=Depends(exigir_login)):
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     orcamento = db.fetch_one(
@@ -4210,7 +4364,7 @@ def pagar_orcamento(orc_id: int, request: Request, usuario=Depends(exigir_login)
         raise HTTPException(status_code=404)
 
     estab_id_check = request.cookies.get("estabelecimento_id")
-    if usuario["tipo"] != "admin":
+    if usuario["tipo"] != "admin" and not usuario.get("is_super"):
         if estab_id_check and str(orcamento["estabelecimento_id"]) != str(estab_id_check):
             raise HTTPException(status_code=403)
 
@@ -4243,7 +4397,7 @@ def registrar_pagamento(
     observacao: str = Form(None),
     usuario=Depends(exigir_login),
 ):
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     orcamento = db.fetch_one("SELECT * FROM orcamentos WHERE id = %s", (orc_id,))
@@ -4278,7 +4432,7 @@ def registrar_pagamento(
 def cancelar_pagamento(orc_id: int, pag_id: int, request: Request, usuario=Depends(exigir_login)):
     if is_write_limited(request, usuario, "delete"):
         raise HTTPException(status_code=429, detail="Muitas requisicoes. Aguarde 1 minuto.")
-    if usuario["tipo"] not in ("admin", "recepcionista"):
+    if usuario["tipo"] not in ("admin", "recepcionista") and not usuario.get("is_super"):
         raise HTTPException(status_code=403)
 
     db.execute("UPDATE pagamentos SET status = 'cancelado' WHERE id = %s AND orcamento_id = %s", (pag_id, orc_id))
@@ -4627,7 +4781,7 @@ def fix_orphan_patients(request: Request, usuario=Depends(exigir_login)):
     for pac in orfaos:
         numero = _proximo_numero_prontuario(estab_id)
         db.execute(
-            "INSERT INTO paciente_estabelecimento (usuario_id, estabelecimento_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            "INSERT IGNORE INTO paciente_estabelecimento (usuario_id, estabelecimento_id) VALUES (%s, %s)",
             (pac["id"], estab_id),
         )
         db.execute(

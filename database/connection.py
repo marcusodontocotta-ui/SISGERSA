@@ -1,3 +1,4 @@
+import threading
 import pymysql
 import logging
 from config import settings
@@ -13,6 +14,7 @@ class Database:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._connection = None
+            cls._instance._lock = threading.RLock()
         return cls._instance
 
     def _connect(self):
@@ -54,39 +56,57 @@ class Database:
             )
 
     def get_connection(self):
-        try:
-            if self._connection is None:
+        with self._lock:
+            try:
+                if self._connection is None:
+                    self._connect()
+                elif not self._is_alive():
+                    self._connect()
+            except Exception:
                 self._connect()
-            elif not self._is_alive():
-                self._connect()
-        except Exception:
-            self._connect()
-        return self._connection
+            return self._connection
 
     def _is_alive(self):
+        if self._connection is None:
+            return False
         try:
-            if self._connection is None:
-                return False
             if _DB_ENGINE == "postgresql":
                 return not self._connection.closed
-            return self._connection.open
+            self._connection.ping(reconnect=True)
+            return True
         except Exception:
             return False
 
-    def execute(self, query: str, params=None):
-        try:
-            if not self._is_alive():
+    def ping(self) -> bool:
+        with self._lock:
+            try:
+                if not self._is_alive():
+                    self._connect()
+                if _DB_ENGINE == "postgresql":
+                    with self._connection.cursor() as cursor:
+                        cursor.execute("SELECT 1")
+                else:
+                    self._connection.ping(reconnect=True)
+                return True
+            except Exception:
                 self._connection = None
-            conn = self.get_connection()
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            return cursor
-        except Exception:
-            self._connection = None
-            conn = self.get_connection()
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            return cursor
+                return False
+
+    def execute(self, query: str, params=None):
+        with self._lock:
+            try:
+                if not self._is_alive():
+                    self._connection = None
+                conn = self.get_connection()
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                return cursor
+            except Exception:
+                self._connection = None
+                conn = self.get_connection()
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                return cursor
 
     def fetch_one(self, query: str, params=None):
         cursor = self.execute(query, params)
@@ -103,12 +123,13 @@ class Database:
         return rows
 
     def close(self):
-        if self._connection is not None:
-            try:
-                self._connection.close()
-            except Exception:
-                pass
-            self._connection = None
+        with self._lock:
+            if self._connection is not None:
+                try:
+                    self._connection.close()
+                except Exception:
+                    pass
+                self._connection = None
 
 
 db = Database()

@@ -154,19 +154,34 @@ def obter_permissoes_usuario(usuario_id: int, estabelecimento_id: int) -> dict:
 
 
 def salvar_permissoes(usuario_id: int, estabelecimento_id: int, permissoes: dict):
+    from utils.auth import _ENGINE
     for modulo, acoes in permissoes.items():
-        db.execute(
-            """INSERT INTO permissoes_usuario (usuario_id, estabelecimento_id, modulo, pode_ver, pode_criar, pode_editar, pode_excluir)
-               VALUES (%s, %s, %s, %s, %s, %s, %s)
-               ON CONFLICT (usuario_id, estabelecimento_id, modulo) DO UPDATE SET
-               pode_ver = EXCLUDED.pode_ver, pode_criar = EXCLUDED.pode_criar,
-               pode_editar = EXCLUDED.pode_editar, pode_excluir = EXCLUDED.pode_excluir""",
-            (
-                usuario_id, estabelecimento_id, modulo,
-                acoes.get("ver"), acoes.get("criar"),
-                acoes.get("editar"), acoes.get("excluir"),
-            ),
-        )
+        if _ENGINE == "postgresql":
+            db.execute(
+                """INSERT INTO permissoes_usuario (usuario_id, estabelecimento_id, modulo, pode_ver, pode_criar, pode_editar, pode_excluir)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)
+                   ON CONFLICT (usuario_id, estabelecimento_id, modulo) DO UPDATE SET
+                   pode_ver = EXCLUDED.pode_ver, pode_criar = EXCLUDED.pode_criar,
+                   pode_editar = EXCLUDED.pode_editar, pode_excluir = EXCLUDED.pode_excluir""",
+                (
+                    usuario_id, estabelecimento_id, modulo,
+                    acoes.get("ver"), acoes.get("criar"),
+                    acoes.get("editar"), acoes.get("excluir"),
+                ),
+            )
+        else:
+            db.execute(
+                """INSERT INTO permissoes_usuario (usuario_id, estabelecimento_id, modulo, pode_ver, pode_criar, pode_editar, pode_excluir)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)
+                   ON DUPLICATE KEY UPDATE
+                   pode_ver = VALUES(pode_ver), pode_criar = VALUES(pode_criar),
+                   pode_editar = VALUES(pode_editar), pode_excluir = VALUES(pode_excluir)""",
+                (
+                    usuario_id, estabelecimento_id, modulo,
+                    acoes.get("ver"), acoes.get("criar"),
+                    acoes.get("editar"), acoes.get("excluir"),
+                ),
+            )
     _limpar_cache(estabelecimento_id)
 
 

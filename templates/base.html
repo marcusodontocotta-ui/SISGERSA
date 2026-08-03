@@ -112,11 +112,6 @@
                         <a class="nav-link" href="/agenda"><i class="bi bi-calendar-week"></i> Agenda</a>
                     </li>
                     {% endif %}
-                    {% if pode_acessar(usuario, 'orcamentos', 'ver', estab_cookie) %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="/orcamentos"><i class="bi bi-file-earmark-text"></i> Orcamentos</a>
-                    </li>
-                    {% endif %}
 
                     {% if usuario.tipo == 'admin' and usuario.is_super %}
                     <li class="nav-item">
@@ -131,11 +126,6 @@
                     {% if pode_acessar(usuario, 'financeiro', 'ver', estab_cookie) %}
                     <li class="nav-item">
                         <a class="nav-link" href="/financeiro"><i class="bi bi-graph-up"></i> Financeiro</a>
-                    </li>
-                    {% endif %}
-                    {% if pode_acessar(usuario, 'pagamentos', 'ver', estab_cookie) %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="/pagamentos"><i class="bi bi-credit-card"></i> Pagamentos</a>
                     </li>
                     {% endif %}
                     {% if pode_acessar(usuario, 'convenios', 'ver', estab_cookie) or pode_acessar(usuario, 'procedimentos', 'ver', estab_cookie) or (usuario.tipo == 'admin' and usuario.is_super) %}
@@ -195,6 +185,9 @@
                                 {{ 'Super Admin' if usuario.is_super else usuario.tipo }}
                             </span>
                         </span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/minha-conta/alterar-senha"><i class="bi bi-shield-lock"></i> Alterar Senha</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/logout"><i class="bi bi-box-arrow-right"></i> Sair</a>

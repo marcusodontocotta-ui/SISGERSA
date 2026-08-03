@@ -13,7 +13,7 @@
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" href="/orcamentos/{{ orcamento.id }}/nota-fiscal" target="_blank">
                             <i class="bi bi-file-text"></i> Valor Total (R$ {{ "%.2f"|format(orcamento.valor_total|float - orcamento.desconto|float)|replace('.',',') }})</a></li>
-                        {% if total_pago > 0 and total_pago < (orcamento.valor_total|float - orcamento.desconto|float) %}
+                        {% if total_pago > 0 %}
                         <li><a class="dropdown-item" href="/orcamentos/{{ orcamento.id }}/nota-fiscal?valor={{ total_pago }}" target="_blank">
                             <i class="bi bi-credit-card"></i> Valor Pago (R$ {{ "%.2f"|format(total_pago)|replace('.',',') }})</a></li>
                         {% endif %}

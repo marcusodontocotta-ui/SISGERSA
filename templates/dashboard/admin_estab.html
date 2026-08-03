@@ -12,14 +12,34 @@
     {% endif %}
 </div>
 
-{% if plano_info and plano_info.get('limite_consultas_mes') != -1 %}
-<div class="alert alert-info d-flex justify-content-between align-items-center mb-4">
+{% if plano_status == 'expirado' %}
+<div class="alert alert-danger d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <strong>Plano expirado</strong> - Seu período de cortesia do plano {{ plano_info.nome }} terminou em {{ cortesia_ate }}. Você foi rebaixado para o plano Grátis.
+    </div>
+    <a href="#" class="btn btn-sm btn-warning" onclick="alert('Em breve: upgrade de plano')"><i class="bi bi-arrow-up-circle"></i> Reativar plano</a>
+</div>
+{% elif plano_status == 'proximo_expirar' %}
+<div class="alert alert-warning d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <strong>Atenção!</strong> Seu período de cortesia do plano {{ plano_info.nome }} expira em <strong>{{ cortesia_ate }}</strong>.
+    </div>
+    <a href="#" class="btn btn-sm btn-warning" onclick="alert('Em breve: upgrade de plano')"><i class="bi bi-arrow-up-circle"></i> Renovar agora</a>
+</div>
+{% endif %}
+
+{% if plano_info %}
+{% set is_pago = plano_info.valor_mensal is defined and plano_info.valor_mensal > 0 %}
+<div class="alert {% if is_pago %}alert-success{% else %}alert-info{% endif %} d-flex justify-content-between align-items-center mb-4">
     <div>
         <strong>Plano: {{ plano_info.nome }}</strong>
+        {% if is_pago and cortesia_ate and plano_status != 'expirado' %}
+        <span class="ms-3 badge bg-warning text-dark">Período de cortesia até {{ cortesia_ate }}</span>
+        {% endif %}
         {% if uso_info %}
-        <span class="ms-3">Consultas: {{ uso_info.consultas_mes }}/{{ plano_info.limite_consultas_mes }}</span>
-        <span class="ms-3">Pacientes: {{ uso_info.pacientes }}/{{ plano_info.limite_pacientes }}</span>
-        <span class="ms-3">Profissionais: {{ uso_info.profissionais }}/{{ plano_info.limite_profissionais }}</span>
+        <span class="ms-3">Consultas: {{ uso_info.consultas_mes }}/{{ plano_info.limite_consultas_mes or '∞' }}</span>
+        <span class="ms-3">Pacientes: {{ uso_info.pacientes }}/{{ plano_info.limite_pacientes or '∞' }}</span>
+        <span class="ms-3">Profissionais: {{ uso_info.profissionais }}/{{ plano_info.limite_profissionais or '∞' }}</span>
         {% endif %}
     </div>
     <a href="#" class="btn btn-sm btn-warning" onclick="alert('Em breve: upgrade de plano')"><i class="bi bi-arrow-up-circle"></i> Upgrade</a>
@@ -117,11 +137,6 @@
     <div class="col-md-3">
         <a href="/prontuarios" class="btn btn-outline-success w-100 py-3">
             <i class="bi bi-person-plus fs-4 d-block mb-1"></i> Cadastrar Paciente
-        </a>
-    </div>
-    <div class="col-md-3">
-        <a href="/orcamentos/novo" class="btn btn-outline-warning w-100 py-3">
-            <i class="bi bi-file-earmark-plus fs-4 d-block mb-1"></i> Novo Orçamento
         </a>
     </div>
     <div class="col-md-3">

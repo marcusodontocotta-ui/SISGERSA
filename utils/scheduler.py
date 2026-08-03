@@ -26,8 +26,8 @@ def _buscar_consultas_para_lembrete():
                   proc.nome AS procedimento_nome,
                   e.nome AS estabelecimento_nome
            FROM consultas c
-           JOIN pacientes u ON u.id = c.paciente_usuario_id
-           JOIN profissionais p ON p.id = c.profissional_usuario_id
+           JOIN usuarios u ON u.id = c.paciente_usuario_id
+           JOIN usuarios p ON p.id = c.profissional_usuario_id
            LEFT JOIN procedimentos proc ON proc.id = c.procedimento_id
            LEFT JOIN estabelecimentos e ON e.id = c.estabelecimento_id
            WHERE c.status IN ('agendada', 'confirmada')
@@ -74,6 +74,27 @@ def _buscar_consultas_para_lembrete():
         logger.info(f"Lembrete consulta {c['id']} -> {c['paciente_email']}: {status}")
 
 
+def _verificar_expiracao_planos():
+    from database.connection import db
+
+    expirados = db.fetch_all(
+        """SELECT e.id, e.nome, e.plano_id, e.plano_expira_em, p.nome AS plano_nome
+           FROM estabelecimentos e
+           JOIN planos p ON p.id = e.plano_id
+           WHERE e.plano_expira_em IS NOT NULL
+             AND e.plano_expira_em < CURDATE()
+             AND e.plano_id != (SELECT id FROM planos WHERE slug = 'gratis')"""
+    )
+    for e in expirados or []:
+        db.execute(
+            "UPDATE estabelecimentos SET plano_id = (SELECT id FROM planos WHERE slug = 'gratis'), plano_expira_em = NULL WHERE id = %s",
+            (e["id"],),
+        )
+        logger.info(
+            f"Plano expirado: estab #{e['id']} '{e['nome']}' ({e['plano_nome']}) rebaixado para Gratis"
+        )
+
+
 def _loop_scheduler():
     global _running
     while _running:
@@ -81,6 +102,10 @@ def _loop_scheduler():
             _buscar_consultas_para_lembrete()
         except Exception as e:
             logger.error(f"Erro no scheduler de lembretes: {e}")
+        try:
+            _verificar_expiracao_planos()
+        except Exception as e:
+            logger.error(f"Erro ao verificar expiracao de planos: {e}")
         time.sleep(1800)
 
 

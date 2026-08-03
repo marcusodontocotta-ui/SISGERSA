@@ -9,6 +9,10 @@
     --transition-smooth: all 0.2s ease;
 }
 
+html, body {
+    overflow-x: hidden;
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: var(--bg-page);

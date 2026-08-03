@@ -271,7 +271,7 @@
                             <li>{{ r.strip() }}</li>
                             {% endfor %}
                         </ul>
-                        <a href="/registrar" class="btn {% if plano.slug == 'profissional' %}btn-primary{% else %}btn-outline-primary{% endif %} w-100">
+                        <a href="/registrar?plano={{ plano.slug }}" class="btn {% if plano.slug == 'profissional' %}btn-primary{% else %}btn-outline-primary{% endif %} w-100">
                             {% if plano.valor_mensal == 0 %}Comecar gratis{% else %}Escolher plano{% endif %}
                         </a>
                     </div>

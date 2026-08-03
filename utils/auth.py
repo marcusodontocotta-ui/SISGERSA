@@ -4,6 +4,8 @@ from jose import JWTError, jwt
 from config import settings
 from database.connection import db
 
+_ENGINE = settings.DB_ENGINE
+
 
 def hash_senha(senha: str) -> str:
     return bcrypt.hashpw(senha.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -72,35 +74,51 @@ def _is_cpf(texto: str) -> bool:
     return len(cpf) == 11 and cpf.isdigit()
 
 
+def _filtro_cpf_limpo(coluna: str = "cpf") -> str:
+    if _ENGINE == "postgresql":
+        return f"REGEXP_REPLACE({coluna}, '[^0-9]', '', 'g')"
+    return f"REPLACE(REPLACE(REPLACE({coluna}, '.', ''), '-', ''), ' ', '')"
+
+
 def usuarios_por_cpf(cpf: str) -> list:
     cpf_limpo = _normalizar_cpf(cpf)
+    filtro = _filtro_cpf_limpo()
     return db.fetch_all(
-        "SELECT * FROM usuarios WHERE REGEXP_REPLACE(cpf, '[^0-9]', '', 'g') = %s AND ativo = TRUE ORDER BY tipo, nome",
+        f"SELECT * FROM usuarios WHERE {filtro} = %s AND ativo = TRUE ORDER BY tipo, nome",
         (cpf_limpo,),
     )
 
 
 def usuario_por_cpf(cpf: str) -> dict | None:
     cpf_limpo = _normalizar_cpf(cpf)
+    filtro = _filtro_cpf_limpo()
     return db.fetch_one(
-        "SELECT * FROM usuarios WHERE REGEXP_REPLACE(cpf, '[^0-9]', '', 'g') = %s AND ativo = TRUE",
+        f"SELECT * FROM usuarios WHERE {filtro} = %s AND ativo = TRUE",
         (cpf_limpo,),
     )
+
+
+def criar_usuario(nome: str, email: str, senha: str, tipo: str, telefone: str = None, is_super: bool = False) -> int:
+    hash_pwd = hash_senha(senha)
+    cursor = db.execute(
+        """INSERT INTO usuarios (nome, email, senha_hash, tipo, is_super, telefone, ativo)
+           VALUES (%s, %s, %s, %s, %s, %s, TRUE)""",
+        (nome, email, hash_pwd, tipo, is_super, telefone),
+    )
+    return cursor.lastrowid
 
 
 def criar_paciente(
     nome: str, email: str, senha: str, telefone: str = None,
     cpf: str = None, data_nascimento: str = None, tipo_pagamento: str = "particular",
 ) -> int:
-    hash_pwd = hash_senha(senha)
-    cursor = db.execute(
-        """INSERT INTO pacientes (nome, email, senha_hash, telefone, cpf, data_nascimento, tipo_pagamento)
-           VALUES (%s, %s, %s, %s, %s, %s, %s)
-           RETURNING id""",
-        (nome, email, hash_pwd, telefone, cpf, data_nascimento, tipo_pagamento),
-    )
-    row = cursor.fetchone()
-    return row['id'] if isinstance(row, dict) else row[0]
+    user_id = criar_usuario(nome=nome, email=email, senha=senha, tipo="paciente", telefone=telefone)
+    if cpf or data_nascimento:
+        db.execute(
+            "UPDATE usuarios SET cpf = %s, data_nascimento = %s WHERE id = %s",
+            (cpf, data_nascimento, user_id),
+        )
+    return user_id
 
 
 def criar_profissional(
@@ -109,50 +127,45 @@ def criar_profissional(
     is_admin_geral: bool = False, is_admin_estabelecimento: bool = False,
     is_recepcionista: bool = False, is_super: bool = False,
 ) -> int:
-    hash_pwd = hash_senha(senha)
-    cursor = db.execute(
-        """INSERT INTO profissionais
-           (nome, email, senha_hash, telefone,
-            is_dentista, is_medico, is_enfermeiro,
-            is_admin_geral, is_admin_estabelecimento, is_recepcionista, is_super)
-           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-           RETURNING id""",
-        (nome, email, hash_pwd, telefone,
-         is_dentista, is_medico, is_enfermeiro,
-         is_admin_geral, is_admin_estabelecimento, is_recepcionista, is_super),
-    )
-    row = cursor.fetchone()
-    return row['id'] if isinstance(row, dict) else row[0]
-
-
-def criar_usuario(nome: str, email: str, senha: str, tipo: str, telefone: str = None, is_super: bool = False) -> int:
-    if tipo == "paciente":
-        return criar_paciente(nome=nome, email=email, senha=senha, telefone=telefone)
+    if is_admin_geral or is_admin_estabelecimento:
+        tipo = "admin"
+    elif is_recepcionista:
+        tipo = "recepcionista"
     else:
-        kwargs = dict(nome=nome, email=email, senha=senha, telefone=telefone, is_super=is_super)
-        if tipo == "admin":
-            kwargs["is_admin_geral"] = True
-            kwargs["is_admin_estabelecimento"] = True
-        elif tipo == "recepcionista":
-            kwargs["is_recepcionista"] = True
-        return criar_profissional(**kwargs)
+        tipo = "profissional"
+    return criar_usuario(nome=nome, email=email, senha=senha, tipo=tipo, telefone=telefone, is_super=is_super)
 
 
 def vincular_profissional(usuario_id: int, estabelecimento_id: int, especialidade: str = None, cargo: str = None, registro: str = None):
-    db.execute(
-        """INSERT INTO profissional_estabelecimento
-           (usuario_id, estabelecimento_id, especialidade, cargo, registro_profissional)
-           VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING""",
-        (usuario_id, estabelecimento_id, especialidade, cargo, registro),
-    )
+    if _ENGINE == "postgresql":
+        db.execute(
+            """INSERT INTO profissional_estabelecimento
+               (usuario_id, estabelecimento_id, especialidade, cargo, registro_profissional)
+               VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING""",
+            (usuario_id, estabelecimento_id, especialidade, cargo, registro),
+        )
+    else:
+        db.execute(
+            """INSERT IGNORE INTO profissional_estabelecimento
+               (usuario_id, estabelecimento_id, especialidade, cargo, registro_profissional)
+               VALUES (%s, %s, %s, %s, %s)""",
+            (usuario_id, estabelecimento_id, especialidade, cargo, registro),
+        )
 
 
 def vincular_paciente(usuario_id: int, estabelecimento_id: int, observacoes: str = None):
-    db.execute(
-        """INSERT INTO paciente_estabelecimento (usuario_id, estabelecimento_id, observacoes)
-           VALUES (%s, %s, %s) ON CONFLICT DO NOTHING""",
-        (usuario_id, estabelecimento_id, observacoes),
-    )
+    if _ENGINE == "postgresql":
+        db.execute(
+            """INSERT INTO paciente_estabelecimento (usuario_id, estabelecimento_id, observacoes)
+               VALUES (%s, %s, %s) ON CONFLICT DO NOTHING""",
+            (usuario_id, estabelecimento_id, observacoes),
+        )
+    else:
+        db.execute(
+            """INSERT IGNORE INTO paciente_estabelecimento (usuario_id, estabelecimento_id, observacoes)
+               VALUES (%s, %s, %s)""",
+            (usuario_id, estabelecimento_id, observacoes),
+        )
 
 
 def obter_estabelecimentos_usuario(usuario_id: int) -> list:
@@ -173,12 +186,23 @@ def obter_permissoes_paciente(usuario_id: int, estabelecimento_id: int) -> list:
 
 
 def definir_permisao_paciente(usuario_id: int, estabelecimento_id: int, modulo: str, pode_ver: bool = False, pode_criar: bool = False, pode_editar: bool = False, pode_excluir: bool = False):
-    db.execute(
-        """INSERT INTO permissoes_paciente
-           (estabelecimento_id, paciente_usuario_id, modulo, pode_ver, pode_criar, pode_editar, pode_excluir)
-           VALUES (%s, %s, %s, %s, %s, %s, %s)
-           ON CONFLICT (estabelecimento_id, paciente_usuario_id, modulo) DO UPDATE SET
-           pode_ver = EXCLUDED.pode_ver, pode_criar = EXCLUDED.pode_criar,
-           pode_editar = EXCLUDED.pode_editar, pode_excluir = EXCLUDED.pode_excluir""",
-        (estabelecimento_id, usuario_id, modulo, pode_ver, pode_criar, pode_editar, pode_excluir),
-    )
+    if _ENGINE == "postgresql":
+        db.execute(
+            """INSERT INTO permissoes_paciente
+               (estabelecimento_id, paciente_usuario_id, modulo, pode_ver, pode_criar, pode_editar, pode_excluir)
+               VALUES (%s, %s, %s, %s, %s, %s, %s)
+               ON CONFLICT (estabelecimento_id, paciente_usuario_id, modulo) DO UPDATE SET
+               pode_ver = EXCLUDED.pode_ver, pode_criar = EXCLUDED.pode_criar,
+               pode_editar = EXCLUDED.pode_editar, pode_excluir = EXCLUDED.pode_excluir""",
+            (estabelecimento_id, usuario_id, modulo, pode_ver, pode_criar, pode_editar, pode_excluir),
+        )
+    else:
+        db.execute(
+            """INSERT INTO permissoes_paciente
+               (estabelecimento_id, paciente_usuario_id, modulo, pode_ver, pode_criar, pode_editar, pode_excluir)
+               VALUES (%s, %s, %s, %s, %s, %s, %s)
+               ON DUPLICATE KEY UPDATE
+               pode_ver = VALUES(pode_ver), pode_criar = VALUES(pode_criar),
+               pode_editar = VALUES(pode_editar), pode_excluir = VALUES(pode_excluir)""",
+            (estabelecimento_id, usuario_id, modulo, pode_ver, pode_criar, pode_editar, pode_excluir),
+        )

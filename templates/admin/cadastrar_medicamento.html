@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block titulo %}Cadastrar Medicamento - SISGERSA{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-capsule"></i> Cadastrar Medicamento</h2>
+</div>
+
+{% if erro == 'nome_curto' %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle"></i> Informe um nome com pelo menos 2 caracteres.
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% elif erro == 'duplicado' %}
+<div class="alert alert-warning alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle"></i> Já existe um medicamento com este nome.
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% elif erro == 'erro' %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle"></i> Erro ao salvar. Tente novamente.
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% elif salvo == '1' %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle"></i> Medicamento cadastrado com sucesso!
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form method="POST" action="/admin/medicamentos/cadastrar">
+            <div class="mb-3">
+                <label class="form-label">Nome do Medicamento *</label>
+                <input type="text" class="form-control" name="nome" required autofocus maxlength="255"
+                       placeholder="ex: Dipirona, Amoxicilina...">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Princípio Ativo</label>
+                <input type="text" class="form-control" name="principio_ativo" maxlength="255"
+                       placeholder="ex: Metamizol sódico">
+                <div class="form-text">Opcional. Ajuda na busca por princípio ativo.</div>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Cadastrar
+                </button>
+                <a href="#" class="btn btn-secondary" onclick="window.close(); return false;">
+                    <i class="bi bi-x-lg"></i> Fechar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS estabelecimentos (
     email VARCHAR(200),
     endereco TEXT,
     logo_url VARCHAR(500),
+    responsavel_usuario_id INT NULL,
     ativo BOOLEAN DEFAULT TRUE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -88,6 +89,11 @@ CREATE TABLE IF NOT EXISTS convenios (
     cnpj VARCHAR(18),
     telefone VARCHAR(20),
     email VARCHAR(200),
+    plano_padrao VARCHAR(100),
+    limite_consultas_mes INT DEFAULT 0,
+    telefone_2 VARCHAR(20),
+    contato_nome VARCHAR(200),
+    contato_email VARCHAR(200),
     ativo BOOLEAN DEFAULT TRUE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -98,6 +104,9 @@ CREATE TABLE IF NOT EXISTS procedimentos (
     nome VARCHAR(200) NOT NULL,
     descricao TEXT,
     duracao_minutos INT DEFAULT 30,
+    categoria VARCHAR(100),
+    codigo_tuss VARCHAR(50),
+    codigo_americano VARCHAR(50),
     ativo BOOLEAN DEFAULT TRUE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -300,6 +309,7 @@ CREATE TABLE IF NOT EXISTS orcamentos (
     data_validade DATE,
     observacoes TEXT,
     valor_total DECIMAL(10,2) DEFAULT 0,
+    desconto DECIMAL(10,2) DEFAULT 0,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (paciente_usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -386,8 +396,96 @@ CREATE TABLE IF NOT EXISTS config_sistema (
     valor VARCHAR(200) NOT NULL
 );
 
-"""
+-- ============================================
+-- ANAMNESE / SINAIS VITAIS / MEDICAMENTOS
+-- ============================================
 
+CREATE TABLE IF NOT EXISTS anamnese (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    paciente_id INT NOT NULL,
+    estabelecimento_id INT,
+    prontuario_id INT,
+    profissional_usuario_id INT,
+    queixa_principal TEXT,
+    historico_doenca_atual TEXT,
+    impressao TEXT,
+    historico_medico TEXT,
+    historico_familiar TEXT,
+    alergias TEXT,
+    habits TEXT,
+    atividade_fisica VARCHAR(255),
+    tabagismo VARCHAR(20),
+    etilismo VARCHAR(20),
+    refeicoes_dia INT,
+    horas_sono DECIMAL(4,1),
+    gestante BOOLEAN,
+    numero_gestacoes INT,
+    observacoes TEXT,
+    revisao_sistemas JSON,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_anamnese_paciente (paciente_id)
+);
+
+CREATE TABLE IF NOT EXISTS sinais_vitais (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    paciente_id INT NOT NULL,
+    prontuario_id INT,
+    profissional_usuario_id INT,
+    pressao_sistolica INT,
+    pressao_diastolica INT,
+    frequencia_cardiaca INT,
+    frequencia_respiratoria INT,
+    saturacao_oxigenio DOUBLE,
+    temperatura DOUBLE,
+    glicemia DOUBLE,
+    peso DOUBLE,
+    observacoes TEXT,
+    aferido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_sinais_paciente (paciente_id)
+);
+
+CREATE TABLE IF NOT EXISTS medicamentos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(255) NOT NULL,
+    principio_ativo VARCHAR(255),
+    UNIQUE KEY uq_medicamentos_nome (nome)
+);
+
+CREATE TABLE IF NOT EXISTS paciente_medicamentos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    paciente_id INT NOT NULL,
+    medicamento_id INT,
+    nome_medicamento VARCHAR(255),
+    dose VARCHAR(100),
+    frequencia VARCHAR(100),
+    via VARCHAR(100),
+    observacoes TEXT,
+    ativo BOOLEAN DEFAULT TRUE,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_pac_med_paciente (paciente_id)
+);
+
+CREATE TABLE IF NOT EXISTS exames_laboratoriais (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    paciente_id INT NOT NULL,
+    prontuario_id INT,
+    profissional_usuario_id INT,
+    nome_exame VARCHAR(255) NOT NULL,
+    data_solicitacao DATE,
+    data_resultado DATE,
+    resultado VARCHAR(255),
+    valor_referencia VARCHAR(255),
+    laboratorio VARCHAR(255),
+    observacoes TEXT,
+    arquivo_pdf LONGTEXT,
+    arquivo_nome VARCHAR(255),
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_exames_paciente (paciente_id)
+);
+
+"""
 
 SCHEMA_POSTGRESQL = """
 
@@ -404,6 +502,7 @@ CREATE TABLE IF NOT EXISTS estabelecimentos (
     email VARCHAR(200),
     endereco TEXT,
     logo_url VARCHAR(500),
+    responsavel_usuario_id INT NULL,
     ativo BOOLEAN DEFAULT TRUE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -477,6 +576,11 @@ CREATE TABLE IF NOT EXISTS convenios (
     cnpj VARCHAR(18),
     telefone VARCHAR(20),
     email VARCHAR(200),
+    plano_padrao VARCHAR(100),
+    limite_consultas_mes INT DEFAULT 0,
+    telefone_2 VARCHAR(20),
+    contato_nome VARCHAR(200),
+    contato_email VARCHAR(200),
     ativo BOOLEAN DEFAULT TRUE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -487,6 +591,9 @@ CREATE TABLE IF NOT EXISTS procedimentos (
     nome VARCHAR(200) NOT NULL,
     descricao TEXT,
     duracao_minutos INT DEFAULT 30,
+    categoria VARCHAR(100),
+    codigo_tuss VARCHAR(50),
+    codigo_americano VARCHAR(50),
     ativo BOOLEAN DEFAULT TRUE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -689,6 +796,7 @@ CREATE TABLE IF NOT EXISTS orcamentos (
     data_validade DATE,
     observacoes TEXT,
     valor_total DECIMAL(10,2) DEFAULT 0,
+    desconto DECIMAL(10,2) DEFAULT 0,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (paciente_usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -801,6 +909,24 @@ SCHEMA_ALTER_MYSQL = [
     "ALTER TABLE planos ADD COLUMN limite_procedimentos INT DEFAULT 50",
     "ALTER TABLE profissional_estabelecimento ADD COLUMN cor VARCHAR(7) DEFAULT '#6c757d'",
     "ALTER TABLE consultas ADD COLUMN lembrete_enviado BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE procedimentos ADD COLUMN categoria VARCHAR(100) NULL",
+    "ALTER TABLE procedimentos ADD COLUMN codigo_tuss VARCHAR(50) NULL",
+    "ALTER TABLE procedimentos ADD COLUMN codigo_americano VARCHAR(50) NULL",
+    "ALTER TABLE orcamentos ADD COLUMN desconto DECIMAL(10,2) DEFAULT 0",
+    "ALTER TABLE usuarios ADD COLUMN logradouro VARCHAR(255) NULL",
+    "ALTER TABLE usuarios ADD COLUMN numero VARCHAR(20) NULL",
+    "ALTER TABLE usuarios ADD COLUMN complemento VARCHAR(100) NULL",
+    "ALTER TABLE usuarios ADD COLUMN bairro VARCHAR(150) NULL",
+    "ALTER TABLE usuarios ADD COLUMN cidade VARCHAR(150) NULL",
+    "ALTER TABLE usuarios ADD COLUMN estado VARCHAR(5) NULL",
+    "ALTER TABLE usuarios ADD COLUMN cep VARCHAR(9) NULL",
+    "ALTER TABLE usuarios ADD COLUMN tipo_pagamento VARCHAR(20) DEFAULT 'particular'",
+    "ALTER TABLE estabelecimentos ADD COLUMN responsavel_usuario_id INT NULL",
+    "ALTER TABLE convenios ADD COLUMN plano_padrao VARCHAR(100) NULL",
+    "ALTER TABLE convenios ADD COLUMN limite_consultas_mes INT DEFAULT 0",
+    "ALTER TABLE convenios ADD COLUMN telefone_2 VARCHAR(20) NULL",
+    "ALTER TABLE convenios ADD COLUMN contato_nome VARCHAR(200) NULL",
+    "ALTER TABLE convenios ADD COLUMN contato_email VARCHAR(200) NULL",
 ]
 
 def _get_mysql_alter_safe():
