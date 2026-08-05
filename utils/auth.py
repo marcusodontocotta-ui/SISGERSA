@@ -100,6 +100,15 @@ def usuario_por_cpf(cpf: str) -> dict | None:
 
 def criar_usuario(nome: str, email: str, senha: str, tipo: str, telefone: str = None, is_super: bool = False) -> int:
     hash_pwd = hash_senha(senha)
+    if _ENGINE == "postgresql":
+        cursor = db.execute(
+            """INSERT INTO usuarios (nome, email, senha_hash, tipo, is_super, telefone, ativo)
+               VALUES (%s, %s, %s, %s, %s, %s, TRUE)
+               RETURNING id""",
+            (nome, email, hash_pwd, tipo, is_super, telefone),
+        )
+        row = cursor.fetchone()
+        return row["id"] if row else None
     cursor = db.execute(
         """INSERT INTO usuarios (nome, email, senha_hash, tipo, is_super, telefone, ativo)
            VALUES (%s, %s, %s, %s, %s, %s, TRUE)""",

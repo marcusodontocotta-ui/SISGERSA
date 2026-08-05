@@ -2117,6 +2117,14 @@ async def criar_medicamento(request: Request, usuario=Depends(exigir_login)):
         existente = db.fetch_one("SELECT id FROM medicamentos WHERE nome = %s", (nome,))
         if existente:
             return JSONResponse({"ok": True, "id": existente["id"], "nome": nome})
+        if settings.DB_ENGINE == "postgresql":
+            cursor = db.execute(
+                "INSERT INTO medicamentos (nome, principio_ativo) VALUES (%s, %s) RETURNING id",
+                (nome, form.get("principio_ativo", "").strip() or None),
+            )
+            row = cursor.fetchone()
+            novo_id = row["id"] if row else None
+            return JSONResponse({"ok": True, "id": novo_id, "nome": nome})
         cursor = db.execute(
             "INSERT INTO medicamentos (nome, principio_ativo) VALUES (%s, %s)",
             (nome, form.get("principio_ativo", "").strip() or None),
@@ -4111,13 +4119,23 @@ def criar_orcamento(
     conv_id = int(convenio_id) if convenio_id and convenio_id.strip() else None
     dv = data_validade if data_validade and data_validade.strip() else None
 
-    cursor = db.execute(
-        """INSERT INTO orcamentos
-           (paciente_usuario_id, profissional_usuario_id, estabelecimento_id, convenio_id, data_validade, observacoes)
-           VALUES (%s, %s, %s, %s, %s, %s)""",
-        (paciente_id, profissional_id, estab_id, conv_id, dv, observacoes),
-    )
-    new_id = cursor.lastrowid
+    if settings.DB_ENGINE == "postgresql":
+        cursor = db.execute(
+            """INSERT INTO orcamentos
+               (paciente_usuario_id, profissional_usuario_id, estabelecimento_id, convenio_id, data_validade, observacoes)
+               VALUES (%s, %s, %s, %s, %s, %s) RETURNING id""",
+            (paciente_id, profissional_id, estab_id, conv_id, dv, observacoes),
+        )
+        row = cursor.fetchone()
+        new_id = row["id"] if row else None
+    else:
+        cursor = db.execute(
+            """INSERT INTO orcamentos
+               (paciente_usuario_id, profissional_usuario_id, estabelecimento_id, convenio_id, data_validade, observacoes)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (paciente_id, profissional_id, estab_id, conv_id, dv, observacoes),
+        )
+        new_id = cursor.lastrowid
     return RedirectResponse(f"/orcamentos/{new_id}", status_code=302)
 
 
