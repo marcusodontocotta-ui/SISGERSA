@@ -1001,6 +1001,13 @@ CREATE TABLE IF NOT EXISTS contra_indicacoes (
     UNIQUE (principio_ativo_id, tipo, descricao)
 );
 
+CREATE TABLE IF NOT EXISTS principio_sinonimos (
+    id SERIAL PRIMARY KEY,
+    sinonimo_id INT NOT NULL REFERENCES principios_ativos(id) ON DELETE CASCADE,
+    canonico_id INT NOT NULL REFERENCES principios_ativos(id) ON DELETE CASCADE,
+    UNIQUE (sinonimo_id, canonico_id)
+);
+
 """
 
 

@@ -43,6 +43,7 @@ from utils.permissoes import (
 from utils.planos import verificar_limite, LimiteAtingidoError, obter_plano_estabelecimento, contar_uso, bloquear_se_limite, _mes_atual_filter
 from utils.email import enviar_email, montar_confirmacao_agendamento
 from utils.scheduler import iniciar_scheduler, parar_scheduler
+from utils.farmaco import checar_medicamento_paciente, sugestoes_para_sintoma, principios_curados, resolver_principios_medicamento
 
 @asynccontextmanager
 async def lifespan(app):
@@ -2148,6 +2149,16 @@ def listar_medicamentos_json(pac_id: int, usuario=Depends(exigir_login)):
         (pac_id,),
     )
     return JSONResponse([dict(r) for r in rows])
+
+
+@app.post("/pacientes/{pac_id}/medicamentos/verificar")
+async def verificar_medicamento(pac_id: int, request: Request, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "editar")
+    form = dict(await request.form())
+    medicamento_id = int(form["medicamento_id"]) if form.get("medicamento_id") else None
+    nome_medicamento = (form.get("nome_medicamento") or "").strip() or None
+    alertas = checar_medicamento_paciente(pac_id, medicamento_id, nome_medicamento)
+    return JSONResponse({"alertas": alertas, "quantidade": len(alertas)})
 
 
 @app.post("/pacientes/{pac_id}/medicamentos")

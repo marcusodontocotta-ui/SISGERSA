@@ -279,8 +279,10 @@
                     <input type="hidden" name="embedded" value="{{ embedded }}">
                 </div>
                 <div class="modal-footer">
+                    <div id="verificacaoAviso" class="text-start me-auto w-100" style="display:none;"></div>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Adicionar</button>
+                    <button type="button" id="btnVerificarMed" class="btn btn-outline-primary"><i class="bi bi-shield-check"></i> Verificar</button>
+                    <button type="submit" id="btnSalvarMed" class="btn btn-primary">Adicionar</button>
                 </div>
             </form>
         </div>
@@ -344,6 +346,68 @@ document.addEventListener('click', function(e) {
         sugestoes.style.display = 'none';
     }
 });
+
+let btnVerificarMed = document.getElementById('btnVerificarMed');
+let btnSalvarMed = document.getElementById('btnSalvarMed');
+let verificacaoAviso = document.getElementById('verificacaoAviso');
+
+function resetVerificacao() {
+    verificacaoAviso.style.display = 'none';
+    verificacaoAviso.innerHTML = '';
+    btnVerificarMed.disabled = false;
+    btnVerificarMed.innerHTML = '<i class="bi bi-shield-check"></i> Verificar';
+}
+
+function verificarMedicamento() {
+    if (!medId.value && !medNome.value) {
+        verificacaoAviso.innerHTML = '<div class="alert alert-warning py-1 px-2 mb-1 small">Selecione um medicamento antes de verificar.</div>';
+        verificacaoAviso.style.display = 'block';
+        return;
+    }
+    btnVerificarMed.disabled = true;
+    btnVerificarMed.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Verificando...';
+    var f = new FormData();
+    if (medId.value) f.append('medicamento_id', medId.value);
+    if (medNome.value) f.append('nome_medicamento', medNome.value);
+    f.append('embedded', document.querySelector('[name=embedded]').value);
+    fetch('/pacientes/{{ pac.id }}/medicamentos/verificar', {method:'POST', body:f})
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        btnVerificarMed.disabled = false;
+        btnVerificarMed.innerHTML = '<i class="bi bi-shield-check"></i> Verificar';
+        var alertas = d.alertas || [];
+        if (alertas.length === 0) {
+            verificacaoAviso.innerHTML = '<div class="alert alert-success py-1 px-2 mb-1 small"><i class="bi bi-check-circle"></i> Nenhuma interação ou contra-indicação detectada.</div>';
+            verificacaoAviso.style.display = 'block';
+            return;
+        }
+        var h = '';
+        alertas.forEach(function(a) {
+            var cor = a.severidade === 'grave' ? 'danger' : (a.severidade === 'moderada' ? 'warning' : 'info');
+            h += '<div class="alert alert-' + cor + ' py-1 px-2 mb-1 small"><i class="bi bi-exclamation-triangle"></i> <strong>' + a.mensagem + '</strong>' +
+                 (a.conduta ? '<br><span class="text-muted">Conduta: ' + a.conduta + '</span>' : '') + '</div>';
+        });
+        verificacaoAviso.innerHTML = h;
+        verificacaoAviso.style.display = 'block';
+    })
+    .catch(function() {
+        btnVerificarMed.disabled = false;
+        btnVerificarMed.innerHTML = '<i class="bi bi-shield-check"></i> Verificar';
+        verificacaoAviso.innerHTML = '<div class="alert alert-danger py-1 px-2 mb-1 small">Erro ao verificar medicamento.</div>';
+        verificacaoAviso.style.display = 'block';
+    });
+}
+
+if (btnVerificarMed) {
+    btnVerificarMed.addEventListener('click', verificarMedicamento);
+    document.getElementById('buscaMed').addEventListener('input', resetVerificacao);
+    document.querySelector('#modalNovoMedicamento form').addEventListener('submit', function(e) {
+        if (btnVerificarMed.disabled) {
+            e.preventDefault();
+            return;
+        }
+    });
+}
 </script>
 {% endif %}
 
