@@ -663,20 +663,21 @@ def registrar_submit(
 
     try:
         if settings.DB_ENGINE == "postgresql":
-            db.execute(
+            cursor = db.execute(
                 """INSERT INTO estabelecimentos (nome, tipo, cnpj, telefone, email, endereco, plano_id, cupom_id, plano_expira_em)
-                   VALUES (%s, %s, NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), %s, %s, %s)""",
+                   VALUES (%s, %s, NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), %s, %s, %s)
+                   RETURNING id""",
                 (nome_estabelecimento, tipo, cnpj or "", telefone or "", email_estab or "", endereco or "", plano_id, cupom_id, data_expiracao_trial),
             )
+            row = cursor.fetchone()
+            estab_id = row["id"] if row else None
         else:
-            db.execute(
+            cursor = db.execute(
                 """INSERT INTO estabelecimentos (nome, tipo, cnpj, telefone, email, endereco, plano_id, cupom_id, plano_expira_em)
                    VALUES (%s, %s, NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), NULLIF(%s,''), %s, %s, %s)""",
                 (nome_estabelecimento, tipo, cnpj or "", telefone or "", email_estab or "", endereco or "", plano_id, cupom_id, data_expiracao_trial),
             )
-
-        estab = db.fetch_one("SELECT id FROM estabelecimentos ORDER BY id DESC LIMIT 1")
-        estab_id = estab["id"]
+            estab_id = cursor.lastrowid
 
         if cupom_id:
             db.execute("UPDATE cupons SET usos_atual = usos_atual + 1 WHERE id = %s", (cupom_id,))
@@ -2540,13 +2541,24 @@ def criar_consulta(
         (paciente_id, estab_id),
     )
 
-    db.execute(
-        """INSERT INTO consultas
-           (paciente_usuario_id, profissional_usuario_id, estabelecimento_id, prontuario_id, procedimento_id, data_hora, duracao_minutos, observacoes)
-           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
-        (paciente_id, profissional_id, estab_id, prontuario["id"] if prontuario else None, procedimento_id, data_hora, duracao, observacoes),
-    )
-    consulta_id_val = db.fetch_one("SELECT id FROM consultas ORDER BY id DESC LIMIT 1")["id"]
+    if settings.DB_ENGINE == "postgresql":
+        cursor = db.execute(
+            """INSERT INTO consultas
+               (paciente_usuario_id, profissional_usuario_id, estabelecimento_id, prontuario_id, procedimento_id, data_hora, duracao_minutos, observacoes)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+               RETURNING id""",
+            (paciente_id, profissional_id, estab_id, prontuario["id"] if prontuario else None, procedimento_id, data_hora, duracao, observacoes),
+        )
+        row = cursor.fetchone()
+        consulta_id_val = row["id"] if row else None
+    else:
+        cursor = db.execute(
+            """INSERT INTO consultas
+               (paciente_usuario_id, profissional_usuario_id, estabelecimento_id, prontuario_id, procedimento_id, data_hora, duracao_minutos, observacoes)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+            (paciente_id, profissional_id, estab_id, prontuario["id"] if prontuario else None, procedimento_id, data_hora, duracao, observacoes),
+        )
+        consulta_id_val = cursor.lastrowid
 
     if prontuario:
         from datetime import datetime as _dt
