@@ -450,6 +450,10 @@ CREATE TABLE IF NOT EXISTS medicamentos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(255) NOT NULL,
     principio_ativo VARCHAR(255),
+    anvisa_registro VARCHAR(20),
+    classe_terapeutica VARCHAR(255),
+    fabricante VARCHAR(255),
+    situacao_registro VARCHAR(20),
     UNIQUE KEY uq_medicamentos_nome (nome)
 );
 
@@ -895,6 +899,106 @@ ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS tipo_pagamento VARCHAR(20) DEFAULT
 CREATE TABLE IF NOT EXISTS config_sistema (
     chave VARCHAR(100) PRIMARY KEY,
     valor VARCHAR(200) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS medicamentos (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(255) NOT NULL UNIQUE,
+    principio_ativo VARCHAR(255),
+    anvisa_registro VARCHAR(20),
+    classe_terapeutica VARCHAR(255),
+    fabricante VARCHAR(255),
+    situacao_registro VARCHAR(20),
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS paciente_medicamentos (
+    id SERIAL PRIMARY KEY,
+    paciente_id INT NOT NULL,
+    medicamento_id INT,
+    nome_medicamento VARCHAR(255),
+    dose VARCHAR(100),
+    frequencia VARCHAR(100),
+    via VARCHAR(100),
+    observacoes TEXT,
+    ativo BOOLEAN DEFAULT TRUE,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pac_med_paciente ON paciente_medicamentos (paciente_id);
+
+-- ============================================
+-- BASE DE CONHECIMENTO FARMACOLOGICA (FASE 0)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS principios_ativos (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(255) NOT NULL UNIQUE,
+    atc_codigo VARCHAR(20),
+    classe_terapeutica VARCHAR(255),
+    indicacao TEXT,
+    posologia TEXT,
+    contra_indicacoes TEXT,
+    mecanismo_acao TEXT,
+    fonte VARCHAR(100),
+    revisado_em TIMESTAMP,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS medicamento_principios (
+    id SERIAL PRIMARY KEY,
+    medicamento_id INT NOT NULL REFERENCES medicamentos(id) ON DELETE CASCADE,
+    principio_ativo_id INT NOT NULL REFERENCES principios_ativos(id) ON DELETE CASCADE,
+    UNIQUE (medicamento_id, principio_ativo_id)
+);
+
+CREATE TABLE IF NOT EXISTS sintomas (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(255) NOT NULL UNIQUE,
+    categoria VARCHAR(100),
+    cid10 VARCHAR(20),
+    ativo BOOLEAN DEFAULT TRUE,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS indicacoes (
+    id SERIAL PRIMARY KEY,
+    principio_ativo_id INT NOT NULL REFERENCES principios_ativos(id) ON DELETE CASCADE,
+    sintoma_id INT NOT NULL REFERENCES sintomas(id) ON DELETE CASCADE,
+    linha_tratamento INT DEFAULT 1,
+    eficacia INT DEFAULT 5,
+    observacoes TEXT,
+    UNIQUE (principio_ativo_id, sintoma_id)
+);
+
+CREATE TABLE IF NOT EXISTS efeitos_colaterais (
+    id SERIAL PRIMARY KEY,
+    principio_ativo_id INT NOT NULL REFERENCES principios_ativos(id) ON DELETE CASCADE,
+    nome VARCHAR(255) NOT NULL,
+    probabilidade NUMERIC(5,2),
+    severidade VARCHAR(20) DEFAULT 'leve',
+    UNIQUE (principio_ativo_id, nome)
+);
+
+CREATE TABLE IF NOT EXISTS interacoes_medicamentosas (
+    id SERIAL PRIMARY KEY,
+    medicamento_a_id INT NOT NULL REFERENCES principios_ativos(id) ON DELETE CASCADE,
+    medicamento_b_id INT NOT NULL REFERENCES principios_ativos(id) ON DELETE CASCADE,
+    severidade VARCHAR(20) NOT NULL DEFAULT 'moderada',
+    descricao TEXT,
+    conduta TEXT,
+    fonte VARCHAR(100),
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (medicamento_a_id, medicamento_b_id),
+    CHECK (medicamento_a_id < medicamento_b_id)
+);
+
+CREATE TABLE IF NOT EXISTS contra_indicacoes (
+    id SERIAL PRIMARY KEY,
+    principio_ativo_id INT NOT NULL REFERENCES principios_ativos(id) ON DELETE CASCADE,
+    tipo VARCHAR(50) NOT NULL,
+    descricao VARCHAR(255) NOT NULL,
+    severidade VARCHAR(20) DEFAULT 'moderada',
+    UNIQUE (principio_ativo_id, tipo, descricao)
 );
 
 """
