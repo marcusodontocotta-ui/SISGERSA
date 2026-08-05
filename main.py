@@ -2154,12 +2154,18 @@ def listar_medicamentos_json(pac_id: int, usuario=Depends(exigir_login)):
 async def adicionar_medicamento(pac_id: int, request: Request, usuario=Depends(exigir_login)):
     exigir_permissao(usuario, "prontuarios", "editar")
     form = dict(await request.form())
+    medicamento_id = int(form["medicamento_id"]) if form.get("medicamento_id") else None
+    nome_medicamento = (form.get("nome_medicamento") or "").strip() or None
+    if medicamento_id is not None:
+        existe = db.fetch_one("SELECT id FROM medicamentos WHERE id = %s", (medicamento_id,))
+        if not existe:
+            medicamento_id = None
+    if not medicamento_id and not nome_medicamento:
+        return RedirectResponse(url=f"/pacientes/{pac_id}/anamnese?embedded=1&tab=medicamentos&erro=med_vazio", status_code=302)
     db.execute(
         """INSERT INTO paciente_medicamentos (paciente_id, medicamento_id, nome_medicamento, dose, frequencia, via, observacoes)
            VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-        (pac_id,
-         int(form["medicamento_id"]) if form.get("medicamento_id") else None,
-         form.get("nome_medicamento"),
+        (pac_id, medicamento_id, nome_medicamento,
          form.get("dose"), form.get("frequencia"), form.get("via"),
          form.get("observacoes")),
     )
@@ -2169,7 +2175,7 @@ async def adicionar_medicamento(pac_id: int, request: Request, usuario=Depends(e
 @app.post("/pacientes/{pac_id}/medicamentos/{med_id}/remover")
 def remover_medicamento(pac_id: int, med_id: int, usuario=Depends(exigir_login)):
     exigir_permissao(usuario, "prontuarios", "editar")
-    db.execute("DELETE FROM paciente_medicamentos WHERE id = %s AND paciente_id = %s", (med_id, pac_id))
+    db.execute("UPDATE paciente_medicamentos SET ativo = FALSE WHERE id = %s AND paciente_id = %s", (med_id, pac_id))
     return RedirectResponse(url=f"/pacientes/{pac_id}/anamnese?embedded=1&tab=medicamentos", status_code=302)
 
 
