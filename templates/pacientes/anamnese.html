@@ -157,6 +157,27 @@
     <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalNovoMedicamento"><i class="bi bi-plus"></i> Adicionar Medicamento</button>
 </div>
 
+{% if alertas_farmaco %}
+<div class="mb-3">
+    {% set n_graves = alertas_farmaco | selectattr('severidade', 'equalto', 'grave') | list | length %}
+    <div class="alert {% if n_graves %}alert-danger{% else %}alert-warning{% endif %} py-2">
+        <strong><i class="bi bi-shield-exclamation"></i> Alertas farmacológicos ({{ alertas_farmaco|length }})</strong>
+        {% if n_graves %}<span class="badge bg-danger ms-1">{{ n_graves }} grave(s)</span>{% endif %}
+        <ul class="mb-0 mt-1 ps-3 small">
+            {% for a in alertas_farmaco %}
+            <li>
+                {% if a.severidade == 'grave' %}<i class="bi bi-x-octagon text-danger"></i>
+                {% elif a.severidade == 'moderada' %}<i class="bi bi-exclamation-triangle text-warning"></i>
+                {% else %}<i class="bi bi-info-circle text-info"></i>{% endif %}
+                <strong>{{ a.mensagem }}</strong>
+                {% if a.conduta %}<span class="text-muted"> — {{ a.conduta }}</span>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
 {% if medicamentos %}
 <div class="table-responsive">
     <table class="table table-sm table-hover">

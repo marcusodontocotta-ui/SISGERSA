@@ -43,7 +43,7 @@ from utils.permissoes import (
 from utils.planos import verificar_limite, LimiteAtingidoError, obter_plano_estabelecimento, contar_uso, bloquear_se_limite, _mes_atual_filter
 from utils.email import enviar_email, montar_confirmacao_agendamento
 from utils.scheduler import iniciar_scheduler, parar_scheduler
-from utils.farmaco import checar_medicamento_paciente, sugestoes_para_sintoma, principios_curados, resolver_principios_medicamento
+from utils.farmaco import checar_medicamento_paciente, sugestoes_para_sintoma, principios_curados, resolver_principios_medicamento, alertas_paciente
 
 @asynccontextmanager
 async def lifespan(app):
@@ -1973,6 +1973,8 @@ def pagina_anamnese(pac_id: int, request: Request, usuario=Depends(exigir_login)
         (pac_id,),
     )
 
+    alertas_farmaco = alertas_paciente(pac_id) if medicamentos_paciente else []
+
     sinais_vitais = db.fetch_all(
         """SELECT sv.*, u.nome AS profissional_nome
            FROM sinais_vitais sv
@@ -1989,6 +1991,7 @@ def pagina_anamnese(pac_id: int, request: Request, usuario=Depends(exigir_login)
             "request": request, "usuario": usuario, "pac": pac,
             "anamnese": anamnese, "prontuario": prontuario,
             "medicamentos": medicamentos_paciente,
+            "alertas_farmaco": alertas_farmaco,
             "sinais_vitais": sinais_vitais,
             "embedded": embedded in ("1", "True", "true"),
         },

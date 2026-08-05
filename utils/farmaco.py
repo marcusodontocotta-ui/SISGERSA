@@ -229,6 +229,39 @@ def checar_medicamento_paciente(paciente_id, medicamento_id=None, nome_medicamen
     return alertas
 
 
+def alertas_paciente(paciente_id):
+    ativos = medicamentos_ativos_paciente(paciente_id)
+    alertas = []
+
+    todos_pas = set()
+    for med in ativos:
+        pa_ids = resolver_principios_medicamento(med["medicamento_id"], med["nome_medicamento"])
+        todos_pas |= expandir_sinonimos(pa_ids)
+
+    ids = list(todos_pas)
+    if ids:
+        pn = ",".join(["%s"] * len(ids))
+        rows = db.fetch_all(
+            f"""SELECT a.nome AS pa_a, b.nome AS pa_b, i.severidade, i.descricao, i.conduta
+                FROM interacoes_medicamentosas i
+                JOIN principios_ativos a ON a.id = i.medicamento_a_id
+                JOIN principios_ativos b ON b.id = i.medicamento_b_id
+                WHERE i.medicamento_a_id IN ({pn}) AND i.medicamento_b_id IN ({pn})
+                ORDER BY CASE i.severidade WHEN 'grave' THEN 1 WHEN 'moderada' THEN 2 ELSE 3 END""",
+            ids + ids,
+        )
+        for r in rows:
+            alertas.append({
+                "tipo": "interacao",
+                "severidade": r["severidade"],
+                "mensagem": f"{r['pa_a']} + {r['pa_b']}: {r['descricao']}",
+                "conduta": r["conduta"],
+            })
+        alertas += checar_contra_indicacoes(paciente_id, todos_pas)
+
+    return alertas
+
+
 def sugestoes_para_sintoma(sintoma_nome):
     rows = db.fetch_all(
         """SELECT p.nome, p.posologia, i.linha_tratamento, i.eficacia, s.nome AS sintoma
