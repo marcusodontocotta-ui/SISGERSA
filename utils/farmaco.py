@@ -160,6 +160,8 @@ def checar_interacoes(paciente_id, pa_ids_novos):
             "severidade": r["severidade"],
             "mensagem": f"{r['pa_a']} + {r['pa_b']}: {r['descricao']}",
             "conduta": r["conduta"],
+            "pa": r["pa_a"],
+            "pa_b": r["pa_b"],
         })
     return alertas
 
@@ -201,6 +203,7 @@ def checar_contra_indicacoes(paciente_id, pa_ids_novos):
                     "tipo": "contraindicacao",
                     "severidade": r["severidade"],
                     "mensagem": f"{r['pa']}: alergia registrada na anamnese ({desc}).",
+                    "pa": r["pa"],
                 })
         elif tipo == "gestacao":
             if gestante:
@@ -208,6 +211,7 @@ def checar_contra_indicacoes(paciente_id, pa_ids_novos):
                     "tipo": "contraindicacao",
                     "severidade": r["severidade"],
                     "mensagem": f"{r['pa']}: contra-indicado na gravidez ({desc}).",
+                    "pa": r["pa"],
                 })
         elif tipo == "condicao":
             chaves = _chaves_descricao(desc, tipo)
@@ -216,6 +220,7 @@ def checar_contra_indicacoes(paciente_id, pa_ids_novos):
                     "tipo": "contraindicacao",
                     "severidade": r["severidade"],
                     "mensagem": f"{r['pa']}: condição clínica compatível registrada ({desc}).",
+                    "pa": r["pa"],
                 })
 
     return alertas
@@ -273,3 +278,50 @@ def sugestoes_para_sintoma(sintoma_nome):
         (sintoma_nome,),
     )
     return rows
+
+
+def listar_sintomas():
+    return db.fetch_all("SELECT id, nome FROM sintomas ORDER BY nome")
+
+
+def sugestoes_por_sintoma_ids(sintoma_ids):
+    if not sintoma_ids:
+        return []
+    ids = list(dict.fromkeys(sintoma_ids))
+    ph = ",".join(["%s"] * len(ids))
+    return db.fetch_all(
+        f"""SELECT i.sintoma_id, s.nome AS sintoma, p.id AS principio_ativo_id, p.nome AS pa,
+                   p.posologia, i.linha_tratamento, i.eficacia, i.observacoes
+            FROM indicacoes i
+            JOIN principios_ativos p ON p.id = i.principio_ativo_id
+            JOIN sintomas s ON s.id = i.sintoma_id
+            WHERE i.sintoma_id IN ({ph})
+            ORDER BY i.sintoma_id, i.linha_tratamento, i.eficacia DESC""",
+        ids,
+    )
+
+
+def sugestoes_seguras(paciente_id, sintoma_ids):
+    sugestoes = sugestoes_por_sintoma_ids(sintoma_ids)
+    if not sugestoes:
+        return []
+
+    pa_ids = {s["principio_ativo_id"] for s in sugestoes}
+    interacoes = checar_interacoes(paciente_id, pa_ids)
+    contra = checar_contra_indicacoes(paciente_id, pa_ids)
+
+    alertas_por_pa = {}
+    for a in interacoes:
+        alertas_por_pa.setdefault(a["pa"], []).append(a)
+        alertas_por_pa.setdefault(a["pa_b"], []).append(a)
+    for a in contra:
+        alertas_por_pa.setdefault(a["pa"], []).append(a)
+
+    resultado = []
+    for s in sugestoes:
+        item = dict(s)
+        item["alertas"] = alertas_por_pa.get(s["pa"], [])
+        item["n_graves"] = sum(1 for a in item["alertas"] if a["severidade"] == "grave")
+        item["n_moderadas"] = sum(1 for a in item["alertas"] if a["severidade"] == "moderada")
+        resultado.append(item)
+    return resultado

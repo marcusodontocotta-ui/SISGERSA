@@ -36,6 +36,24 @@
         <textarea class="form-control" name="queixa_principal" rows="3">{{ anamnese.queixa_principal or '' }}</textarea>
     </div>
     <div class="col-12">
+        <div class="card border mb-2">
+            <div class="card-body py-2">
+                <label class="form-label fw-semibold mb-1"><i class="bi bi-magic"></i> Sugestões terapêuticas por sintoma</label>
+                <p class="text-muted small mb-2">Marque os sintomas e veja os medicamentos indicados na base curada, já conferindo interações e contra-indicações do paciente.</p>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    {% for s in sintomas %}
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input sugestao-sintoma" type="checkbox" id="sint{{ s.id }}" value="{{ s.id }}">
+                        <label class="form-check-label small" for="sint{{ s.id }}">{{ s.nome }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="btnBuscarSugestoes"><i class="bi bi-search"></i> Buscar sugestões</button>
+            </div>
+        </div>
+        <div id="resultadoSugestoes"></div>
+    </div>
+    <div class="col-12">
         <label class="form-label fw-semibold">História da Moléstia Atual (HDA)</label>
         <textarea class="form-control" name="historico_doenca_atual" rows="4">{{ anamnese.historico_doenca_atual or '' }}</textarea>
     </div>
@@ -429,6 +447,24 @@ if (btnVerificarMed) {
         }
     });
 }
+
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    var sugestao = params.get('sugestao');
+    if (!sugestao) return;
+    var modalEl = document.getElementById('modalNovoMedicamento');
+    var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    var buscaMed = document.getElementById('buscaMed');
+    buscaMed.value = sugestao;
+    modal.show();
+    fetch('/medicamentos/buscar?q=' + encodeURIComponent(sugestao))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.length > 0) {
+            selecionarMed(data[0].id, data[0].nome);
+        }
+    });
+})();
 </script>
 {% endif %}
 
@@ -487,6 +523,74 @@ if (btnVerificarMed) {
 {% endif %}
 
 {% if tab_atual not in ('medicamentos', 'sinais') %}
+{% if tab_atual == 'queixa' %}
+<script>
+let btnBuscar = document.getElementById('btnBuscarSugestoes');
+
+function buscarSugestoes() {
+    var marcados = [];
+    document.querySelectorAll('.sugestao-sintoma:checked').forEach(function(el) {
+        marcados.push(el.value);
+    });
+    if (marcados.length === 0) {
+        document.getElementById('resultadoSugestoes').innerHTML = '<div class="alert alert-warning py-2 small">Selecione ao menos um sintoma.</div>';
+        return;
+    }
+    btnBuscar.disabled = true;
+    btnBuscar.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Buscando...';
+    var f = new FormData();
+    marcados.forEach(function(v) { f.append('sintoma_ids', v); });
+    fetch('/pacientes/{{ pac.id }}/sugestoes', {method:'POST', body:f})
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        btnBuscar.disabled = false;
+        btnBuscar.innerHTML = '<i class="bi bi-search"></i> Buscar sugestões';
+        var el = document.getElementById('resultadoSugestoes');
+        if (!d.sugestoes || d.sugestoes.length === 0) {
+            el.innerHTML = '<div class="alert alert-info py-2 small">Nenhum medicamento curado encontrado para os sintomas selecionados.</div>';
+            return;
+        }
+        var h = '<div class="table-responsive"><table class="table table-sm table-hover"><thead><tr><th>Sintoma</th><th>Princípio ativo</th><th>Linha</th><th>Segurança</th><th></th></tr></thead><tbody>';
+        d.sugestoes.forEach(function(s) {
+            var selo, cor;
+            if (s.n_graves > 0) {
+                selo = '<span class="badge bg-danger">' + s.n_graves + ' grave(s)</span>';
+                cor = 'danger';
+            } else if (s.n_moderadas > 0) {
+                selo = '<span class="badge bg-warning text-dark">' + s.n_moderadas + ' moderada(s)</span>';
+                cor = 'warning';
+            } else {
+                selo = '<span class="badge bg-success">OK</span>';
+                cor = 'success';
+            }
+            var obs = s.observacoes ? '<br><small class="text-muted">' + s.observacoes + '</small>' : '';
+            h += '<tr class="table-' + cor + '">';
+            h += '<td class="align-middle"><small>' + s.sintoma + '</small></td>';
+            h += '<td class="align-middle"><strong>' + s.pa + '</strong><br><small class="text-muted">' + (s.posologia || '') + '</small>' + obs + '</td>';
+            h += '<td class="align-middle"><small>Linha ' + s.linha_tratamento + '</small></td>';
+            h += '<td class="align-middle">' + selo + '</td>';
+            h += '<td class="align-middle text-end"><button type="button" class="btn btn-sm btn-outline-primary py-0" onclick="vincularSugestao(\'' + s.pa.replace(/'/g, "\\'") + '\')"><i class="bi bi-plus"></i> Vincular</button></td>';
+            h += '</tr>';
+        });
+        h += '</tbody></table></div>';
+        el.innerHTML = h;
+    })
+    .catch(function() {
+        btnBuscar.disabled = false;
+        btnBuscar.innerHTML = '<i class="bi bi-search"></i> Buscar sugestões';
+        document.getElementById('resultadoSugestoes').innerHTML = '<div class="alert alert-danger py-2 small">Erro ao buscar sugestões.</div>';
+    });
+}
+
+function vincularSugestao(pa) {
+    window.location.href = '/pacientes/{{ pac.id }}/anamnese?tab=medicamentos&embedded=1&sugestao=' + encodeURIComponent(pa);
+}
+
+if (btnBuscar) {
+    btnBuscar.addEventListener('click', buscarSugestoes);
+}
+</script>
+{% endif %}
 <script>
 document.getElementById('formAnamnese').addEventListener('submit', function(e) {
     var rev = {};

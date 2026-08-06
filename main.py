@@ -43,7 +43,7 @@ from utils.permissoes import (
 from utils.planos import verificar_limite, LimiteAtingidoError, obter_plano_estabelecimento, contar_uso, bloquear_se_limite, _mes_atual_filter
 from utils.email import enviar_email, montar_confirmacao_agendamento
 from utils.scheduler import iniciar_scheduler, parar_scheduler
-from utils.farmaco import checar_medicamento_paciente, sugestoes_para_sintoma, principios_curados, resolver_principios_medicamento, alertas_paciente
+from utils.farmaco import checar_medicamento_paciente, sugestoes_para_sintoma, principios_curados, resolver_principios_medicamento, alertas_paciente, listar_sintomas, sugestoes_seguras
 
 @asynccontextmanager
 async def lifespan(app):
@@ -1974,6 +1974,7 @@ def pagina_anamnese(pac_id: int, request: Request, usuario=Depends(exigir_login)
     )
 
     alertas_farmaco = alertas_paciente(pac_id) if medicamentos_paciente else []
+    sintomas = listar_sintomas()
 
     sinais_vitais = db.fetch_all(
         """SELECT sv.*, u.nome AS profissional_nome
@@ -1992,6 +1993,7 @@ def pagina_anamnese(pac_id: int, request: Request, usuario=Depends(exigir_login)
             "anamnese": anamnese, "prontuario": prontuario,
             "medicamentos": medicamentos_paciente,
             "alertas_farmaco": alertas_farmaco,
+            "sintomas": sintomas,
             "sinais_vitais": sinais_vitais,
             "embedded": embedded in ("1", "True", "true"),
         },
@@ -2162,6 +2164,20 @@ async def verificar_medicamento(pac_id: int, request: Request, usuario=Depends(e
     nome_medicamento = (form.get("nome_medicamento") or "").strip() or None
     alertas = checar_medicamento_paciente(pac_id, medicamento_id, nome_medicamento)
     return JSONResponse({"alertas": alertas, "quantidade": len(alertas)})
+
+
+@app.post("/pacientes/{pac_id}/sugestoes")
+async def sugestoes_sintomas(pac_id: int, request: Request, usuario=Depends(exigir_login)):
+    exigir_permissao(usuario, "prontuarios", "ver")
+    form = await request.form()
+    sintoma_ids = []
+    for v in form.getlist("sintoma_ids"):
+        try:
+            sintoma_ids.append(int(v))
+        except (TypeError, ValueError):
+            continue
+    sugestoes = sugestoes_seguras(pac_id, sintoma_ids)
+    return JSONResponse({"sugestoes": sugestoes, "quantidade": len(sugestoes)})
 
 
 @app.post("/pacientes/{pac_id}/medicamentos")
