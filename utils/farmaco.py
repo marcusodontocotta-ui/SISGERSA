@@ -119,10 +119,10 @@ def expandir_sinonimos(pa_ids):
         f"SELECT sinonimo_id, canonico_id FROM principio_sinonimos WHERE sinonimo_id IN ({placeholders})",
         ids,
     )
-    expandido = set(ids)
-    for r in rows:
-        expandido.add(r["canonico_id"])
-    return expandido
+    mapa = {r["sinonimo_id"]: r["canonico_id"] for r in rows}
+    if not mapa:
+        return set(ids)
+    return {mapa.get(pid, pid) for pid in ids}
 
 
 def principios_curados(pa_ids):

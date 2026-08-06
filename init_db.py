@@ -70,14 +70,16 @@ def criar_banco():
             criadas += 1
 
     if engine == "postgresql":
+        # No Postgres, `usuarios` e uma VIEW (pacientes + profissionais). As colunas
+        # de endereco/cadastro de paciente vivem na tabela base `pacientes`.
         pg_alts = [
-            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS logradouro VARCHAR(255)",
-            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS numero VARCHAR(20)",
-            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS complemento VARCHAR(100)",
-            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS bairro VARCHAR(150)",
-            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS cidade VARCHAR(150)",
-            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS estado VARCHAR(5)",
-            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS cep VARCHAR(9)",
+            "ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS logradouro VARCHAR(255)",
+            "ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS numero VARCHAR(20)",
+            "ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS complemento VARCHAR(100)",
+            "ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS bairro VARCHAR(150)",
+            "ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS cidade VARCHAR(150)",
+            "ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS estado VARCHAR(5)",
+            "ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS cep VARCHAR(9)",
         ]
         for alt in pg_alts:
             try:
