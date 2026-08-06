@@ -36,13 +36,48 @@ def _chaves_descricao(descricao, tipo):
 
 
 def _texto_casa(texto_paciente, chaves):
-    tp = _normalizar(texto_paciente)
+    tp = _normalizar(texto_paciente or "")
+    if not tp or not chaves:
+        return False
     for ch in chaves:
         if not ch:
             continue
         if ch in tp or tp in ch:
             return True
+        for v in _variantes_plural(ch):
+            if v and (v in tp or tp in v):
+                return True
     return False
+
+
+def _variantes_plural(palavra):
+    """Gera variantes singular/plural básicas de português para palavras simples."""
+    v = {palavra}
+    p = palavra.lower()
+    if p.endswith("ns") and len(p) > 3:
+        v.add(p[:-2] + "m")
+    elif p.endswith("oes") and len(p) > 4:
+        v.add(p[:-3] + "ao")
+    elif p.endswith("aes") and len(p) > 4:
+        v.add(p[:-3] + "ao")
+    elif p.endswith("ais") and len(p) > 4:
+        v.add(p[:-3] + "al")
+    elif p.endswith("eis") and len(p) > 4:
+        v.add(p[:-3] + "el")
+    elif p.endswith("s") and len(p) > 3:
+        v.add(p[:-1])
+    if not p.endswith("s"):
+        if p.endswith("al") and len(p) > 3:
+            v.add(p[:-2] + "ais")
+        elif p.endswith("el") and len(p) > 3:
+            v.add(p[:-2] + "eis")
+        elif p.endswith("ol") and len(p) > 3:
+            v.add(p[:-2] + "ois")
+        elif p.endswith("ao") and len(p) > 3:
+            v.add(p[:-2] + "oes")
+        else:
+            v.add(p + "s")
+    return v
 
 
 def resolver_principios_medicamento(medicamento_id=None, nome_medicamento=None):
