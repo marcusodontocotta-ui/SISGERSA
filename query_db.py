@@ -1,11 +1,7 @@
 ﻿import psycopg2
-conn = psycopg2.connect(
-    host='dpg-d9hqikr7uimc73dt3e0g-a.oregon-postgres.render.com',
-    port=5432,
-    user='sisgersa',
-    password='tOJ0rv1qWUQABYIWRMO0ew2c2AtfGZNU',
-    dbname='sisgersa'
-)
+from utils.db_url import get_database_url
+
+conn = psycopg2.connect(get_database_url())
 cur = conn.cursor()
 
 print('=== TABLES LIKE %orcamento% ===')

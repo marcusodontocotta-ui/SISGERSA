@@ -3,13 +3,11 @@ Cleanup: remove imported data from estab=1 and empty prontuarios from estab=4
 Then re-import with estab=4 and link professionals.
 """
 import sys, os, time
-sys.path.insert(0, r'C:\Users\T-GAMER\Documents\Default Project\medical_db')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import psycopg
+from utils.db_url import get_database_url
 
-DATABASE_URL = os.environ.get(
-    'DATABASE_URL',
-    'postgresql://sisgersa:tOJ0rv1qWUQABYIWRMO0ew2c2AtfGZNU@dpg-d9hqikr7uimc73dt3e0g-a.oregon-postgres.render.com/sisgersa'
-)
+DATABASE_URL = get_database_url()
 
 t0 = time.time()
 conn = psycopg.connect(DATABASE_URL, sslmode='require', connect_timeout=30)

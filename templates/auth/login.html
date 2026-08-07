@@ -34,6 +34,13 @@
                         </div>
                         {% endif %}
 
+                        {% if motivo == 'senha-alterada' %}
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <i class="bi bi-check-circle"></i> Senha alterada com sucesso. Faça login novamente.
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        {% endif %}
+
                         <form method="POST" action="/login" autocomplete="off">
                             <div class="mb-3">
                                 <label for="email" class="form-label">Email ou CPF</label>

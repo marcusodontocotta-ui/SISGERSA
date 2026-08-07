@@ -54,6 +54,29 @@ CREATE TABLE IF NOT EXISTS usuarios (
     UNIQUE KEY uk_codigo_paciente (codigo_paciente)
 );
 
+CREATE TABLE IF NOT EXISTS sessoes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    jti VARCHAR(64) NOT NULL,
+    criada_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    revogada_em TIMESTAMP NULL,
+    ultima_atividade DATETIME NULL,
+    UNIQUE KEY uk_sessoes_jti (jti),
+    KEY idx_sessoes_usuario (usuario_id)
+);
+
+CREATE TABLE IF NOT EXISTS rate_limits (
+    chave VARCHAR(120) PRIMARY KEY,
+    contagem INT NOT NULL DEFAULT 1,
+    janela_inicio DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pending_logins (
+    session_key VARCHAR(64) PRIMARY KEY,
+    user_ids TEXT NOT NULL,
+    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS profissional_estabelecimento (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT NOT NULL,
@@ -545,6 +568,28 @@ CREATE TABLE IF NOT EXISTS usuarios (
     UNIQUE (codigo_paciente)
 );
 
+CREATE TABLE IF NOT EXISTS sessoes (
+    id SERIAL PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    jti VARCHAR(64) NOT NULL UNIQUE,
+    criada_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    revogada_em TIMESTAMP NULL,
+    ultima_atividade TIMESTAMP NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessoes_usuario ON sessoes (usuario_id);
+
+CREATE TABLE IF NOT EXISTS rate_limits (
+    chave VARCHAR(120) PRIMARY KEY,
+    contagem INT NOT NULL DEFAULT 1,
+    janela_inicio TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pending_logins (
+    session_key VARCHAR(64) PRIMARY KEY,
+    user_ids TEXT NOT NULL,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS profissional_estabelecimento (
     id SERIAL PRIMARY KEY,
     usuario_id INT NOT NULL,
@@ -1006,6 +1051,28 @@ CREATE TABLE IF NOT EXISTS principio_sinonimos (
     sinonimo_id INT NOT NULL REFERENCES principios_ativos(id) ON DELETE CASCADE,
     canonico_id INT NOT NULL REFERENCES principios_ativos(id) ON DELETE CASCADE,
     UNIQUE (sinonimo_id, canonico_id)
+);
+
+CREATE TABLE IF NOT EXISTS classes_farmacologicas (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL UNIQUE,
+    descricao VARCHAR(255),
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS classe_principio_ativo (
+    classe_id INT NOT NULL REFERENCES classes_farmacologicas(id) ON DELETE CASCADE,
+    principio_ativo_id INT NOT NULL REFERENCES principios_ativos(id) ON DELETE CASCADE,
+    PRIMARY KEY (classe_id, principio_ativo_id)
+);
+
+CREATE TABLE IF NOT EXISTS reacoes_cruzadas (
+    id SERIAL PRIMARY KEY,
+    classe_origem_id INT NOT NULL REFERENCES classes_farmacologicas(id) ON DELETE CASCADE,
+    classe_alvo_id INT NOT NULL REFERENCES classes_farmacologicas(id) ON DELETE CASCADE,
+    severidade VARCHAR(20) DEFAULT 'grave',
+    descricao VARCHAR(255),
+    UNIQUE (classe_origem_id, classe_alvo_id)
 );
 
 """

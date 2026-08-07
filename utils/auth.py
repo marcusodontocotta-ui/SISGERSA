@@ -15,15 +15,106 @@ def verificar_senha(senha: str, hash_armazenado: str) -> bool:
     return bcrypt.checkpw(senha.encode("utf-8"), hash_armazenado.encode("utf-8"))
 
 
-def criar_token(usuario_id: int, tipo: str, is_super: bool = False) -> str:
+def criar_token(usuario_id: int, tipo: str, is_super: bool = False, jti: str = None) -> str:
     expiracao = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
         "sub": str(usuario_id),
         "tipo": tipo,
         "is_super": is_super,
+        "jti": jti,
         "exp": expiracao,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def criar_sessao(usuario_id: int, jti: str):
+    db.execute(
+        "INSERT INTO sessoes (usuario_id, jti) VALUES (%s, %s)",
+        (usuario_id, jti),
+    )
+
+
+def obter_sessao(usuario_id: int, jti: str) -> dict | None:
+    if not jti:
+        return None
+    return db.fetch_one(
+        "SELECT jti, ultima_atividade FROM sessoes WHERE jti = %s AND usuario_id = %s AND revogada_em IS NULL",
+        (jti, usuario_id),
+    )
+
+
+def sessao_valida(usuario_id: int, jti: str) -> bool:
+    return bool(obter_sessao(usuario_id, jti))
+
+
+IDLE_TIMEOUT_SECONDS = 20 * 60
+_ATIVIDADE_INTERVALO = 60
+
+
+def _para_datetime(valor):
+    if isinstance(valor, datetime):
+        return valor
+    if isinstance(valor, str):
+        for fmt in (
+            "%Y-%m-%d %H:%M:%S.%f",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S.%f",
+        ):
+            try:
+                return datetime.strptime(valor, fmt)
+            except ValueError:
+                continue
+    return None
+
+
+def sessao_ativa(usuario_id: int, jti: str) -> bool:
+    """Sessao valida E dentro do limite de inatividade (idle timeout).
+
+    Estado compartilhado entre workers via coluna sessoes.ultima_atividade.
+    A atualizacao de atividade e limitada a uma escrita por minuto por sessao.
+    """
+    sessao = obter_sessao(usuario_id, jti)
+    if not sessao:
+        return False
+    agora = datetime.now()
+    ultima = _para_datetime(sessao.get("ultima_atividade"))
+    if ultima is not None:
+        segundos_ocioso = (agora - ultima).total_seconds()
+        if segundos_ocioso > IDLE_TIMEOUT_SECONDS:
+            return False
+        if segundos_ocioso < _ATIVIDADE_INTERVALO:
+            return True
+    db.execute(
+        "UPDATE sessoes SET ultima_atividade = %s WHERE jti = %s AND revogada_em IS NULL",
+        (agora, jti),
+    )
+    return True
+
+
+def limpar_sessoes_antigas(dias: int = 30):
+    limite = datetime.now() - timedelta(days=dias)
+    db.execute(
+        "UPDATE sessoes SET revogada_em = criada_em "
+        "WHERE revogada_em IS NULL AND criada_em < %s",
+        (limite,),
+    )
+
+
+def revogar_sessao(jti: str):
+    if not jti:
+        return
+    db.execute(
+        "UPDATE sessoes SET revogada_em = CURRENT_TIMESTAMP WHERE jti = %s AND revogada_em IS NULL",
+        (jti,),
+    )
+
+
+def revogar_sessoes_usuario(usuario_id: int):
+    db.execute(
+        "UPDATE sessoes SET revogada_em = CURRENT_TIMESTAMP WHERE usuario_id = %s AND revogada_em IS NULL",
+        (usuario_id,),
+    )
 
 
 def verificar_token(token: str) -> dict | None:

@@ -11,6 +11,10 @@ services:
         fromDatabase:
           name: sisgersa-db
           property: connectionString
+      # Pool de conexoes por worker. 4 workers x 5 = ate 20 conexoes;
+      # o Postgres do Render (free) aceita ~100, entao ha folga.
+      - key: DB_MAX_CONNECTIONS
+        value: "5"
       - key: SECRET_KEY
         generateValue: true
       - key: ENVIRONMENT

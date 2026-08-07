@@ -10,11 +10,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import openpyxl
 import psycopg
 from datetime import datetime, date
+from utils.db_url import get_database_url
 
-DATABASE_URL = os.environ.get(
-    'DATABASE_URL',
-    'postgresql://sisgersa:tOJ0rv1qWUQABYIWRMO0ew2c2AtfGZNU@dpg-d9hqikr7uimc73dt3e0g-a.oregon-postgres.render.com/sisgersa'
-)
+DATABASE_URL = get_database_url()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ESTAB_ID = 4
 

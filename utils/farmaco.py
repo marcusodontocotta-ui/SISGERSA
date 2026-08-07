@@ -1,4 +1,5 @@
 from database.connection import db
+import re
 import unicodedata
 
 TIPO_CONTRA = {
@@ -35,6 +36,89 @@ def _chaves_descricao(descricao, tipo):
     return chaves
 
 
+_RE_NAO_PALAVRA = re.compile(r"[a-z0-9]")
+
+# Sinônimos/variantes de termos clínicos para o histórico médico (condições).
+# Chaves normalizadas (minúsculas, sem acento) -> variações que também casam.
+SINONIMOS_CONDICAO = {
+    "colite associada a antibiotico previa": [
+        "colite", "colite associada a antibiotico", "colite pseudomembranosa",
+        "diarreia por antibiotico",
+    ],
+    "criancas < 8 anos (mancha dentaria)": [
+        "crianca", "criancas", "menor de 8 anos", "menor de oito anos",
+    ],
+    "diabetes descompensado (uso prolongado)": [
+        "diabetes", "diabetes mellitus", "diabetico", "dm",
+    ],
+    "discrasias sanguineas": [
+        "discrasia", "discrasias", "discrasia sanguinea", "hemofilia", "hemofilico",
+        "coagulopatia", "coagulopatias", "plaquetopenia", "trombocitopenia",
+        "leucopenia", "purpura", "doenca hematologica", "doencas hematologicas",
+    ],
+    "doenca cardiaca isquemica/icc": [
+        "doenca cardiaca", "doenca cardiaca isquemica", "insuficiencia cardiaca",
+        "icc", "cardiaco", "coronariopatia", "angina", "infarto",
+    ],
+    "doenca hepatica grave": [
+        "doenca hepatica", "hepatopatia", "cirrose", "doenca do figado", "hepatite",
+    ],
+    "hepatopatia ativa": ["hepatopatia", "hepatopatia ativa", "doenca hepatica", "hepatite", "cirrose"],
+    "hepatopatia previa": ["hepatopatia previa", "hepatopatia", "doenca hepatica previa"],
+    "infeccao fungica sistemica nao tratada": [
+        "infeccao fungica", "micose sistemica", "candidemia", "aspergilose", "fungemia",
+    ],
+    "infeccao sistemica nao tratada": [
+        "infeccao sistemica", "infeccao", "sepse", "bacteremia", "septicemia",
+    ],
+    "ingestao de alcool (reacao dissulfiram-like)": [
+        "alcool", "alcoolismo", "etilismo", "ingestao de alcool",
+    ],
+    "insuficiencia hepatica grave": [
+        "insuficiencia hepatica", "insuficiencia hepatica cronica", "doenca hepatica",
+        "falencia hepatica", "cirrose", "hepatopatia",
+    ],
+    "insuficiencia renal grave": [
+        "insuficiencia renal", "insuficiencia renal cronica", "doenca renal",
+        "doenca renal cronica", "nefropatia", "nefropatia diabetica",
+        "doenca renal diabetica", "falencia renal", "dialise", "insuficiencia renal aguda",
+    ],
+    "ulcera peptica ativa": [
+        "ulcera", "ulcera peptica", "ulcera gastrica", "ulcera duodenal",
+        "gastrite", "dispepsia",
+    ],
+    "uso concomitante de farmacos com interacao qt": [
+        "interacao qt", "prolongamento qt", "intervalo qt", "qt longo",
+        "sindrome do qt longo", "torcades", "qtc", "qt",
+    ],
+}
+
+
+def _variacoes_condicao(chaves):
+    extras = set()
+    for ch in chaves:
+        for termo, variacoes in SINONIMOS_CONDICAO.items():
+            if ch == termo or termo in ch or ch in termo:
+                extras.update(variacoes)
+                break
+    return sorted(extras)
+
+
+def _tem_fronteira(pedaco, alvo):
+    """True se `pedaco` ocorre em `alvo` delimitado por caracteres não
+    alfanuméricos (fronteira de palavra), evitando falsos positivos de
+    substring, ex: 'sulfa' em 'sulfato ferroso'."""
+    if not pedaco:
+        return False
+    for pos in [m.start() for m in re.finditer(re.escape(pedaco), alvo)]:
+        ant = alvo[pos - 1] if pos > 0 else ""
+        pos2 = pos + len(pedaco)
+        prox = alvo[pos2] if pos2 < len(alvo) else ""
+        if not (_RE_NAO_PALAVRA.search(ant) or _RE_NAO_PALAVRA.search(prox)):
+            return True
+    return False
+
+
 def _texto_casa(texto_paciente, chaves):
     tp = _normalizar(texto_paciente or "")
     if not tp or not chaves:
@@ -42,10 +126,10 @@ def _texto_casa(texto_paciente, chaves):
     for ch in chaves:
         if not ch:
             continue
-        if ch in tp or tp in ch:
+        if _tem_fronteira(ch, tp) or _tem_fronteira(tp, ch):
             return True
         for v in _variantes_plural(ch):
-            if v and (v in tp or tp in v):
+            if v and (_tem_fronteira(v, tp) or _tem_fronteira(tp, v)):
                 return True
     return False
 
@@ -106,6 +190,22 @@ def resolver_principios_medicamento(medicamento_id=None, nome_medicamento=None):
                 (rows[0]["id"],),
             )
             pa_ids.update(r["principio_ativo_id"] for r in med)
+        if not pa_ids:
+            rows = db.fetch_all(
+                """SELECT ps.canonico_id
+                   FROM principio_sinonimos ps
+                   JOIN principios_ativos s ON s.id = ps.sinonimo_id
+                   WHERE LOWER(s.nome) = LOWER(%s) LIMIT 1""",
+                (nome_medicamento,),
+            )
+            if rows:
+                pa_ids.update(r["canonico_id"] for r in rows)
+            else:
+                rows = db.fetch_all(
+                    "SELECT id FROM principios_ativos WHERE LOWER(nome) = LOWER(%s) LIMIT 1",
+                    (nome_medicamento,),
+                )
+                pa_ids.update(r["id"] for r in rows)
 
     return pa_ids
 
@@ -201,6 +301,121 @@ def checar_interacoes(paciente_id, pa_ids_novos):
     return alertas
 
 
+def _chaves_classes(pa_ids):
+    """Retorna {pa_id: {chaves de classe}} - nomes das classes e de todos os
+    membros de cada classe dos PAs, normalizados (matching por classe)."""
+    if not pa_ids:
+        return {}
+    ids = list(pa_ids)
+    placeholders = ",".join(["%s"] * len(ids))
+    rows = db.fetch_all(
+        f"""SELECT cpa.principio_ativo_id AS pa_id,
+                   cl.nome AS classe,
+                   m.nome AS membro,
+                   s.nome AS sinonimo
+            FROM classe_principio_ativo cpa
+            JOIN classes_farmacologicas cl ON cl.id = cpa.classe_id
+            LEFT JOIN classe_principio_ativo cpa_m ON cpa_m.classe_id = cl.id
+            LEFT JOIN principios_ativos m ON m.id = cpa_m.principio_ativo_id
+            LEFT JOIN principio_sinonimos ps ON ps.canonico_id = m.id
+            LEFT JOIN principios_ativos s ON s.id = ps.sinonimo_id
+            WHERE cpa.principio_ativo_id IN ({placeholders})""",
+        ids,
+    )
+    mapa = {}
+    for r in rows:
+        chaves = mapa.setdefault(r["pa_id"], set())
+        if r["classe"]:
+            chaves.add(_normalizar(r["classe"]))
+        if r["membro"]:
+            chaves.add(_normalizar(r["membro"]))
+        if r["sinonimo"]:
+            chaves.add(_normalizar(r["sinonimo"]))
+    return mapa
+
+
+def _chaves_sinonimos(pa_ids):
+    """Retorna {pa_id: {chaves}} com os nomes dos sinônimos do princípio ativo
+    canônico (ex: canonico paracetamol -> sinonimo tylenol)."""
+    if not pa_ids:
+        return {}
+    ids = list(pa_ids)
+    placeholders = ",".join(["%s"] * len(ids))
+    rows = db.fetch_all(
+        f"""SELECT ps.canonico_id AS pa_id, s.nome AS sinonimo
+            FROM principio_sinonimos ps
+            JOIN principios_ativos s ON s.id = ps.sinonimo_id
+            WHERE ps.canonico_id IN ({placeholders})""",
+        ids,
+    )
+    mapa = {}
+    for r in rows:
+        if r["sinonimo"]:
+            mapa.setdefault(r["pa_id"], set()).add(_normalizar(r["sinonimo"]))
+    return mapa
+
+
+def _chaves_cruzadas(pa_ids):
+    """Retorna {pa_id: {chaves}} de reações cruzadas: para cada PA prescrito,
+    as chaves (nomes/membros/sinônimos) das classes que reagem de forma cruzada
+    com as classes do PA. Ex: cefalexina (Cefalosporinas) ganha as chaves de
+    Penicilinas, detectando paciente alérgico a penicilinas."""
+    if not pa_ids:
+        return {}
+    ids = list(pa_ids)
+    placeholders = ",".join(["%s"] * len(ids))
+    rows = db.fetch_all(
+        f"""SELECT cpa.principio_ativo_id AS pa_id,
+                   cl_o.nome AS classe,
+                   m.nome AS membro,
+                   s.nome AS sinonimo,
+                   rc.descricao,
+                   rc.severidade
+            FROM classe_principio_ativo cpa
+            JOIN reacoes_cruzadas rc ON rc.classe_alvo_id = cpa.classe_id
+            JOIN classes_farmacologicas cl_o ON cl_o.id = rc.classe_origem_id
+            LEFT JOIN classe_principio_ativo cpa_m ON cpa_m.classe_id = cl_o.id
+            LEFT JOIN principios_ativos m ON m.id = cpa_m.principio_ativo_id
+            LEFT JOIN principio_sinonimos ps ON ps.canonico_id = m.id
+            LEFT JOIN principios_ativos s ON s.id = ps.sinonimo_id
+            WHERE cpa.principio_ativo_id IN ({placeholders})""",
+        ids,
+    )
+    mapa = {}
+    info = {}
+    for r in rows:
+        chaves = mapa.setdefault(r["pa_id"], set())
+        if r["classe"]:
+            chaves.add(_normalizar(r["classe"]))
+        if r["membro"]:
+            chaves.add(_normalizar(r["membro"]))
+        if r["sinonimo"]:
+            chaves.add(_normalizar(r["sinonimo"]))
+        if r["descricao"]:
+            info.setdefault(r["pa_id"], set()).add((r["severidade"], r["descricao"]))
+    return mapa, info
+
+
+def _classes_por_pa(pa_ids):
+    """Retorna {pa_id: [nomes das classes do PA]} para exibição no alerta."""
+    if not pa_ids:
+        return {}
+    ids = list(pa_ids)
+    placeholders = ",".join(["%s"] * len(ids))
+    rows = db.fetch_all(
+        f"""SELECT DISTINCT cpa.principio_ativo_id AS pa_id, cl.nome AS classe
+            FROM classe_principio_ativo cpa
+            JOIN classes_farmacologicas cl ON cl.id = cpa.classe_id
+            WHERE cpa.principio_ativo_id IN ({placeholders})
+            ORDER BY cl.nome""",
+        ids,
+    )
+    mapa = {}
+    for r in rows:
+        mapa.setdefault(r["pa_id"], []).append(r["classe"])
+    return mapa
+
+
 def checar_contra_indicacoes(paciente_id, pa_ids_novos):
     pa_ids_novos = expandir_sinonimos(pa_ids_novos)
     if not pa_ids_novos:
@@ -219,7 +434,7 @@ def checar_contra_indicacoes(paciente_id, pa_ids_novos):
     ids = list(pa_ids_novos)
     placeholders = ",".join(["%s"] * len(ids))
     rows = db.fetch_all(
-        f"""SELECT p.nome AS pa, c.tipo, c.descricao, c.severidade
+        f"""SELECT p.nome AS pa, p.id AS pa_id, c.tipo, c.descricao, c.severidade
             FROM contra_indicacoes c
             JOIN principios_ativos p ON p.id = c.principio_ativo_id
             WHERE c.principio_ativo_id IN ({placeholders})
@@ -227,19 +442,43 @@ def checar_contra_indicacoes(paciente_id, pa_ids_novos):
         ids,
     )
 
+    chaves_classes = _chaves_classes(pa_ids_novos)
+    chaves_sinonimos = _chaves_sinonimos(pa_ids_novos)
+    chaves_cruzadas, info_cruzadas = _chaves_cruzadas(pa_ids_novos)
+    classes_por_pa = _classes_por_pa(pa_ids_novos)
+
     for r in rows:
         desc = r["descricao"].lower()
         tipo = r["tipo"]
 
         if tipo == "alergia":
             chaves = _chaves_descricao(desc, tipo)
+            chaves += sorted(chaves_classes.get(r["pa_id"], ()))
+            chaves += sorted(chaves_sinonimos.get(r["pa_id"], ()))
+            prefixo = r["pa"]
+            cls = classes_por_pa.get(r["pa_id"])
+            if cls:
+                prefixo = f"{r['pa']} ({', '.join(cls)})"
             if _texto_casa(texto_alergias, chaves):
                 alertas.append({
                     "tipo": "contraindicacao",
                     "severidade": r["severidade"],
-                    "mensagem": f"{r['pa']}: alergia registrada na anamnese ({desc}).",
+                    "mensagem": f"{prefixo}: alergia registrada na anamnese ({desc}).",
                     "pa": r["pa"],
                 })
+            elif chaves_cruzadas.get(r["pa_id"]):
+                if _texto_casa(texto_alergias, sorted(chaves_cruzadas[r["pa_id"]])):
+                    ordem = {"grave": 0, "moderada": 1, "leve": 2}
+                    sev, desc_cruz = min(
+                        info_cruzadas.get(r["pa_id"], [("moderada", "")]),
+                        key=lambda x: ordem.get(x[0], 9),
+                    )
+                    alertas.append({
+                        "tipo": "contraindicacao",
+                        "severidade": sev,
+                        "mensagem": f"{prefixo}: reação cruzada — alergia registrada na anamnese ({desc_cruz or desc}).",
+                        "pa": r["pa"],
+                    })
         elif tipo == "gestacao":
             if gestante:
                 alertas.append({
@@ -250,6 +489,7 @@ def checar_contra_indicacoes(paciente_id, pa_ids_novos):
                 })
         elif tipo == "condicao":
             chaves = _chaves_descricao(desc, tipo)
+            chaves += _variacoes_condicao(chaves)
             if _texto_casa(texto_condicoes, chaves):
                 alertas.append({
                     "tipo": "contraindicacao",

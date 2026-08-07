@@ -1,15 +1,10 @@
 import psycopg, openpyxl, json
 from collections import defaultdict
+from utils.db_url import get_database_url
 
 EXCEL = r'C:\Users\T-GAMER\Documents\Default Project\medical_db\T_anamnese.xlsx'
 
-conn = psycopg.connect(
-    host='dpg-d9hqikr7uimc73dt3e0g-a.oregon-postgres.render.com',
-    port=5432, user='sisgersa',
-    password='tOJ0rv1qWUQABYIWRMO0ew2c2AtfGZNU',
-    dbname='sisgersa',
-    connect_timeout=30
-)
+conn = psycopg.connect(get_database_url(), connect_timeout=30)
 cur = conn.cursor()
 
 print("=== Limpeza de duplicatas ===")

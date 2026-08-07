@@ -1,8 +1,6 @@
 from datetime import datetime, timedelta
 import os
 import uuid
-import secrets
-from collections import defaultdict
 import time
 import logging
 from contextlib import asynccontextmanager
@@ -20,6 +18,13 @@ from config import settings
 from database.connectivity import init_connectivity_checker, is_online, force_check
 from database.cache import download_to_cache, get_cache_status, start_background_cache, stop_background_cache, cache_query_one, cache_query_all
 from database.backup import dump_database, start_background_backup, stop_background_backup, get_last_backup, get_backup_count, cleanup_old_backups
+from database.estado import (
+    rate_limit_excedido,
+    registrar_tentativa,
+    incrementar_contador,
+    criar_pending_login,
+    consumir_pending_login,
+)
 from utils.auth import (
     usuario_por_email,
     usuarios_por_email,
@@ -31,6 +36,10 @@ from utils.auth import (
     hash_senha,
     criar_token,
     verificar_token,
+    criar_sessao,
+    sessao_ativa,
+    revogar_sessao,
+    revogar_sessoes_usuario,
     obter_estabelecimentos_usuario,
     criar_usuario,
     vincular_paciente,
@@ -56,7 +65,7 @@ async def lifespan(app):
 
     if settings.DB_ENGINE == "postgresql":
         try:
-            from init_db import criar_banco, criar_admin_padrao, seed_planos, seed_cupons
+            from init_db import criar_banco, criar_admin_padrao, seed_planos, seed_cupons, criar_tabela_sessoes
             criar_banco()
             criar_admin_padrao()
             seed_planos()
@@ -66,11 +75,22 @@ async def lifespan(app):
             logger.error(f"Startup: erro ao inicializar banco: {e}", exc_info=True)
     else:
         try:
-            from init_db import seed_planos, seed_cupons
+            from init_db import seed_planos, seed_cupons, criar_tabela_sessoes
             seed_planos()
             seed_cupons()
         except Exception as e:
             logger.error(f"Startup: erro ao semear dados: {e}")
+
+    try:
+        criar_tabela_sessoes()
+    except Exception as e:
+        logger.error(f"Startup: erro ao garantir tabela de sessoes: {e}")
+
+    try:
+        from init_db import criar_tabelas_estado
+        criar_tabelas_estado()
+    except Exception as e:
+        logger.error(f"Startup: erro ao garantir tabelas de estado: {e}")
 
     if settings.DB_ENGINE == "postgresql":
         try:
@@ -208,56 +228,23 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 
-login_attempts = defaultdict(list)
 RATE_LIMIT_WINDOW = 300
 RATE_LIMIT_MAX = 10
 
 def is_rate_limited(ip: str) -> bool:
-    now = time.time()
-    login_attempts[ip] = [t for t in login_attempts[ip] if now - t < RATE_LIMIT_WINDOW]
-    return len(login_attempts[ip]) >= RATE_LIMIT_MAX
+    return rate_limit_excedido(f"login:{ip}", RATE_LIMIT_WINDOW, RATE_LIMIT_MAX)
 
 def record_login_attempt(ip: str):
-    login_attempts[ip].append(time.time())
+    registrar_tentativa(f"login:{ip}", RATE_LIMIT_WINDOW)
 
-def _cleanup_rate_limits():
-    now = time.time()
-    empty_keys = [k for k, v in login_attempts.items() if not v or now - v[-1] > RATE_LIMIT_WINDOW * 2]
-    for k in empty_keys:
-        del login_attempts[k]
-    empty_keys_w = [k for k, v in write_requests.items() if not v or now - v[-1] > WRITE_RATE_WINDOW * 2]
-    for k in empty_keys_w:
-        del write_requests[k]
-    stale = [k for k in list(_pending_logins_ts.keys()) if now - _pending_logins_ts[k] > 600]
-    for k in stale:
-        _pending_logins.pop(k, None)
-        _pending_logins_ts.pop(k, None)
-
-
-write_requests = defaultdict(list)
 WRITE_RATE_WINDOW = 60
 WRITE_RATE_LIMIT_CREATE = 50
 WRITE_RATE_LIMIT_DELETE = 15
 
-def _is_write_limited(key: str, limit: int) -> bool:
-    now = time.time()
-    write_requests[key] = [t for t in write_requests[key] if now - t < WRITE_RATE_WINDOW]
-    return len(write_requests[key]) >= limit
-
-def record_write(key: str):
-    write_requests[key].append(time.time())
-
 def is_write_limited(request: Request, usuario: dict, action: str = "create") -> bool:
-    key = f"{usuario['id']}:{action}"
+    key = f"write:{usuario['id']}:{action}"
     limit = WRITE_RATE_LIMIT_DELETE if action == "delete" else WRITE_RATE_LIMIT_CREATE
-    if _is_write_limited(key, limit):
-        return True
-    record_write(key)
-    return False
-
-
-IDLE_TIMEOUT_SECONDS = 20 * 60
-_ultima_atividade: dict = {}
+    return incrementar_contador(key, WRITE_RATE_WINDOW) > limit
 
 
 def obter_usuario_atual(request: Request):
@@ -267,12 +254,8 @@ def obter_usuario_atual(request: Request):
     payload = verificar_token(token)
     if not payload:
         return None
-    agora = time.time()
-    ultima = _ultima_atividade.get(payload["sub"])
-    if ultima is not None and agora - ultima > IDLE_TIMEOUT_SECONDS:
-        _ultima_atividade.pop(payload["sub"], None)
+    if not sessao_ativa(payload.get("sub"), payload.get("jti")):
         return None
-    _ultima_atividade[payload["sub"]] = agora
     usuario = db.fetch_one("SELECT * FROM usuarios WHERE id = %s AND ativo = TRUE", (payload["sub"],))
     return usuario
 
@@ -433,11 +416,10 @@ def login_submit(request: Request, email: str = Form(...), senha: str = Form(...
     if is_https:
         cookie_kwargs["secure"] = True
 
-    import hashlib, time
+    import hashlib
     session_key = hashlib.sha256(f"{email}:{time.time()}:{client_ip}".encode()).hexdigest()[:32]
 
-    _pending_logins[session_key] = [u["id"] for u in usuarios_validos]
-    _pending_logins_ts[session_key] = time.time()
+    criar_pending_login(session_key, [u["id"] for u in usuarios_validos])
 
     usuarios_info = []
     for u in usuarios_validos:
@@ -492,18 +474,19 @@ def alterar_senha_submit(
         "UPDATE usuarios SET senha_hash = %s WHERE id = %s",
         (hash_senha(nova_senha), usuario["id"]),
     )
-    return templates.TemplateResponse(
-        "auth/alterar_senha.html",
-        {"request": request, "usuario": usuario, "erro": None, "sucesso": "Senha alterada com sucesso."},
-    )
-
-
-_pending_logins = {}
-_pending_logins_ts = {}
+    revogar_sessoes_usuario(usuario["id"])
+    response = RedirectResponse("/login?motivo=senha-alterada", status_code=302)
+    response.delete_cookie("token")
+    response.delete_cookie("estabelecimento_id")
+    response.delete_cookie("impersonate_token")
+    response.delete_cookie("impersonate_estab")
+    return response
 
 
 def _login_usuario(request: Request, usuario: dict):
-    token = criar_token(usuario["id"], usuario["tipo"], bool(usuario.get("is_super", False)))
+    jti = uuid.uuid4().hex
+    token = criar_token(usuario["id"], usuario["tipo"], bool(usuario.get("is_super", False)), jti)
+    criar_sessao(usuario["id"], jti)
 
     estabelecimentos = []
     if usuario["tipo"] in ("admin", "profissional", "recepcionista"):
@@ -533,8 +516,7 @@ def login_selecionar(request: Request, session_key: str = Form(...), usuario_id:
             {"request": request, "erro": "Muitas tentativas. Aguarde 5 minutos."},
         )
 
-    allowed_ids = _pending_logins.pop(session_key, [])
-    _pending_logins_ts.pop(session_key, None)
+    allowed_ids = consumir_pending_login(session_key)
     if not allowed_ids or usuario_id not in allowed_ids:
         return templates.TemplateResponse(
             "auth/login.html",
@@ -707,7 +689,9 @@ def registrar_submit(
             "plano_info": _plano_info(),
         })
 
-    token = criar_token(admin_id, "admin", False)
+    jti = uuid.uuid4().hex
+    token = criar_token(admin_id, "admin", False, jti)
+    criar_sessao(admin_id, jti)
 
     cookie_kwargs = dict(httponly=True, samesite="lax")
     is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
@@ -727,7 +711,7 @@ def logout(request: Request, motivo: str = None):
     token = request.cookies.get("token")
     payload = verificar_token(token) if token else None
     if payload:
-        _ultima_atividade.pop(payload["sub"], None)
+        revogar_sessao(payload.get("jti"))
     destino = "/login"
     if motivo:
         destino += f"?motivo={motivo}"
@@ -777,7 +761,9 @@ def impersonate_user(
         if pe:
             estab_id = str(pe["estabelecimento_id"])
 
-    token = criar_token(target["id"], target["tipo"], target.get("is_super", False))
+    jti = uuid.uuid4().hex
+    token = criar_token(target["id"], target["tipo"], target.get("is_super", False), jti)
+    criar_sessao(target["id"], jti)
 
     cookie_kwargs = dict(httponly=True, samesite="lax")
     is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
@@ -2192,6 +2178,20 @@ async def adicionar_medicamento(pac_id: int, request: Request, usuario=Depends(e
             medicamento_id = None
     if not medicamento_id and not nome_medicamento:
         return RedirectResponse(url=f"/pacientes/{pac_id}/anamnese?embedded=1&tab=medicamentos&erro=med_vazio", status_code=302)
+
+    alertas = checar_medicamento_paciente(pac_id, medicamento_id, nome_medicamento)
+    graves = [a for a in alertas if a.get("severidade") == "grave"]
+    if graves and form.get("confirmar_grave") != "1":
+        from urllib.parse import quote
+        resumo = "; ".join(a["mensagem"] for a in graves[:3])
+        if len(graves) > 3:
+            resumo += f" (+{len(graves) - 3} outras)"
+        msg = f"Medicamento não adicionado — alerta(s) grave(s): {resumo}"
+        return RedirectResponse(
+            url=f"/pacientes/{pac_id}/anamnese?embedded=1&tab=medicamentos&erro={quote(msg)}",
+            status_code=302,
+        )
+
     db.execute(
         """INSERT INTO paciente_medicamentos (paciente_id, medicamento_id, nome_medicamento, dose, frequencia, via, observacoes)
            VALUES (%s, %s, %s, %s, %s, %s, %s)""",
@@ -3078,6 +3078,7 @@ def ver_prontuario(prontuario_id: int, request: Request, usuario=Depends(exigir_
             "evolucoes": evolucoes,
             "consultas": consultas,
             "imagens": imagens,
+            "alertas_farmaco": alertas_paciente(prontuario["paciente_usuario_id"]),
             "profissionais": profissionais,
             "orcamentos_paciente": orcamentos_paciente,
             "tratamentos_realizados": tratamentos_realizados,

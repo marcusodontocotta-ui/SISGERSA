@@ -1,14 +1,10 @@
 import psycopg, openpyxl, time
 from collections import defaultdict
+from utils.db_url import get_database_url
 
-DB = dict(
-    host='dpg-d9hqikr7uimc73dt3e0g-a.oregon-postgres.render.com',
-    port=5432, user='sisgersa',
-    password='tOJ0rv1qWUQABYIWRMO0ew2c2AtfGZNU',
-    dbname='sisgersa',
-)
+DB = get_database_url()
 
-conn = psycopg.connect(**DB, connect_timeout=30, autocommit=True)
+conn = psycopg.connect(DB, connect_timeout=30, autocommit=True)
 cur = conn.cursor()
 
 # Mappings
@@ -147,7 +143,7 @@ for row in ws.iter_rows(min_row=2, values_only=True):
         else:
             er += batch_num
             print(f"  ERRO no batch, reconectando e tentando novamente...")
-            conn = psycopg.connect(**DB, connect_timeout=30, autocommit=True)
+            conn = psycopg.connect(DB, connect_timeout=30, autocommit=True)
             cur = conn.cursor()
             conn.autocommit = False
         batch_orc_sql, batch_orc_params, batch_item_sqls = [], [], []

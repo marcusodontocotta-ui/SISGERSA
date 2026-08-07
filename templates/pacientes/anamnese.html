@@ -184,9 +184,12 @@
         <ul class="mb-0 mt-1 ps-3 small">
             {% for a in alertas_farmaco %}
             <li>
-                {% if a.severidade == 'grave' %}<i class="bi bi-x-octagon text-danger"></i>
+                {% if a.tipo == 'interacao' %}<i class="bi bi-arrow-left-right text-primary"></i>
+                {% elif a.severidade == 'grave' %}<i class="bi bi-x-octagon text-danger"></i>
                 {% elif a.severidade == 'moderada' %}<i class="bi bi-exclamation-triangle text-warning"></i>
                 {% else %}<i class="bi bi-info-circle text-info"></i>{% endif %}
+                {% if a.tipo == 'interacao' %}<span class="badge bg-info text-dark ms-1">Interação</span>
+                {% elif a.tipo == 'contraindicacao' %}<span class="badge bg-warning text-dark ms-1">Contra-indicação</span>{% endif %}
                 <strong>{{ a.mensagem }}</strong>
                 {% if a.conduta %}<span class="text-muted"> — {{ a.conduta }}</span>{% endif %}
             </li>
@@ -316,6 +319,7 @@
                     </div>
                     <div><label class="form-label">Observações</label><input type="text" class="form-control form-control-sm" name="observacoes"></div>
                     <input type="hidden" name="embedded" value="{{ embedded }}">
+                    <input type="hidden" name="confirmar_grave" id="confirmarGrave" value="0">
                 </div>
                 <div class="modal-footer">
                     <div id="verificacaoAviso" class="text-start me-auto w-100" style="display:none;"></div>
@@ -324,6 +328,22 @@
                     <button type="submit" id="btnSalvarMed" class="btn btn-primary">Adicionar</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalConfirmarGrave" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title text-danger"><i class="bi bi-exclamation-octagon"></i> Alerta grave detectado</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <p class="small">Este medicamento apresenta alerta(s) grave(s) para este paciente. Cancele para escolher outra opção ou adicione assumindo a responsabilidade clínica.</p>
+                <div id="confirmGraveLista"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="btnConfirmarGrave" class="btn btn-danger"><i class="bi bi-shield-exclamation"></i> Adicionar mesmo assim</button>
+            </div>
         </div>
     </div>
 </div>
@@ -364,6 +384,7 @@ function selecionarMed(id, nome) {
     medNome.value = '';
     buscaMed.value = nome;
     sugestoes.style.display = 'none';
+    resetVerificacao();
 }
 
 function addRapido(nome) {
@@ -389,15 +410,18 @@ document.addEventListener('click', function(e) {
 let btnVerificarMed = document.getElementById('btnVerificarMed');
 let btnSalvarMed = document.getElementById('btnSalvarMed');
 let verificacaoAviso = document.getElementById('verificacaoAviso');
+let estadoVerificacao = null;
 
 function resetVerificacao() {
+    estadoVerificacao = null;
+    document.getElementById('confirmarGrave').value = '0';
     verificacaoAviso.style.display = 'none';
     verificacaoAviso.innerHTML = '';
     btnVerificarMed.disabled = false;
     btnVerificarMed.innerHTML = '<i class="bi bi-shield-check"></i> Verificar';
 }
 
-function verificarMedicamento() {
+function verificarMedicamento(aposOk) {
     if (!medId.value && !medNome.value) {
         verificacaoAviso.innerHTML = '<div class="alert alert-warning py-1 px-2 mb-1 small">Selecione um medicamento antes de verificar.</div>';
         verificacaoAviso.style.display = 'block';
@@ -415,26 +439,51 @@ function verificarMedicamento() {
         btnVerificarMed.disabled = false;
         btnVerificarMed.innerHTML = '<i class="bi bi-shield-check"></i> Verificar';
         var alertas = d.alertas || [];
+        estadoVerificacao = alertas;
+        document.getElementById('confirmarGrave').value = '0';
         if (alertas.length === 0) {
             verificacaoAviso.innerHTML = '<div class="alert alert-success py-1 px-2 mb-1 small"><i class="bi bi-check-circle"></i> Nenhuma interação ou contra-indicação detectada.</div>';
             verificacaoAviso.style.display = 'block';
+            if (aposOk) aposOk();
             return;
         }
         var h = '';
         alertas.forEach(function(a) {
             var cor = a.severidade === 'grave' ? 'danger' : (a.severidade === 'moderada' ? 'warning' : 'info');
-            h += '<div class="alert alert-' + cor + ' py-1 px-2 mb-1 small"><i class="bi bi-exclamation-triangle"></i> <strong>' + a.mensagem + '</strong>' +
+            var icone = a.tipo === 'interacao' ? 'bi-arrow-left-right' : 'bi-exclamation-triangle';
+            var rotulo = a.tipo === 'interacao'
+                ? '<span class="badge bg-info text-dark ms-1">Interação</span>'
+                : '<span class="badge bg-warning text-dark ms-1">Contra-indicação</span>';
+            h += '<div class="alert alert-' + cor + ' py-1 px-2 mb-1 small"><i class="bi ' + icone + '"></i> ' + rotulo +
+                 ' <strong>' + a.mensagem + '</strong>' +
                  (a.conduta ? '<br><span class="text-muted">Conduta: ' + a.conduta + '</span>' : '') + '</div>';
         });
         verificacaoAviso.innerHTML = h;
         verificacaoAviso.style.display = 'block';
+        if (aposOk) aposOk();
     })
     .catch(function() {
         btnVerificarMed.disabled = false;
         btnVerificarMed.innerHTML = '<i class="bi bi-shield-check"></i> Verificar';
+        estadoVerificacao = null;
         verificacaoAviso.innerHTML = '<div class="alert alert-danger py-1 px-2 mb-1 small">Erro ao verificar medicamento.</div>';
         verificacaoAviso.style.display = 'block';
     });
+}
+
+function temGrave() {
+    return (estadoVerificacao || []).some(function(a) { return a.severidade === 'grave'; });
+}
+
+function mostrarConfirmacaoGrave() {
+    var graves = (estadoVerificacao || []).filter(function(a) { return a.severidade === 'grave'; });
+    var h = '';
+    graves.forEach(function(a) {
+        h += '<div class="alert alert-danger py-1 px-2 mb-1 small"><strong>' + a.mensagem + '</strong>' +
+             (a.conduta ? '<br><span class="text-muted">Conduta: ' + a.conduta + '</span>' : '') + '</div>';
+    });
+    document.getElementById('confirmGraveLista').innerHTML = h;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalConfirmarGrave')).show();
 }
 
 if (btnVerificarMed) {
@@ -445,6 +494,30 @@ if (btnVerificarMed) {
             e.preventDefault();
             return;
         }
+        if (!medId.value && !medNome.value) return;
+        var f = document.querySelector('#modalNovoMedicamento form');
+        if (estadoVerificacao === null) {
+            e.preventDefault();
+            verificarMedicamento(function() {
+                if (temGrave()) {
+                    mostrarConfirmacaoGrave();
+                } else {
+                    f.submit();
+                }
+            });
+            return;
+        }
+        if (temGrave() && document.getElementById('confirmarGrave').value !== '1') {
+            e.preventDefault();
+            mostrarConfirmacaoGrave();
+            return;
+        }
+    });
+    document.getElementById('btnConfirmarGrave').addEventListener('click', function() {
+        document.getElementById('confirmarGrave').value = '1';
+        var m = bootstrap.Modal.getInstance(document.getElementById('modalConfirmarGrave'));
+        if (m) m.hide();
+        document.querySelector('#modalNovoMedicamento form').submit();
     });
 }
 

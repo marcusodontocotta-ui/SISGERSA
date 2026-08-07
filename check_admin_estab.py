@@ -1,6 +1,7 @@
 import psycopg
+from utils.db_url import get_database_url
 
-PG_URL = 'postgresql://sisgersa:tOJ0rv1qWUQABYIWRMO0ew2c2AtfGZNU@dpg-d9hqikr7uimc73dt3e0g-a.oregon-postgres.render.com/sisgersa'
+PG_URL = get_database_url()
 
 conn = psycopg.connect(PG_URL)
 conn.autocommit = False

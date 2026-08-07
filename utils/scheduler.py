@@ -77,13 +77,15 @@ def _buscar_consultas_para_lembrete():
 def _verificar_expiracao_planos():
     from database.connection import db
 
+    hoje = datetime.now().date()
     expirados = db.fetch_all(
         """SELECT e.id, e.nome, e.plano_id, e.plano_expira_em, p.nome AS plano_nome
            FROM estabelecimentos e
            JOIN planos p ON p.id = e.plano_id
            WHERE e.plano_expira_em IS NOT NULL
-             AND e.plano_expira_em < CURDATE()
-             AND e.plano_id != (SELECT id FROM planos WHERE slug = 'gratis')"""
+             AND e.plano_expira_em < %s
+             AND e.plano_id != (SELECT id FROM planos WHERE slug = 'gratis')""",
+        (hoje,),
     )
     for e in expirados or []:
         db.execute(
@@ -93,6 +95,20 @@ def _verificar_expiracao_planos():
         logger.info(
             f"Plano expirado: estab #{e['id']} '{e['nome']}' ({e['plano_nome']}) rebaixado para Gratis"
         )
+
+
+def _limpar_estado_antigo():
+    from database.estado import limpar_estado_antigo as _limpar_estado_db
+    from utils.auth import limpar_sessoes_antigas
+
+    try:
+        _limpar_estado_db()
+    except Exception as e:
+        logger.error(f"Scheduler: erro ao limpar estado: {e}")
+    try:
+        limpar_sessoes_antigas()
+    except Exception as e:
+        logger.error(f"Scheduler: erro ao limpar sessoes antigas: {e}")
 
 
 def _loop_scheduler():
@@ -106,6 +122,10 @@ def _loop_scheduler():
             _verificar_expiracao_planos()
         except Exception as e:
             logger.error(f"Erro ao verificar expiracao de planos: {e}")
+        try:
+            _limpar_estado_antigo()
+        except Exception as e:
+            logger.error(f"Erro ao limpar estado antigo: {e}")
         time.sleep(1800)
 
 

@@ -12,6 +12,7 @@ class Settings:
     DB_USER: str = os.getenv("DB_USER", "root")
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "")
     DB_NAME: str = os.getenv("DB_NAME", "medical_db")
+    DB_MAX_CONNECTIONS: int = int(os.getenv("DB_MAX_CONNECTIONS", 5))
 
     SECRET_KEY: str = os.getenv("SECRET_KEY", "mude-esta-chave-em-producao")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
@@ -28,6 +29,15 @@ class Settings:
     SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "onboarding@resend.dev")
     EMAIL_HABILITADO: bool = os.getenv("EMAIL_HABILITADO", "false").lower() == "true"
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+
+    _SECRET_KEYS_FRACAS = {
+        "mude-esta-chave-em-producao",
+        "changeme",
+        "change-me",
+        "secret",
+        "secret-key",
+        "mudar",
+    }
 
     def __init__(self):
         database_url = os.getenv("DATABASE_URL", "")
@@ -51,6 +61,21 @@ class Settings:
                 self.DB_NAME = parsed.path.lstrip("/")
         else:
             self.DATABASE_URL = None
+        self._validar_seguranca()
+
+    def _validar_seguranca(self):
+        if self.ENVIRONMENT != "production":
+            return
+        if (
+            not self.SECRET_KEY
+            or len(self.SECRET_KEY) < 32
+            or self.SECRET_KEY in self._SECRET_KEYS_FRACAS
+        ):
+            raise RuntimeError(
+                "SECRET_KEY insegura em producao: defina uma chave aleatoria de pelo menos "
+                "32 caracteres na variavel de ambiente SECRET_KEY "
+                "(ex.: python -c \"import secrets; print(secrets.token_hex(32))\")."
+            )
 
     @property
     def database_url(self) -> str:

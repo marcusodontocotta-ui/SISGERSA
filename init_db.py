@@ -124,6 +124,122 @@ def criar_banco():
     logger.info(f"criar_banco: {criadas} OK, {erros} erros")
 
 
+def criar_tabela_sessoes():
+    engine = settings.DB_ENGINE
+    if engine == "postgresql":
+        stmts = [
+            """CREATE TABLE IF NOT EXISTS sessoes (
+                id SERIAL PRIMARY KEY,
+                usuario_id INT NOT NULL,
+                jti VARCHAR(64) NOT NULL UNIQUE,
+                criada_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                revogada_em TIMESTAMP NULL
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_sessoes_usuario ON sessoes (usuario_id)",
+        ]
+    else:
+        stmts = [
+            """CREATE TABLE IF NOT EXISTS sessoes (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                usuario_id INT NOT NULL,
+                jti VARCHAR(64) NOT NULL,
+                criada_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                revogada_em TIMESTAMP NULL,
+                UNIQUE KEY uk_sessoes_jti (jti),
+                KEY idx_sessoes_usuario (usuario_id)
+            )""",
+        ]
+    try:
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        for stmt in stmts:
+            try:
+                cursor.execute(stmt)
+            except Exception as e:
+                logger.warning(f"criar_tabela_sessoes: erro: {e}")
+        cursor.close()
+        logger.info("criar_tabela_sessoes: OK")
+    except Exception as e:
+        logger.warning(f"criar_tabela_sessoes: falha geral: {e}")
+
+
+def _coluna_existe(tabela: str, coluna: str) -> bool:
+    try:
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        if settings.DB_ENGINE == "postgresql":
+            cursor.execute(
+                "SELECT 1 FROM information_schema.columns WHERE table_name = %s AND column_name = %s",
+                (tabela, coluna),
+            )
+        else:
+            cursor.execute(
+                """SELECT 1 FROM information_schema.columns
+                   WHERE table_schema = DATABASE() AND table_name = %s AND column_name = %s""",
+                (tabela, coluna),
+            )
+        row = cursor.fetchone()
+        cursor.close()
+        return bool(row)
+    except Exception:
+        return False
+
+
+def criar_tabelas_estado():
+    """Cria tabelas de estado compartilhado entre workers (rate_limits,
+    pending_logins) e garante a coluna de atividade nas sessoes."""
+    engine = settings.DB_ENGINE
+    if engine == "postgresql":
+        stmts = [
+            """CREATE TABLE IF NOT EXISTS rate_limits (
+                chave VARCHAR(120) PRIMARY KEY,
+                contagem INT NOT NULL DEFAULT 1,
+                janela_inicio TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS pending_logins (
+                session_key VARCHAR(64) PRIMARY KEY,
+                user_ids TEXT NOT NULL,
+                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+        ]
+    else:
+        stmts = [
+            """CREATE TABLE IF NOT EXISTS rate_limits (
+                chave VARCHAR(120) PRIMARY KEY,
+                contagem INT NOT NULL DEFAULT 1,
+                janela_inicio DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS pending_logins (
+                session_key VARCHAR(64) PRIMARY KEY,
+                user_ids TEXT NOT NULL,
+                criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+        ]
+    try:
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        for stmt in stmts:
+            try:
+                cursor.execute(stmt)
+            except Exception as e:
+                logger.warning(f"criar_tabelas_estado: erro: {e}")
+        cursor.close()
+        logger.info("criar_tabelas_estado: OK")
+    except Exception as e:
+        logger.warning(f"criar_tabelas_estado: falha geral: {e}")
+
+    if not _coluna_existe("sessoes", "ultima_atividade"):
+        tipo = "TIMESTAMP" if engine == "postgresql" else "DATETIME"
+        try:
+            conn = db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(f"ALTER TABLE sessoes ADD COLUMN ultima_atividade {tipo} NULL")
+            cursor.close()
+            logger.info("criar_tabelas_estado: sessoes.ultima_atividade adicionada")
+        except Exception as e:
+            logger.warning(f"criar_tabelas_estado: ALTER sessoes: {e}")
+
+
 def criar_schema_extra():
     if settings.DB_ENGINE != "postgresql":
         return

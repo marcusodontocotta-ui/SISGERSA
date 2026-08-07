@@ -103,6 +103,32 @@
 </div>
 {% endif %}
 
+{% if alertas_farmaco %}
+{% set n_graves = alertas_farmaco | selectattr('severidade', 'equalto', 'grave') | list | length %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center {% if n_graves %}bg-danger text-white{% else %}bg-warning text-dark{% endif %}">
+        <h5 class="mb-0"><i class="bi bi-shield-exclamation"></i> Alertas farmacológicos ({{ alertas_farmaco|length }})</h5>
+        {% if n_graves %}<span class="badge bg-light text-danger">{{ n_graves }} grave(s)</span>{% endif %}
+    </div>
+    <div class="card-body py-2">
+        <ul class="mb-0 ps-3 small">
+            {% for a in alertas_farmaco %}
+            <li class="mb-1">
+                {% if a.tipo == 'interacao' %}<i class="bi bi-arrow-left-right text-primary"></i>
+                {% elif a.severidade == 'grave' %}<i class="bi bi-x-octagon text-danger"></i>
+                {% elif a.severidade == 'moderada' %}<i class="bi bi-exclamation-triangle text-warning"></i>
+                {% else %}<i class="bi bi-info-circle text-info"></i>{% endif %}
+                {% if a.tipo == 'interacao' %}<span class="badge bg-info text-dark ms-1">Interação</span>
+                {% elif a.tipo == 'contraindicacao' %}<span class="badge bg-warning text-dark ms-1">Contra-indicação</span>{% endif %}
+                <strong>{{ a.mensagem }}</strong>
+                {% if a.conduta %}<span class="text-muted"> — {{ a.conduta }}</span>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
 <div class="row">
     <div class="col-md-6">
         <div class="card mb-4">
